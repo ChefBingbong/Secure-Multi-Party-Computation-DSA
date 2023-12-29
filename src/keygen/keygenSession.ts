@@ -43,6 +43,8 @@ export class KeygenSession {
                   this.hasher.update(partyId);
             }
 
+            // set up for vss polynomial share generation. these are used for assigning shares
+            // or random polynomial between all parties
             const vssConstant = sampleScalar();
             const vssSecret = Polynomial.new(this.threshold, vssConstant);
 

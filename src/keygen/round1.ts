@@ -7,7 +7,7 @@ import {
 import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
 import { Exponent } from "../polynomial/exponent";
 import { Polynomial } from "../polynomial/polynomial";
-import { sampleScalarPointPair } from "../sample";
+import { generateElGamalKeyPair } from "../sample";
 import { zkSchCreateRandomness } from "../zk/zksch";
 import { KeygenSession } from "./keygenSession";
 import { KeygenBroadcastForRound2 } from "./round2";
@@ -24,14 +24,17 @@ export class KeygenRound1 {
       }
 
       public async process(): Promise<KeygenRound1Output> {
+            // generate large random primes and use these to create a paillier keypair
             const { p, q } = await randomPaillierPrimes();
             const paillierSecret = new PaillierSecretKey(p, q);
 
+            // a pedersen commit is used to add extra security with the
+            // paillier key pair
             const selfPaillierPublic = paillierSecret.publicKey;
             const { pedersen: selfPedersenPublic, lambda: pedersenSecret } =
                   paillierSecret.generatePedersen();
 
-            const [elGamalSecret, elGamalPublic] = sampleScalarPointPair();
+            const [elGamalSecret, elGamalPublic] = generateElGamalKeyPair();
 
             const selfShare = this.session.inputForRound1.vssSecret.evaluate(
                   partyIdToScalar(this.session.selfId)
@@ -41,6 +44,8 @@ export class KeygenRound1 {
                   this.session.inputForRound1.vssSecret
             );
 
+            // here we create randomness for a schnorr ZKP which
+            // is used later for round proofs
             const schnorrRand = zkSchCreateRandomness();
 
             const selfRID = randBetween(2n ** 256n);
@@ -57,6 +62,7 @@ export class KeygenRound1 {
                         selfPedersenPublic,
                   ]);
 
+            //broadcast results to other parties
             const broadcasts: Array<KeygenBroadcastForRound2> = [
                   KeygenBroadcastForRound2.from({
                         from: this.session.selfId,

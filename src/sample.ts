@@ -90,7 +90,7 @@ export const sampleNeg = (bits: number): bigint => {
       return result;
 };
 
-export const sampleScalarPointPair = (): [bigint, AffinePoint] => {
+export const generateElGamalKeyPair = (): [bigint, AffinePoint] => {
       const scalar = randBetween(Fn.N - 1n);
       const point = secp256k1.ProjectivePoint.BASE.multiply(scalar);
       return [scalar, point.toAffine()];
