@@ -11,6 +11,8 @@ import errorHandlingMiddleware from "./middleware/errorHandler";
 import { AppLogger } from "./middleware/logger";
 import P2pserver from "../p2p/server";
 import { Validators } from "../validators/validators";
+import { json } from "stream/consumers";
+import Flatted from "flatted";
 
 export class App extends AppLogger {
       public server: Server;
@@ -52,7 +54,9 @@ export class App extends AppLogger {
             this.app.get("/validators", (req, res) => {
                   try {
                         const partyIds = Validators.getPartyIDs().length; // Replace with the actual method to get partyIds
-                        res.status(200).json({ partyIds });
+                        res.status(200).json({
+                              partyIds,
+                        });
                   } catch (error) {
                         res.status(500).json({ error: "Internal Server Error" });
                   }

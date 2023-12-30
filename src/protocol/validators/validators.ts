@@ -1,4 +1,5 @@
 import Validator from "./validator";
+import _ from "lodash";
 
 export class Validators {
       private static partyIDs: Validator[] = [];
@@ -31,8 +32,12 @@ export class Validators {
             return true;
       }
 
+      private static update(newValidators: Validator[]) {
+            this.partyIDs = [...newValidators];
+      }
+
       // Returns true if the Validators is sorted and does not contain any duplicates.
-      public isValid(): boolean {
+      private static isValid(): boolean {
             const n = Validators.partyIDs.length;
             for (let i = 1; i < n; i++) {
                   if (Validators.partyIDs[i - 1] >= Validators.partyIDs[i]) {
@@ -40,6 +45,20 @@ export class Validators {
                   }
             }
             return true;
+      }
+
+      static updateValidators(newValidators: Validator) {
+            const ids = this.getPartyIDs().map((v) => v.ID);
+
+            if (ids.includes(newValidators.ID)) {
+                  console.log(
+                        `Recieved validator group is not longer than the current group`
+                  );
+                  return;
+            }
+
+            console.log("Replacing the current chain with new chain");
+            this.update([newValidators, ...this.getPartyIDs()]);
       }
 
       // Finds id in partyIDs and returns a copy of the slice if it was found.
