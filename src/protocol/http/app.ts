@@ -9,6 +9,8 @@ import { Logger } from "winston";
 import config from "../config/config";
 import errorHandlingMiddleware from "./middleware/errorHandler";
 import { AppLogger } from "./middleware/logger";
+import P2pserver from "../p2p/server";
+import { Validators } from "../validators/validators";
 
 export class App extends AppLogger {
       public server: Server;
@@ -45,27 +47,28 @@ export class App extends AppLogger {
             this.app.get("/", (req, res) => {
                   res.status(200).send({ result: "ok" });
             });
+
+            // New route to get partyIds
+            this.app.get("/validators", (req, res) => {
+                  try {
+                        const partyIds = Validators.getPartyIDs().length; // Replace with the actual method to get partyIds
+                        res.status(200).json({ partyIds });
+                  } catch (error) {
+                        res.status(500).json({ error: "Internal Server Error" });
+                  }
+            });
       }
 
       private configureErrorHandling(): void {
             this.app.use(errorHandlingMiddleware);
       }
 
-      public start(port: number): void {
-            this.server = this.app.listen(port, async () => {
-                  App.log.info(`Server listening on port ${port}.`);
+      public start(): void {
+            this.server = this.app.listen(Number(config.port), async () => {
+                  App.log.info(`Server listening on port ${Number(config.port)}.`);
+                  // P2pserver.listen();
             });
       }
 }
 
-const app = new App();
-app.start(Number(config.port));
-
-process.on("SIGTERM", () => {
-      App.log.info("SIGTERM received");
-      if (app.server) {
-            app.server.close();
-      }
-});
-
-export default app;
+export default App;

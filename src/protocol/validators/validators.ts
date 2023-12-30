@@ -10,8 +10,13 @@ export class Validators {
 
       // Returns a sorted slice from partyIDs.
       static create(partyID: Validator): Validators {
-            if (this.partyIDs.includes(partyID)) return;
+            // if (this.partyIDs.includes(partyID)) return;
+            // console.log(partyID);
             return new Validators(partyID);
+      }
+
+      static getPartyIDs(): Validator[] {
+            return Validators.partyIDs;
       }
 
       // Returns true if partyIDs contains id.

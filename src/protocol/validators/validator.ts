@@ -5,9 +5,9 @@ class Validator {
       private publicKey: string;
       public ID: string;
 
-      constructor(secret: string) {
+      constructor() {
             this.ID = ChainUtil.id();
-            this.keyPair = ChainUtil.genKeyPair(secret);
+            this.keyPair = ChainUtil.genKeyPair(this.ID);
             this.publicKey = this.keyPair.getPublic("hex");
       }
 

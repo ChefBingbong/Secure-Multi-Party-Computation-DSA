@@ -1,5 +1,5 @@
 import { eddsa as EDDSA } from "elliptic";
-import * as uuidV1 from "uuid/v1";
+import { v4 } from "uuid";
 import { SHA256 } from "crypto-js";
 
 class ChainUtil {
@@ -9,7 +9,7 @@ class ChainUtil {
       }
 
       static id(): string {
-            return uuidV1();
+            return v4();
       }
 
       static hash(data: any): string {
