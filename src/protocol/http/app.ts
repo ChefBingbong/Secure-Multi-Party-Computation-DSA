@@ -1,26 +1,27 @@
-import cors from "cors";
 import compression from "compression";
+import cors from "cors";
+import express, { Express } from "express";
+import expressRateLimit from "express-rate-limit";
 import helmet from "helmet";
 import hpp from "hpp";
-import express, { Express, NextFunction, Request, Response } from "express";
-import expressRateLimit from "express-rate-limit";
-import { AppLogger } from "./utils/logger";
-import { Logger } from "winston";
 import { Server } from "http";
-import errorHandlingMiddleware from "./midleware/errorHandlingMiddleware";
+import { Logger } from "winston";
+import config from "../config/config";
+import errorHandlingMiddleware from "./middleware/errorHandler";
+import { AppLogger } from "./middleware/logger";
 
 export class App extends AppLogger {
       public server: Server;
       public app: Express;
       public static log: Logger;
 
-      constructor(router: express.Router) {
+      constructor() {
             super();
             this.app = express();
-            this.configureMiddlewares();
-            this.configureRoutes(router);
-            // this.configureErrorHandling();
             App.log = this.getLogger("on-ramp-api-logger");
+
+            this.configureMiddlewares();
+            this.configureRoutes();
             this.configureErrorHandling();
       }
 
@@ -40,8 +41,7 @@ export class App extends AppLogger {
             this.app.use(rateLimit);
       }
 
-      private configureRoutes(router: express.Router): void {
-            this.app.use("/", router);
+      private configureRoutes(): void {
             this.app.get("/", (req, res) => {
                   res.status(200).send({ result: "ok" });
             });
@@ -58,7 +58,7 @@ export class App extends AppLogger {
       }
 }
 
-const app = new App(router);
+const app = new App();
 app.start(Number(config.port));
 
 process.on("SIGTERM", () => {
