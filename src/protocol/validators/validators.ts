@@ -1,19 +1,22 @@
-class IDSlice {
-      private partyIDs: string[];
+import Validator from "./validator";
 
-      private constructor(partyIDs: string[]) {
-            this.partyIDs = partyIDs;
-            this.partyIDs.sort();
+export class Validators {
+      private static partyIDs: Validator[] = [];
+
+      private constructor(partyID: Validator) {
+            Validators.partyIDs.push(partyID);
+            Validators.partyIDs.sort();
       }
 
       // Returns a sorted slice from partyIDs.
-      static create(partyIDs: string[]): IDSlice {
-            return new IDSlice(partyIDs);
+      static create(partyID: Validator): Validators {
+            if (this.partyIDs.includes(partyID)) return;
+            return new Validators(partyID);
       }
 
       // Returns true if partyIDs contains id.
-      // Assumes that the IDSlice is valid.
-      public contains(...ids: string[]): boolean {
+      // Assumes that the Validators is valid.
+      public contains(...ids: Validator[]): boolean {
             for (const id of ids) {
                   const index = this.search(id);
                   if (index < 0) {
@@ -23,11 +26,11 @@ class IDSlice {
             return true;
       }
 
-      // Returns true if the IDSlice is sorted and does not contain any duplicates.
+      // Returns true if the Validators is sorted and does not contain any duplicates.
       public isValid(): boolean {
-            const n = this.partyIDs.length;
+            const n = Validators.partyIDs.length;
             for (let i = 1; i < n; i++) {
-                  if (this.partyIDs[i - 1] >= this.partyIDs[i]) {
+                  if (Validators.partyIDs[i - 1] >= Validators.partyIDs[i]) {
                         return false;
                   }
             }
@@ -35,82 +38,27 @@ class IDSlice {
       }
 
       // Finds id in partyIDs and returns a copy of the slice if it was found.
-      public remove(id: string): IDSlice {
-            const newPartyIDs = this.partyIDs.filter((partyID) => partyID !== id);
-            return new IDSlice(newPartyIDs);
+      public remove(id: string): Validator[] {
+            return Validators.partyIDs.filter((partyID) => partyID.ID !== id);
       }
 
-      // Returns the length of the IDSlice.
+      // Returns the length of the Validators.
       public get length(): number {
-            return this.partyIDs.length;
+            return Validators.partyIDs.length;
       }
 
       // search returns the index of x in the sorted array.
-      private search(x: string): number {
-            return this.partyIDs.indexOf(x);
-      }
-
-      // WriteTo implements io.WriterTo and should be used within the hash.Hash function.
-      // It writes the full uncompressed point to w, ie 64 bytes.
-      writeTo(w: WriteStream): Promise<number> {
-            return new Promise<number>((resolve, reject) => {
-                  if (!this.partyIDs) {
-                        reject(new Error("Unexpected EOF"));
-                  }
-
-                  const lengthBuffer = Buffer.alloc(8);
-                  lengthBuffer.writeBigUInt64BE(BigInt(this.partyIDs.length));
-
-                  w.write(lengthBuffer, (err) => {
-                        if (err) {
-                              reject(err);
-                        } else {
-                              let nAll = 8;
-
-                              const writeNext = (index: number): void => {
-                                    if (index < this.partyIDs.length) {
-                                          const idBuffer = Buffer.from(
-                                                this.partyIDs[index]
-                                          );
-
-                                          w.write(idBuffer, (err) => {
-                                                if (err) {
-                                                      reject(err);
-                                                } else {
-                                                      nAll += idBuffer.length;
-                                                      writeNext(index + 1);
-                                                }
-                                          });
-                                    } else {
-                                          resolve(nAll);
-                                    }
-                              };
-
-                              writeNext(0);
-                        }
-                  });
-            });
+      private search(x: Validator): number {
+            return Validators.partyIDs.indexOf(x);
       }
 
       // Domain implements hash.WriterToWithDomain, and separates this type within hash.Hash.
       static domain(): string {
-            return "IDSlice";
+            return "Validators";
       }
 
       // String implements fmt.Stringer.
       public toString(): string {
-            return this.partyIDs.join(", ");
+            return Validators.partyIDs.join(", ");
       }
 }
-
-// Assuming WriteStream is an interface or class representing an asynchronous writable stream.
-interface WriteStream {
-      write(buffer: Buffer, callback: (error?: Error) => void): void;
-}
-
-// Example usage:
-const partyIDs = ["id3", "id1", "id2"];
-const idSlice = IDSlice.create(partyIDs);
-console.log(idSlice.contains("id1", "id2")); // true
-console.log(idSlice.isValid()); // true
-console.log(idSlice.toString()); // id1, id2, id3

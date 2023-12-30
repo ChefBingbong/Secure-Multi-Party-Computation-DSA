@@ -34,8 +34,16 @@
     "@swc/core": "^1.3.101",
     "@swc/jest": "^0.2.29",
     "bigint-crypto-utils": "3.3.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
     "elliptic": "^6.5.4",
     "ethers": "^6.9.1",
-    "tsx": "^4.7.0"
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "hpp": "^0.2.3",
+    "tsx": "^4.7.0",
+    "winston": "^3.11.0"
   }
 }
