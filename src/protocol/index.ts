@@ -3,6 +3,7 @@ import config from "./config/config";
 import App from "./http/app";
 import P2pServer from "./p2p/server";
 // const emitter = new EventEmitter();
+export let node: P2pServer;
 function generatePortRangeRecursive(endPort, startPort = 6001) {
       if (endPort < startPort) {
             // throw new Error("End port must be greater than or equal to 3001");
@@ -47,7 +48,7 @@ startProtocol().then(() => {
       const p2pPort = Number(config.p2pPort);
       const ports = generatePortRangeRecursive(p2pPort);
       console.log(p2pPort);
-      const node = new P2pServer();
+      node = new P2pServer();
 
       // p2p.setOnNodeJoinCallback((socket) => {
       //       console.log(`New node joined with ID: ${1}`);

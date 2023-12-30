@@ -58,12 +58,17 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         this.log.info(`${name}: ${text}`);
                   });
 
+                  this.on("direct", ({ message: { name, text } }) => {
+                        this.log.info(`${name}: ${text}`);
+                  });
+
                   ports.forEach((pot) => {
                         this.connect("127.0.0.1", Number(pot), () => {
                               this.log.info(
                                     `Connection to ${pot} established.`
                               );
                         });
+                        this.broadcast({ name: "name", text: "text" });
                   });
             });
             return (cb) => this.server.close(cb);
@@ -91,7 +96,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
       // 2 methods to send data either to all nodes in the network
       // or to a specific node (direct message)
       public broadcast = (
-            message: string,
+            message: any,
             id: string = v4(),
             origin: string = this.NODE_ID,
             ttl: number = 255
@@ -101,7 +106,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
       public sendDirect = (
             destination: string,
-            message: string,
+            message: any,
             id: string = v4(),
             origin: string = this.NODE_ID,
             ttl: number = 255
@@ -119,7 +124,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
       private initState() {
             // Once connection is established, send the handshake message
             this.emitter.on("_connect", (connectionId) => {
-                  this._send(connectionId, {
+                  this._send(connectionId.connectionId, {
                         type: "handshake",
                         data: { nodeId: this.NODE_ID },
                   });
@@ -127,16 +132,15 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
             this.emitter.on("_message", ({ connectionId, message }) => {
                   const { type, data } = message;
-
                   if (type === "handshake") {
                         const { nodeId } = data;
                         this.neighbors.set(nodeId, connectionId);
-                        this.emitter.emitConnect(nodeId);
+                        this.emitter.emitConnect(nodeId, true);
                   }
 
                   if (type === "message") {
                         const nodeId = this.findNodeId(connectionId);
-                        this.emitter.emitMessage(nodeId, data);
+                        this.emitter.emitMessage(nodeId, data, true);
                   }
             });
 
@@ -145,13 +149,14 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   if (!nodeId) return;
 
                   this.neighbors.delete(nodeId);
-                  this.emitter.emitDisconnect(nodeId);
+                  this.emitter.emitDisconnect(nodeId, true);
             });
 
             this.emitter.on("message", ({ nodeId, data: packet }) => {
                   // First of all we decide, whether this message at
                   // any point has been send by us. We do it in one
                   // place to replace with a strategy later TODO
+                  // console.log(packet);
                   if (this.seenMessages.has(packet.id) || packet.ttl < 1)
                         return;
                   else this.seenMessages.add(packet.id);
@@ -193,15 +198,15 @@ class P2pServer extends AppLogger implements P2PNetwork {
       private handleNewSocket = (socket: net.Socket) => {
             const connectionId = v4();
             this.connections.set(connectionId, socket);
-            this.emitter.emitConnect(connectionId, true);
+            this.emitter.emitConnect(connectionId, false);
 
             socket.on("close", () => {
                   this.connections.delete(connectionId);
-                  this.emitter.emitDisconnect(connectionId, true);
+                  this.emitter.emitDisconnect(connectionId, false);
             });
 
             socket.pipe(T()).on("data", (message) => {
-                  this.emitter.emitMessage(connectionId, message, true);
+                  this.emitter.emitMessage(connectionId, message, false);
             });
       };
 

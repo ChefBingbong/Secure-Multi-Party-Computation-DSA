@@ -13,6 +13,7 @@ import P2pserver from "../p2p/server";
 import { Validators } from "../validators/validators";
 import { json } from "stream/consumers";
 import Flatted from "flatted";
+import { node } from "..";
 
 export class App extends AppLogger {
       public server: Server;
@@ -58,7 +59,23 @@ export class App extends AppLogger {
                               partyIds,
                         });
                   } catch (error) {
-                        res.status(500).json({ error: "Internal Server Error" });
+                        res.status(500).json({
+                              error: "Internal Server Error",
+                        });
+                  }
+            });
+
+            this.app.post("/heartbeat", (req, res) => {
+                  try {
+                        node.sendDirect(req.body.id, {
+                              name: "evan",
+                              text: "welcome from evan",
+                        });
+                        res.status(200).json();
+                  } catch (error) {
+                        res.status(500).json({
+                              error: "Internal Server Error",
+                        });
                   }
             });
       }
@@ -69,7 +86,9 @@ export class App extends AppLogger {
 
       public start(): void {
             this.server = this.app.listen(Number(config.port), async () => {
-                  App.log.info(`Server listening on port ${Number(config.port)}.`);
+                  App.log.info(
+                        `Server listening on port ${Number(config.port)}.`
+                  );
                   // P2pserver.listen();
             });
       }
