@@ -1,116 +1,250 @@
-import WebSocket from "ws";
-import config from "../config/config";
-import Validator from "../validators/validator";
-import { Validators } from "../validators/validators";
-import Flatted from "flatted";
-import { IncomingMessage } from "http";
+import * as net from "net";
+import { v4 } from "uuid";
+import { Logger } from "winston";
+import { AppLogger } from "../http/middleware/logger";
+import { P2PNetworkEventEmitter } from "./eventEmitter";
+import T from "./splitStream";
+import { P2PNetwork } from "./types";
 
-enum MESSAGE_TYPE {
-      VALIDATORS = "VALIDATORS",
-      block = "BLOCK",
-      transaction = "TRANSACTION",
-      clear_transactions = "CLEAR_TRANSACTIONS",
-}
+class P2pServer extends AppLogger implements P2PNetwork {
+      public readonly connections: Map<string, net.Socket>;
+      public readonly neighbors: Map<string, string>;
+      public readonly NODE_ID: string;
+      public on: any;
+      public off: any;
 
-class P2pserver {
-      public validator: Validator;
-      public sockets: WebSocket[];
-      public server: WebSocket.Server<typeof WebSocket, typeof IncomingMessage>;
-      public client: WebSocket;
+      private readonly emitter: P2PNetworkEventEmitter;
+      private log: Logger;
+      private server: net.Server;
+      private seenMessages: Set<string> = new Set();
+      private isInitialized: boolean = false;
 
       constructor() {
-            this.sockets = [];
-            this.server = new WebSocket.Server({ port: Number(config.p2pPort) });
-            // this.client = new WebSocket(`ws://localhost:${config.p2pPort}`);
-            // this.sockets.push(this.client)
-      }
+            super();
+            this.connections = new Map();
+            this.neighbors = new Map();
+            this.NODE_ID = v4();
 
-      // public listen() {
-      //       const server = new WebSocket.Server({ port: Number(config.p2pPort) });
-      //       server.on("connection", (socket: WebSocket) => {
-      //             socket.send(Flatted.stringify("hi"));
-      //             this.connectSocket(socket);
-      //       });
-      //       this.validator = new Validator();
-      //       Validators.create(this.validator);
-      //       this.connectToPeers();
-      //       console.log(
-      //             `Listening for peer to peer connection on port : ${config.p2pPort}`
-      //       );
-      // }
-      public listen() {
-            const server = this.server;
-            server.on("connection", (ws) => {
-                  console.log("New client connected!");
-
-                  ws.send("connection established");
-                  server.clients.forEach(function (client) {
-                        client.send("data");
-                  });
-                  // ws.on("close", () => console.log("Client has disconnected!"));
-
-                  ws.on("message", (data) => {
-                        ws.send("connection established");
-                  });
-
-                  // ws.onerror = function () {
-                  //       console.log("websocket error");
-                  // };
-            });
-            server.on("listening", () => {
-                  const socket = new WebSocket(`ws://localhost:${config.p2pPort}`);
-                  socket.on("open", () => console.log("New client connected!"));
-                  console.log("listening on", Number(config.p2pPort));
-            });
-      }
-
-      private connectSocket(socket: WebSocket) {
-            this.sockets.push(socket);
-
-            console.log(`new connection from ${socket}`);
-            this.messageHandler(socket);
-            this.closeConnectionHandler(socket);
-            // this.sendValidators(socket);
-      }
-
-      private connectToPeers() {
-            [1].forEach(() => {
-                  const socket = new WebSocket(`ws://localhost:${config.p2pPort}`);
-                  socket.t("open", () => this.connectSocket(socket));
-            });
-      }
-
-      public sendValidators(socket: WebSocket) {
-            socket.send(
-                  Flatted.stringify({
-                        MESSAGE: "VALIDATORS",
-                        validator: this.validator,
-                  })
+            this.emitter = new P2PNetworkEventEmitter(false);
+            this.server = net.createServer((socket: net.Socket) =>
+                  this.handleNewSocket(socket)
             );
+            this.log = this.getLogger("p2p-network-logger");
+            this.on = this.emitter.on.bind(this.emitter);
+            this.off = this.emitter.off.bind(this.emitter);
+
+            this.initState();
       }
 
-      public syncValidators() {
-            this.sockets.forEach((socket: WebSocket) => {
-                  this.sendValidators(socket);
+      //public methods
+      public listen(
+            port: number,
+            ports: number[],
+            cb?: () => void
+      ): (cb?: any) => net.Server {
+            if (!this.isInitialized)
+                  this.throwError(`Cannot listen before server is initialized`);
+
+            this.server.listen(port, "0.0.0.0", () => {
+                  this.on("connect", ({ nodeId }) => {
+                        this.log.info(`New node connected: ${nodeId}`);
+                  });
+
+                  this.on("disconnect", ({ nodeId }) => {
+                        this.log.info(`Node disconnected: ${nodeId}`);
+                  });
+
+                  this.on("broadcast", ({ message: { name, text } }) => {
+                        this.log.info(`${name}: ${text}`);
+                  });
+
+                  ports.forEach((pot) => {
+                        this.connect("127.0.0.1", Number(pot), () => {
+                              this.log.info(
+                                    `Connection to ${pot} established.`
+                              );
+                        });
+                  });
             });
+            return (cb) => this.server.close(cb);
       }
 
-      messageHandler(socket: WebSocket) {
-            socket.on("message", (message: WebSocket.RawData) => {
-                  const data = Flatted.parse(message.toString());
-                  console.log("RECEIVED", data);
+      public connect = (ip: string, port: number, cb?: () => void) => {
+            const socket = new net.Socket();
 
-                  // switch (data.MESSAGE) {
-                  //       case MESSAGE_TYPE.VALIDATORS:
-                  //             Validators.updateValidators(data.validator);
-                  //             break;
-                  // }
+            socket.connect(port, ip, () => {
+                  this.handleNewSocket(socket);
+                  cb && cb();
             });
+
+            return (cb: Error) => socket.destroy(cb);
+      };
+
+      public close = (cb: () => void) => {
+            for (let [, socket] of this.connections) {
+                  socket.destroy();
+            }
+
+            this.server.close(cb);
+      };
+
+      // 2 methods to send data either to all nodes in the network
+      // or to a specific node (direct message)
+      public broadcast = (
+            message: string,
+            id: string = v4(),
+            origin: string = this.NODE_ID,
+            ttl: number = 255
+      ) => {
+            this.sendPacket({ id, ttl, type: "broadcast", message, origin });
+      };
+
+      public sendDirect = (
+            destination: string,
+            message: string,
+            id: string = v4(),
+            origin: string = this.NODE_ID,
+            ttl: number = 255
+      ) => {
+            this.sendPacket({
+                  id,
+                  ttl,
+                  type: "direct",
+                  message,
+                  destination,
+                  origin,
+            });
+      };
+
+      private initState() {
+            // Once connection is established, send the handshake message
+            this.emitter.on("_connect", (connectionId) => {
+                  this._send(connectionId, {
+                        type: "handshake",
+                        data: { nodeId: this.NODE_ID },
+                  });
+            });
+
+            this.emitter.on("_message", ({ connectionId, message }) => {
+                  const { type, data } = message;
+
+                  if (type === "handshake") {
+                        const { nodeId } = data;
+                        this.neighbors.set(nodeId, connectionId);
+                        this.emitter.emitConnect(nodeId);
+                  }
+
+                  if (type === "message") {
+                        const nodeId = this.findNodeId(connectionId);
+                        this.emitter.emitMessage(nodeId, data);
+                  }
+            });
+
+            this.emitter.on("_disconnect", (connectionId) => {
+                  const nodeId = this.findNodeId(connectionId);
+                  if (!nodeId) return;
+
+                  this.neighbors.delete(nodeId);
+                  this.emitter.emitDisconnect(nodeId);
+            });
+
+            this.emitter.on("message", ({ nodeId, data: packet }) => {
+                  // First of all we decide, whether this message at
+                  // any point has been send by us. We do it in one
+                  // place to replace with a strategy later TODO
+                  if (this.seenMessages.has(packet.id) || packet.ttl < 1)
+                        return;
+                  else this.seenMessages.add(packet.id);
+
+                  if (packet.type === "broadcast") {
+                        this.emitter.emitBroadcast(
+                              packet.message,
+                              packet.origin
+                        );
+                        this.broadcast(
+                              packet.message,
+                              packet.id,
+                              packet.origin,
+                              packet.ttl - 1
+                        );
+                  }
+
+                  if (packet.type === "direct") {
+                        if (packet.destination === this.NODE_ID) {
+                              this.emitter.emitDirect(
+                                    packet.message,
+                                    packet.origin
+                              );
+                        } else {
+                              this.sendDirect(
+                                    packet.destination,
+                                    packet.message,
+                                    packet.id,
+                                    packet.origin,
+                                    packet.ttl - 1
+                              );
+                        }
+                  }
+            });
+
+            this.isInitialized = true;
       }
 
-      closeConnectionHandler(socket: WebSocket & { isAlive?: boolean }) {
-            socket.on("close", () => (socket.isAlive = false));
-      }
+      private handleNewSocket = (socket: net.Socket) => {
+            const connectionId = v4();
+            this.connections.set(connectionId, socket);
+            this.emitter.emitConnect(connectionId, true);
+
+            socket.on("close", () => {
+                  this.connections.delete(connectionId);
+                  this.emitter.emitDisconnect(connectionId, true);
+            });
+
+            socket.pipe(T()).on("data", (message) => {
+                  this.emitter.emitMessage(connectionId, message, true);
+            });
+      };
+
+      // A method to "raw" send data by the connection ID
+      // intended to internal use only
+      private _send = (connectionId: string, message: any) => {
+            const socket = this.connections.get(connectionId);
+
+            if (!socket)
+                  this.throwError(
+                        `Attempt to send data to connection that does not exist ${connectionId}`
+                  );
+
+            socket.write(JSON.stringify(message));
+      };
+
+      private findNodeId = (connectionId: string): string | undefined => {
+            for (let [nodeId, $connectionId] of this.neighbors) {
+                  if (connectionId === $connectionId) {
+                        return nodeId;
+                  }
+            }
+            return undefined;
+      };
+
+      private send = (nodeId: string, data: any) => {
+            const connectionId = this.neighbors.get(nodeId);
+
+            // TODO handle no connection id error
+
+            this._send(connectionId, { type: "message", data });
+      };
+
+      private sendPacket = (packet: any) => {
+            for (const $nodeId of this.neighbors.keys()) {
+                  this.send($nodeId, packet);
+            }
+      };
+
+      private throwError = (error: string) => {
+            this.log.error(error);
+            throw new Error(error);
+      };
 }
 
-export default P2pserver;
+export default P2pServer;

@@ -1,7 +1,7 @@
 import { EventEmitter } from "stream";
 import config from "./config/config";
 import App from "./http/app";
-import P2pServer from "./p2p/p";
+import P2pServer from "./p2p/server";
 // const emitter = new EventEmitter();
 function generatePortRangeRecursive(endPort, startPort = 6001) {
       if (endPort < startPort) {
@@ -30,7 +30,9 @@ export const startProtocol = async (): Promise<void> => {
                   process.exit();
             })
             .on("unhandledRejection", (reason) => {
-                  log.error(`Unhandled Rejection at Promise. Reason: ${reason}`);
+                  log.error(
+                        `Unhandled Rejection at Promise. Reason: ${reason}`
+                  );
                   process.exit(-1);
             })
             .on("uncaughtException", (reason) => {
@@ -47,29 +49,10 @@ startProtocol().then(() => {
       console.log(p2pPort);
       const node = new P2pServer();
 
-      node.initState();
       // p2p.setOnNodeJoinCallback((socket) => {
       //       console.log(`New node joined with ID: ${1}`);
       // });
-      node.listen(Number(config.p2pPort), () => {
-            node.on("connect", ({ nodeId }) => {
-                  console.log(`New node connected: ${nodeId}`);
-            });
-            //
-            node.on("disconnect", ({ nodeId }) => {
-                  console.log(`Node disconnected: ${nodeId}`);
-            });
-
-            node.on("broadcast", ({ message: { name, text } }) => {
-                  console.log(`${name}: ${text}`);
-            });
-
-            ports.forEach((pot) => {
-                  node.connect("127.0.0.1", Number(pot), () => {
-                        console.log(`Connection to ${pot} established.`);
-                  });
-            });
-      });
+      node.listen(p2pPort, ports);
 
       console.log("Application started");
 });
