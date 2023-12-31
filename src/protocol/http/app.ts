@@ -64,7 +64,7 @@ export class App extends AppLogger {
 
             this.app.post("/heartbeat", (req, res) => {
                   try {
-                        node.sendDirect(req.body.id, {
+                        node.sendDirect("6001", {
                               name: "evan",
                               text: "welcome from evan",
                         });

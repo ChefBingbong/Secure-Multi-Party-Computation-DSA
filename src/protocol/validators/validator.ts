@@ -1,3 +1,4 @@
+import config from "../config/config";
 import ChainUtil from "./chainUtil";
 
 class Validator {
@@ -15,7 +16,8 @@ class Validator {
       toString(): string {
             return `Wallet - 
             publicKey: ${this.publicKey.toString()} -
-            validatorId: ${this.ID}`;
+            validatorId: ${this.ID}
+            port: ${config.p2pPort}`;
       }
 
       sign(dataHash: string): string {

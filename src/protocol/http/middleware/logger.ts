@@ -12,7 +12,9 @@ export class AppLogger {
       private initLogger() {
             if (!this.logger) {
                   let customFormat = format.json();
-                  const transportsConfig: Transport[] = [new transports.Console()];
+                  const transportsConfig: Transport[] = [
+                        new transports.Console(),
+                  ];
 
                   const httpTransportOptions = {
                         host: "http-intake.logs.us3.datadoghq.com",
@@ -42,10 +44,10 @@ export class AppLogger {
       }
 
       private customPrintf() {
-            return format.printf(({ level, message, label, timestamp }) => {
-                  return `${timestamp} | ${level
-                        .toLowerCase()
-                        .padEnd(5)} | ${label.padEnd(20)} | ${message}`;
+            return format.printf(({ level, message, label }) => {
+                  return `${level.toLowerCase().padEnd(5)} | ${label.padEnd(
+                        5
+                  )} | ${message}\n`;
             });
       }
 

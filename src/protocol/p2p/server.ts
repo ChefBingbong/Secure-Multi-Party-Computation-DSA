@@ -6,6 +6,7 @@ import Validator from "../validators/validator";
 import { P2PNetworkEventEmitter } from "./eventEmitter";
 import T from "./splitStream";
 import { P2PNetwork } from "./types";
+import config from "../config/config";
 
 class P2pServer extends AppLogger implements P2PNetwork {
       public readonly connections: Map<string, net.Socket>;
@@ -30,16 +31,17 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.emitter.on.bind(this.emitter);
             this.emitter.off.bind(this.emitter);
 
-            this.log = this.getLogger("p2p-network-logger");
+            this.log = this.getLogger("p2p-log");
             this.server = net.createServer((socket: net.Socket) =>
-                  this.handleNewSocket(socket)
+                  this.handleNewSocket(socket, false)
             );
             P2pServer.validators = new Map([
-                  [this.validator.ID, this.validator.toString()],
+                  [config.p2pPort, this.validator.toString()],
             ]);
             this.initState();
       }
 
+      // static methods
       public static getAllValidators = () => {
             return [...P2pServer.validators.values()].filter(
                   (value, index, self) => {
@@ -80,7 +82,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
                                     `Connection to ${pot} established.`
                               );
                         });
-                        this.broadcast({ name: "name", text: "text" });
                   });
             });
             return (cb) => this.server.close(cb);
@@ -154,7 +155,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   const { type, data } = message;
                   if (type === "handshake") {
                         const { nodeId } = data;
-                        const validatorId = this.extractValidatorId(nodeId);
+                        const validatorId = this.extractValidatorHost(nodeId);
 
                         this.neighbors.set(validatorId, connectionId);
                         P2pServer.validators.set(validatorId, nodeId);
@@ -219,10 +220,10 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.isInitialized = true;
       }
 
-      private handleNewSocket = (socket: net.Socket) => {
+      private handleNewSocket = (socket: net.Socket, emitConnect = true) => {
             const connectionId = v4();
             this.connections.set(connectionId, socket);
-            this.emitter.emitConnect(connectionId, false);
+            if (emitConnect) this.emitter.emitConnect(connectionId, false);
 
             socket.on("close", () => {
                   this.connections.delete(connectionId);
@@ -256,8 +257,8 @@ class P2pServer extends AppLogger implements P2PNetwork {
             return undefined;
       };
 
-      private extractValidatorId(inputString) {
-            const match = inputString.match(/validatorId:\s*([\w-]+)/);
+      private extractValidatorHost(inputString) {
+            const match = inputString.match(/port:\s*(\d+)/);
 
             if (match) return match[1];
             return this.validator.ID;
