@@ -14,7 +14,8 @@ class Validator {
       // Used for printing the wallet details
       toString(): string {
             return `Wallet - 
-            publicKey: ${this.publicKey.toString()}`;
+            publicKey: ${this.publicKey.toString()} -
+            validatorId: ${this.ID}`;
       }
 
       sign(dataHash: string): string {

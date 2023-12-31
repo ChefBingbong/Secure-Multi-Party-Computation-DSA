@@ -54,7 +54,7 @@ export class App extends AppLogger {
             // New route to get partyIds
             this.app.get("/validators", (req, res) => {
                   try {
-                        const partyIds = Validators.getPartyIDs().length; // Replace with the actual method to get partyIds
+                        const partyIds = P2pserver.getAllValidators(); // Replace with the actual method to get partyIds
                         res.status(200).json({
                               partyIds,
                         });

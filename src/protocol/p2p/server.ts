@@ -2,16 +2,18 @@ import * as net from "net";
 import { v4 } from "uuid";
 import { Logger } from "winston";
 import { AppLogger } from "../http/middleware/logger";
+import Validator from "../validators/validator";
 import { P2PNetworkEventEmitter } from "./eventEmitter";
 import T from "./splitStream";
 import { P2PNetwork } from "./types";
 
 class P2pServer extends AppLogger implements P2PNetwork {
       public readonly connections: Map<string, net.Socket>;
-      public readonly neighbors: Map<string, string>;
       public readonly NODE_ID: string;
-      public on: any;
-      public off: any;
+      public readonly neighbors: Map<string, string>;
+      public readonly validator: Validator = new Validator();
+
+      public static validators: Map<string, string>;
 
       private readonly emitter: P2PNetworkEventEmitter;
       private log: Logger;
@@ -23,18 +25,28 @@ class P2pServer extends AppLogger implements P2PNetwork {
             super();
             this.connections = new Map();
             this.neighbors = new Map();
-            this.NODE_ID = v4();
 
             this.emitter = new P2PNetworkEventEmitter(false);
+            this.emitter.on.bind(this.emitter);
+            this.emitter.off.bind(this.emitter);
+
+            this.log = this.getLogger("p2p-network-logger");
             this.server = net.createServer((socket: net.Socket) =>
                   this.handleNewSocket(socket)
             );
-            this.log = this.getLogger("p2p-network-logger");
-            this.on = this.emitter.on.bind(this.emitter);
-            this.off = this.emitter.off.bind(this.emitter);
-
+            P2pServer.validators = new Map([
+                  [this.validator.ID, this.validator.toString()],
+            ]);
             this.initState();
       }
+
+      public static getAllValidators = () => {
+            return [...P2pServer.validators.values()].filter(
+                  (value, index, self) => {
+                        return self.indexOf(value) === index;
+                  }
+            );
+      };
 
       //public methods
       public listen(
@@ -93,12 +105,20 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.server.close(cb);
       };
 
+      public on = (event: string, listener: (...args: any[]) => void) => {
+            this.emitter.on(event, listener);
+      };
+
+      public off = (event: string, listener: (...args: any[]) => void) => {
+            this.emitter.on(event, listener);
+      };
+
       // 2 methods to send data either to all nodes in the network
       // or to a specific node (direct message)
       public broadcast = (
             message: any,
             id: string = v4(),
-            origin: string = this.NODE_ID,
+            origin: string = this.validator.ID,
             ttl: number = 255
       ) => {
             this.sendPacket({ id, ttl, type: "broadcast", message, origin });
@@ -108,7 +128,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             destination: string,
             message: any,
             id: string = v4(),
-            origin: string = this.NODE_ID,
+            origin: string = this.validator.ID,
             ttl: number = 255
       ) => {
             this.sendPacket({
@@ -126,7 +146,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.emitter.on("_connect", (connectionId) => {
                   this._send(connectionId.connectionId, {
                         type: "handshake",
-                        data: { nodeId: this.NODE_ID },
+                        data: { nodeId: this.validator.toString() },
                   });
             });
 
@@ -134,8 +154,11 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   const { type, data } = message;
                   if (type === "handshake") {
                         const { nodeId } = data;
-                        this.neighbors.set(nodeId, connectionId);
-                        this.emitter.emitConnect(nodeId, true);
+                        const validatorId = this.extractValidatorId(nodeId);
+
+                        this.neighbors.set(validatorId, connectionId);
+                        P2pServer.validators.set(validatorId, nodeId);
+                        this.emitter.emitConnect(validatorId, true);
                   }
 
                   if (type === "message") {
@@ -145,10 +168,11 @@ class P2pServer extends AppLogger implements P2PNetwork {
             });
 
             this.emitter.on("_disconnect", (connectionId) => {
-                  const nodeId = this.findNodeId(connectionId);
+                  const nodeId = this.findNodeId(connectionId.connectionId);
                   if (!nodeId) return;
 
                   this.neighbors.delete(nodeId);
+                  P2pServer.validators.delete(nodeId);
                   this.emitter.emitDisconnect(nodeId, true);
             });
 
@@ -175,7 +199,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   }
 
                   if (packet.type === "direct") {
-                        if (packet.destination === this.NODE_ID) {
+                        if (packet.destination === this.validator.ID) {
                               this.emitter.emitDirect(
                                     packet.message,
                                     packet.origin
@@ -231,6 +255,13 @@ class P2pServer extends AppLogger implements P2PNetwork {
             }
             return undefined;
       };
+
+      private extractValidatorId(inputString) {
+            const match = inputString.match(/validatorId:\s*([\w-]+)/);
+
+            if (match) return match[1];
+            return this.validator.ID;
+      }
 
       private send = (nodeId: string, data: any) => {
             const connectionId = this.neighbors.get(nodeId);

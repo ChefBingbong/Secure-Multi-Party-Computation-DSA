@@ -62,7 +62,7 @@ export class Validators {
       }
 
       // Finds id in partyIDs and returns a copy of the slice if it was found.
-      public remove(id: string): Validator[] {
+      public static remove(id: string): Validator[] {
             return Validators.partyIDs.filter((partyID) => partyID.ID !== id);
       }
 

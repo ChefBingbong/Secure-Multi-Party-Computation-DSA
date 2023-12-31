@@ -2,7 +2,7 @@ import * as net from "net";
 
 export interface P2PNetwork {
       connections: Map<string, net.Socket>;
-      neighbors: Map<string, string>;
+      // neighbors: Map<string, string>;
       NODE_ID: string;
 
       listen(
@@ -29,6 +29,8 @@ export interface P2PNetwork {
             origin?: string,
             ttl?: number
       ) => void;
+      on: (event: string, listener: (...args: any[]) => void) => void;
+      off: (event: string, listener: (...args: any[]) => void) => void;
 }
 
 export interface Message {
