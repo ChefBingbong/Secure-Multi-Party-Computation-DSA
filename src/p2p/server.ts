@@ -2,7 +2,7 @@ import * as net from "net";
 import { v4 } from "uuid";
 import { Logger } from "winston";
 import { AppLogger } from "../http/middleware/logger";
-import Validator from "../validators/validator";
+import Validator from "../protocol/validators/validator";
 import { P2PNetworkEventEmitter } from "./eventEmitter";
 import T from "./splitStream";
 import { P2PNetwork } from "./types";

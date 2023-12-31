@@ -11,7 +11,7 @@ import P2pserver from "../p2p/server";
 import errorHandlingMiddleware from "./middleware/errorHandler";
 import { AppLogger } from "./middleware/logger";
 import P2pServer from "../p2p/server";
-import { startKeygen } from "..";
+import { startKeygen } from "../protocol";
 
 export class App extends AppLogger {
       public server: Server;

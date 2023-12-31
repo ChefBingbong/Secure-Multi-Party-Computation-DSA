@@ -120,7 +120,7 @@ export class MultiHandler {
                         r.finalRound,
                         n
                   );
-                  console.log(this.broadcast);
+                  console.log(this.messages);
 
                   // this.finalize();
             });

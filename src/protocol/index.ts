@@ -1,7 +1,7 @@
 import { KeygenSession } from "../mpcTss/keygen/keygenSession";
-import config from "./config/config";
-import { redisClient } from "./db/redis";
-import App from "./http/app";
+import config from "../config/config";
+import { redisClient } from "../db/redis";
+import App from "../http/app";
 import { MultiHandler } from "./messageProcessor";
 
 export const updatePeerReplica = async (port: number) => {
