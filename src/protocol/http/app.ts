@@ -6,14 +6,11 @@ import helmet from "helmet";
 import hpp from "hpp";
 import { Server } from "http";
 import { Logger } from "winston";
+import { node } from "..";
 import config from "../config/config";
+import P2pserver from "../p2p/server";
 import errorHandlingMiddleware from "./middleware/errorHandler";
 import { AppLogger } from "./middleware/logger";
-import P2pserver from "../p2p/server";
-import { Validators } from "../validators/validators";
-import { json } from "stream/consumers";
-import Flatted from "flatted";
-import { node } from "..";
 
 export class App extends AppLogger {
       public server: Server;
