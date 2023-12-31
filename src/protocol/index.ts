@@ -1,4 +1,4 @@
-import { KeygenSession } from "../mpcTss/keygen/keygenSession";
+import { KeygenSession } from "../mpc/keygen/keygenSession";
 import config from "../config/config";
 import { redisClient } from "../db/redis";
 import App from "../http/app";

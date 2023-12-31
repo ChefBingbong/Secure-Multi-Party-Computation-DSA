@@ -1,5 +1,5 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
-import { PartyId } from "../keyConfig";
+import { PartyId } from "./partyKey";
 import { Hasher } from "../utils/hasher";
 import { KeygenSession } from "./keygenSession";
 import { KeygenBroadcastForRound3 } from "./round3";

@@ -1,5 +1,5 @@
 import { randBetween } from "bigint-crypto-utils";
-import { partyIdToScalar } from "../keyConfig";
+import { partyIdToScalar } from "./partyKey";
 import {
       randomPaillierPrimes,
       validatePaillierPrime,

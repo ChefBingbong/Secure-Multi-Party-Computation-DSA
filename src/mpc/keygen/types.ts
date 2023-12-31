@@ -1,4 +1,4 @@
-import { PartyId } from "../keyConfig";
+import { PartyId } from "./partyKey";
 import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
 import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
 import { PedersenParams } from "../Pedersen/pendersen";

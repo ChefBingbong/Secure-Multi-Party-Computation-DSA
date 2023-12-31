@@ -1,5 +1,5 @@
 import { Hasher } from "../utils/hasher";
-import { PartyId } from "../keyConfig";
+import { PartyId } from "./partyKey";
 import { Polynomial } from "../polynomial/polynomial";
 import { sampleScalar } from "../sample";
 import { KeygenInputForRound1 } from "./types";

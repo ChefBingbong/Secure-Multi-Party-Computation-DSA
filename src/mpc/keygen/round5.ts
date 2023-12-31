@@ -1,4 +1,4 @@
-import { PartyId, PartySecretKeyConfig } from "../keyConfig";
+import { PartyId, PartySecretKeyConfig } from "./partyKey";
 import {
       ZkSchResponse,
       ZkSchResponseJSON,

@@ -1,6 +1,6 @@
-import { PartyId } from "../mpcTss/keyConfig";
-import { KeygenSession } from "../mpcTss/keygen/keygenSession";
-import { KeygenInputForRound1 } from "../mpcTss/keygen/types";
+import { PartyId } from "../mpc/keygen/partyKey";
+import { KeygenSession } from "../mpc/keygen/keygenSession";
+import { KeygenInputForRound1 } from "../mpc/keygen/types";
 
 // Define the Message interface
 interface Message {

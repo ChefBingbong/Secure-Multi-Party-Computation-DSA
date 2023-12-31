@@ -1,6 +1,6 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { pointFromJSON, pointToJSON } from "../curve";
-import { PartyId, partyIdToScalar } from "../keyConfig";
+import { PartyId, partyIdToScalar } from "./partyKey";
 import { paillierValidateN } from "../paillierKeyPair/paillierCryptoUtils";
 import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
 import { PedersenParams } from "../Pedersen/pendersen";
@@ -12,7 +12,10 @@ import { ZkModPrivate, ZkModPublic, zkModCreateProof } from "../zk/mod";
 import { ZkPrmPrivate, ZkPrmPublic, zkPrmCreateProof } from "../zk/prm";
 import { ZkSchCommitment } from "../zk/zksch";
 import { KeygenSession } from "./keygenSession";
-import { KeygenBroadcastForRound4, KeygenDirectMessageForRound4 } from "./round4";
+import {
+      KeygenBroadcastForRound4,
+      KeygenDirectMessageForRound4,
+} from "./round4";
 import {
       KeygenBroadcastForRound3JSON,
       KeygenInputForRound3,
@@ -182,7 +185,9 @@ export class KeygenRound3 {
 
             this.RIDs[from] = bmsg.RID;
             this.ChainKeys[from] = bmsg.C;
-            this.PaillierPublic[from] = new PaillierPublicKey(bmsg.pedersenPublic.n);
+            this.PaillierPublic[from] = new PaillierPublicKey(
+                  bmsg.pedersenPublic.n
+            );
             this.Pedersen[from] = bmsg.pedersenPublic;
             this.vssPolynomials[from] = vssPolynomial;
             this.SchnorrCommitments[from] = bmsg.schnorrCommitment;
@@ -191,7 +196,8 @@ export class KeygenRound3 {
 
       public process(): KeygenRound3Output {
             let chainKey: bigint | null =
-                  this.inputForRound3.inputForRound2.inputRound1.previousChainKey;
+                  this.inputForRound3.inputForRound2.inputRound1
+                        .previousChainKey;
             if (chainKey === null) {
                   chainKey = 0n;
                   for (const j of this.session.partyIds) {
@@ -269,7 +275,8 @@ export class KeygenRound3 {
                   const { vssSecret } =
                         this.inputForRound3.inputForRound2.inputRound1;
                   const share = vssSecret.evaluate(partyIdToScalar(j));
-                  const { ciphertext: C } = this.PaillierPublic[j].encrypt(share);
+                  const { ciphertext: C } =
+                        this.PaillierPublic[j].encrypt(share);
 
                   directMessages.push(
                         KeygenDirectMessageForRound4.from({

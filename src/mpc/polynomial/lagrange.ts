@@ -1,5 +1,5 @@
 import Fn from "./Fn";
-import { PartyId, partyIdToScalar } from "../keyConfig";
+import { PartyId, partyIdToScalar } from "../keygen/partyKey";
 
 export const lagrange = (
       interpolationDomain: PartyId[]
@@ -11,7 +11,8 @@ const lagrangeFor = (
       interpolationDomain: PartyId[],
       subset: PartyId[]
 ): Record<PartyId, bigint> => {
-      const { scalars, numerator } = getScalarsAndNumerator(interpolationDomain);
+      const { scalars, numerator } =
+            getScalarsAndNumerator(interpolationDomain);
       const coefficients: Record<PartyId, bigint> = {};
       for (const j of subset) {
             coefficients[j] = lagrangeInternal(scalars, numerator, j);

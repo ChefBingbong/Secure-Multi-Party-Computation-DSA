@@ -6,7 +6,7 @@ import {
       PartyPublicKeyConfig,
       PartySecretKeyConfig,
       partyIdToScalar,
-} from "../keyConfig";
+} from "./partyKey";
 import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
 import { PedersenParams } from "../Pedersen/pendersen";
 import { Exponent } from "../polynomial/exponent";
@@ -126,7 +126,12 @@ export class KeygenDirectMessageForRound4 {
             share: bigint;
             facProof: ZkFacProof;
       }): KeygenDirectMessageForRound4 {
-            const d = new KeygenDirectMessageForRound4(from, to, share, facProof);
+            const d = new KeygenDirectMessageForRound4(
+                  from,
+                  to,
+                  share,
+                  facProof
+            );
             Object.freeze(d);
             return d;
       }
@@ -192,7 +197,9 @@ export class KeygenRound4 {
                   throw new Error(`failed to validate mod proof from ${from}`);
             }
 
-            const prmPub: ZkPrmPublic = { Aux: this.input.PedersenPublic[from] };
+            const prmPub: ZkPrmPublic = {
+                  Aux: this.input.PedersenPublic[from],
+            };
             const prmVerified = zkPrmVerifyProof(
                   prmProof,
                   prmPub,
@@ -241,16 +248,18 @@ export class KeygenRound4 {
                   throw new Error(`decrypted share is not in correct range`);
             }
 
-            const ExpectedPublicShare = this.input.vssPolynomials[from].evaluate(
-                  partyIdToScalar(this.session.selfId)
-            );
+            const ExpectedPublicShare = this.input.vssPolynomials[
+                  from
+            ].evaluate(partyIdToScalar(this.session.selfId));
             const PublicShare = secp256k1.ProjectivePoint.BASE.multiply(Share);
             if (
-                  !secp256k1.ProjectivePoint.fromAffine(ExpectedPublicShare).equals(
-                        PublicShare
-                  )
+                  !secp256k1.ProjectivePoint.fromAffine(
+                        ExpectedPublicShare
+                  ).equals(PublicShare)
             ) {
-                  throw new Error(`${to} failed to validate VSS share from ${from}`);
+                  throw new Error(
+                        `${to} failed to validate VSS share from ${from}`
+                  );
             }
 
             this.ShareReceived[from] = Share;
@@ -279,7 +288,9 @@ export class KeygenRound4 {
                   ShamirPublicPolynomials.push(this.input.vssPolynomials[j]);
             }
 
-            const ShamirPublicPolynomial = Exponent.sum(ShamirPublicPolynomials);
+            const ShamirPublicPolynomial = Exponent.sum(
+                  ShamirPublicPolynomials
+            );
 
             const PublicData: Record<PartyId, PartyPublicKeyConfig> = {};
             for (const j of this.session.partyIds) {
@@ -307,8 +318,10 @@ export class KeygenRound4 {
                   partyId: this.session.selfId,
                   threshold: this.session.threshold,
                   ecdsa: UpdatedSecretECDSA,
-                  elgamal: this.input.inputForRound3.inputForRound2.elGamalSecret,
-                  paillier: this.input.inputForRound3.inputForRound2.paillierSecret,
+                  elgamal: this.input.inputForRound3.inputForRound2
+                        .elGamalSecret,
+                  paillier: this.input.inputForRound3.inputForRound2
+                        .paillierSecret,
                   rid: this.input.RID,
                   chainKey: this.input.ChainKey,
                   publicPartyData: PublicData,
