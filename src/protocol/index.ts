@@ -1,6 +1,8 @@
+import { KeygenSession } from "../mpcTss/keygen/keygenSession";
 import config from "./config/config";
 import { redisClient } from "./db/redis";
 import App from "./http/app";
+import { MultiHandler } from "./messageProcessor";
 
 export const updatePeerReplica = async (port: number) => {
       const peers = await redisClient.getSingleData<number[]>("validators");
@@ -51,6 +53,26 @@ export const startProtocol = async (): Promise<void> => {
             });
 };
 
+export const startKeygen = async () => {
+      const validators = await redisClient.getSingleData<number[]>(
+            "validators"
+      );
+      const partyIds = validators.map(String);
+      const threshold = validators.length - 1;
+      const message: Uint8Array = new TextEncoder().encode("hello");
+
+      for (const selfId of partyIds) {
+            const keygenSession = () =>
+                  new KeygenSession(
+                        selfId,
+                        partyIds,
+                        threshold
+                        // precomputedPaillierPrimesA
+                  );
+            const startFunc = keygenSession().start;
+            const protocolHandler = new MultiHandler(startFunc, null);
+      }
+};
 startProtocol().then(() => {
       console.log("Application started");
 });

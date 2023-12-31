@@ -7,7 +7,7 @@ import { KeygenInputForRound1 } from "./types";
 export class KeygenSession {
       public currentRound = "round1";
       public curve = "secp256k1";
-      public finalRound = "round5";
+      public finalRound: number = 5;
       public partyIds: Array<PartyId>;
       public protocolId = "cmp/sign";
       public selfId: PartyId;
@@ -58,6 +58,29 @@ export class KeygenSession {
                   previousChainKey: null,
             };
       }
+
+      public start = async () => {
+            for (let partyId of this.partyIds) {
+                  this.hasher.update(partyId);
+            }
+
+            // set up for vss polynomial share generation. these are used for assigning shares
+            // or random polynomial between all parties
+            const vssConstant = sampleScalar();
+            const vssSecret = Polynomial.new(this.threshold, vssConstant);
+
+            this.inputForRound1 = {
+                  ...this,
+                  vssSecret,
+                  precomputedPaillierPrimes: this.precomputedPaillierPrimes,
+
+                  // TODO: these are for refresh? not implemented yet
+                  previousSecretECDSA: null,
+                  previousPublicSharesECDSA: null,
+                  previousChainKey: null,
+            };
+            return this;
+      };
 
       public cloneHashForId(id: PartyId): Hasher {
             return this.hasher.clone().update(id);

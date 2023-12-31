@@ -11,6 +11,7 @@ import P2pserver from "../p2p/server";
 import errorHandlingMiddleware from "./middleware/errorHandler";
 import { AppLogger } from "./middleware/logger";
 import P2pServer from "../p2p/server";
+import { startKeygen } from "..";
 
 export class App extends AppLogger {
       public server: Server;
@@ -69,6 +70,17 @@ export class App extends AppLogger {
                               name: "evan",
                               text: "welcome from evan",
                         });
+                        res.status(200).json();
+                  } catch (error) {
+                        res.status(500).json({
+                              error: "Internal Server Error",
+                        });
+                  }
+            });
+
+            this.app.post("/start", (req, res) => {
+                  try {
+                        startKeygen();
                         res.status(200).json();
                   } catch (error) {
                         res.status(500).json({
