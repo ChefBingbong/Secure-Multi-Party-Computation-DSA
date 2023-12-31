@@ -45,6 +45,7 @@ export const postBroadcast = (
             app.p2pServer.broadcast({
                   name: "broadcast-message",
                   text: `recieved message from node ${config.p2pPort}`,
+                  // nodeId: config.p2pPort,
             });
             res.send("success");
       } catch (error) {
@@ -58,9 +59,10 @@ export const postStart = async (
       next: NextFunction
 ) => {
       try {
-            await startKeygen();
+            await app.p2pServer.startKeygen();
             res.status(200).json();
       } catch (error) {
+            console.log(error);
             next(error);
       }
 };
