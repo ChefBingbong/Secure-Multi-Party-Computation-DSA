@@ -1,5 +1,5 @@
 import Fn from "./Fn";
-import { PartyId, partyIdToScalar } from "../keygen/partyKey";
+import { PartyId, partyIdToScalar } from "../../keygen/partyKey";
 
 export const lagrange = (
       interpolationDomain: PartyId[]

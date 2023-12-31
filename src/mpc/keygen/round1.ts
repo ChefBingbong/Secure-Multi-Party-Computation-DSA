@@ -5,9 +5,9 @@ import {
       validatePaillierPrime,
 } from "../paillierKeyPair/paillierCryptoUtils";
 import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
-import { Exponent } from "../polynomial/exponent";
-import { Polynomial } from "../polynomial/polynomial";
-import { generateElGamalKeyPair } from "../sample";
+import { Exponent } from "../math/polynomial/exponent";
+import { Polynomial } from "../math/polynomial/polynomial";
+import { generateElGamalKeyPair } from "../math/sample";
 import { zkSchCreateRandomness } from "../zk/zksch";
 import { KeygenSession } from "./keygenSession";
 import { KeygenBroadcastForRound2 } from "./round2";

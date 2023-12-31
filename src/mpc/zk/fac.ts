@@ -7,9 +7,9 @@ import {
       sampleIntervalLN,
       sampleIntervalLN2,
       sampleIntervalLepsN,
-} from "../sample";
-import Fn from "../polynomial/Fn";
-import { isInIntervalLEpsPlus1RootN } from "../arith";
+} from "../math/sample";
+import Fn from "../math/polynomial/Fn";
+import { isInIntervalLEpsPlus1RootN } from "../math/arith";
 
 export type ZkFacPublic = {
       N: bigint;
@@ -204,7 +204,10 @@ export const zkFacVerifyProof = (
             Nhat
       );
       const lhs = modMultiply(
-            [modPow(proof.comm.Q, proof.Z1, Nhat), modPow(pub.Aux.t, proof.V, Nhat)],
+            [
+                  modPow(proof.comm.Q, proof.Z1, Nhat),
+                  modPow(pub.Aux.t, proof.V, Nhat),
+            ],
             Nhat
       );
       const rhs = modMultiply([modPow(R, e, Nhat), proof.comm.T], Nhat);
@@ -224,7 +227,15 @@ const challenge = (
       comm: ZkFacCommitment
 ): bigint => {
       const bigHash = hasher
-            .updateMulti([pub.N, pub.Aux, comm.P, comm.Q, comm.A, comm.B, comm.T])
+            .updateMulti([
+                  pub.N,
+                  pub.Aux,
+                  comm.P,
+                  comm.Q,
+                  comm.A,
+                  comm.B,
+                  comm.T,
+            ])
             .digestBigint();
 
       // TODO: not at all sure here

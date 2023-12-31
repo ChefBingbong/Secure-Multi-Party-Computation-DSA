@@ -1,6 +1,6 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 
-import Fn from "../polynomial/Fn";
+import Fn from "../math/polynomial/Fn";
 import {
       PartyId,
       PartyPublicKeyConfig,
@@ -9,7 +9,7 @@ import {
 } from "./partyKey";
 import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
 import { PedersenParams } from "../Pedersen/pendersen";
-import { Exponent } from "../polynomial/exponent";
+import { Exponent } from "../math/polynomial/exponent";
 import {
       ZkFacProof,
       ZkFacProofJSON,

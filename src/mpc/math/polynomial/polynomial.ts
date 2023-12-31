@@ -1,5 +1,5 @@
 import Fn from "./Fn";
-import { sampleScalar } from "../math/sample";
+import { sampleScalar } from "../sample";
 
 export class Polynomial {
       public coefficients: Array<bigint>;

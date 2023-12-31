@@ -7,7 +7,7 @@ import {
       modMultiply,
       randBytesSync,
 } from "bigint-crypto-utils";
-import { sampleUnitModN } from "../sample";
+import { sampleUnitModN } from "../math/sample";
 
 const SEC_PARAM = 64;
 const BITS_BLUM_PRIME = 4 * SEC_PARAM;
@@ -21,7 +21,8 @@ export const computeDecryptionShift =
       (x: bigint): bigint =>
             (x - 1n) / n;
 
-export const calculateLambda = (p: bigint, q: bigint): bigint => lcm(p - 1n, q - 1n);
+export const calculateLambda = (p: bigint, q: bigint): bigint =>
+      lcm(p - 1n, q - 1n);
 
 const primes = (below: number): bigint[] => {
       const sieve = new Uint8Array(below).fill(1);
@@ -106,7 +107,10 @@ const tryBlumPrime = async (): Promise<bigint | null> => {
       return null;
 };
 
-export const randomPaillierPrimes = async (): Promise<{ p: bigint; q: bigint }> => {
+export const randomPaillierPrimes = async (): Promise<{
+      p: bigint;
+      q: bigint;
+}> => {
       let p: bigint | undefined = undefined;
       let q: bigint;
 
@@ -139,7 +143,9 @@ export const validatePaillierPrime = async (p: bigint): Promise<void> => {
       const pMinus1div2 = (p - 1n) / 2n;
       const isPrime = await isProbablyPrime(pMinus1div2, 1);
       if (!isPrime) {
-            throw new Error(`INVALID_P_MINUS_1_DIV_2: ${pMinus1div2} is not prime`);
+            throw new Error(
+                  `INVALID_P_MINUS_1_DIV_2: ${pMinus1div2} is not prime`
+            );
       }
 };
 

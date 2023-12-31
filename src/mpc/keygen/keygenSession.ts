@@ -1,7 +1,7 @@
 import { Hasher } from "../utils/hasher";
 import { PartyId } from "./partyKey";
-import { Polynomial } from "../polynomial/polynomial";
-import { sampleScalar } from "../sample";
+import { Polynomial } from "../math/polynomial/polynomial";
+import { sampleScalar } from "../math/sample";
 import { KeygenInputForRound1 } from "./types";
 
 export class KeygenSession {

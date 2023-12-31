@@ -1,9 +1,9 @@
 import { modAdd, modMultiply, modPow } from "bigint-crypto-utils";
 
 import { Hasher } from "../utils/hasher";
-import { isValidModN } from "../arith";
+import { isValidModN } from "../math/arith";
 import { PedersenParams } from "../Pedersen/pendersen";
-import { STAT_PARAM, sampleModN } from "../sample";
+import { STAT_PARAM, sampleModN } from "../math/sample";
 
 export type ZkPrmPublic = {
       Aux: PedersenParams;
@@ -30,7 +30,13 @@ export class ZkPrmProof {
             this.Zs = Zs;
       }
 
-      public static from({ As, Zs }: { As: bigint[]; Zs: bigint[] }): ZkPrmProof {
+      public static from({
+            As,
+            Zs,
+      }: {
+            As: bigint[];
+            Zs: bigint[];
+      }): ZkPrmProof {
             const p = new ZkPrmProof(As, Zs);
             Object.freeze(p);
             return p;
@@ -50,7 +56,10 @@ export class ZkPrmProof {
       }
 }
 
-export const zkPrmIsProofValid = (proof: ZkPrmProof, pub: ZkPrmPublic): boolean => {
+export const zkPrmIsProofValid = (
+      proof: ZkPrmProof,
+      pub: ZkPrmPublic
+): boolean => {
       if (!proof) {
             return false;
       }
@@ -146,7 +155,11 @@ export const zkPrmVerifyProof = (
       return verifications.every((v) => v);
 };
 
-const challenge = (hasher: Hasher, pub: ZkPrmPublic, A: bigint[]): boolean[] => {
+const challenge = (
+      hasher: Hasher,
+      pub: ZkPrmPublic,
+      A: bigint[]
+): boolean[] => {
       hasher.update(pub.Aux);
       for (const a of A) {
             hasher.update(a);

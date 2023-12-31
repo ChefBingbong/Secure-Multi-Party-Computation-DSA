@@ -1,9 +1,9 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 
-import { AffinePoint, AffinePointJSON, ProjectivePoint } from "../types";
+import { AffinePoint, AffinePointJSON, ProjectivePoint } from "../../types";
 import { Polynomial } from "./polynomial";
 import Fn from "./Fn";
-import { Hashable, IngestableBasic } from "../utils/hasher";
+import { Hashable, IngestableBasic } from "../../utils/hasher";
 import { pointFromJSON, pointToJSON } from "../curve";
 
 export type ExponentJSON = {
@@ -128,7 +128,10 @@ export class Exponent implements Hashable {
       }
 
       public copy(): Exponent {
-            const copyExp = new Exponent(this.isConstant, this.coefficients.slice());
+            const copyExp = new Exponent(
+                  this.isConstant,
+                  this.coefficients.slice()
+            );
             Object.freeze(copyExp);
             return copyExp;
       }

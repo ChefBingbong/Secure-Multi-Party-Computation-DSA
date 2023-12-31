@@ -8,11 +8,11 @@ import {
 } from "../paillierKeyPair/types";
 import { PedersenParams } from "../Pedersen/pendersen";
 import { PedersenParametersJSON } from "../Pedersen/types";
-import { lagrange } from "../polynomial/lagrange";
+import { lagrange } from "../math/polynomial/lagrange";
 import { bytesToNumberBE } from "@noble/curves/abstract/utils";
 import { utf8ToBytes } from "@noble/hashes/utils";
 import { Hashable, IngestableBasic } from "../utils/hasher";
-import { pointFromJSON, pointToJSON } from "../curve";
+import { pointFromJSON, pointToJSON } from "../math/curve";
 
 export type PartyId = string;
 

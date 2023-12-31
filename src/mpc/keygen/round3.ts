@@ -1,10 +1,10 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
-import { pointFromJSON, pointToJSON } from "../curve";
+import { pointFromJSON, pointToJSON } from "../math/curve";
 import { PartyId, partyIdToScalar } from "./partyKey";
 import { paillierValidateN } from "../paillierKeyPair/paillierCryptoUtils";
 import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
 import { PedersenParams } from "../Pedersen/pendersen";
-import { Exponent } from "../polynomial/exponent";
+import { Exponent } from "../math/polynomial/exponent";
 import { AffinePoint } from "../types";
 import { Hasher } from "../utils/hasher";
 import { ZkFacPrivate, ZkFacPublic, zkFacCreateProof } from "../zk/fac";

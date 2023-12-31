@@ -1,5 +1,5 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { AffinePoint, AffinePointJSON, ProjectivePoint } from "./types";
+import { AffinePoint, AffinePointJSON, ProjectivePoint } from "../types";
 import { bitLength } from "bigint-crypto-utils";
 import { bytesToNumberBE, numberToBytesBE } from "@noble/curves/abstract/utils";
 import Fn from "./polynomial/Fn";

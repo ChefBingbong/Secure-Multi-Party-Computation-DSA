@@ -7,9 +7,9 @@ import {
 } from "bigint-crypto-utils";
 import { bytesToNumberBE } from "@noble/curves/abstract/utils";
 
-import { isValidModN, jacobi } from "../arith";
+import { isValidModN, jacobi } from "../math/arith";
 import { Hasher } from "../utils/hasher";
-import { STAT_PARAM, sampleQNR } from "../sample";
+import { STAT_PARAM, sampleQNR } from "../math/sample";
 
 export type ZkModPublic = {
       N: bigint;
@@ -145,7 +145,10 @@ export const zkModMakeQuadraticResidue = (
       return { a, b, out };
 };
 
-export const zkModIsProofValid = (proof: ZkModProof, pub: ZkModPublic): boolean => {
+export const zkModIsProofValid = (
+      proof: ZkModProof,
+      pub: ZkModPublic
+): boolean => {
       if (!proof) {
             return false;
       }
@@ -262,7 +265,11 @@ export const zkModVerifyProof = async (
 };
 
 // TODO: Needs checking
-export const zkModChallenge = (hasher: Hasher, n: bigint, w: bigint): bigint[] => {
+export const zkModChallenge = (
+      hasher: Hasher,
+      n: bigint,
+      w: bigint
+): bigint[] => {
       hasher.updateMulti([n, w]);
 
       const bytesPerSample = Math.floor(bitLength(n) / 8) + 2; // TODO: why +2?

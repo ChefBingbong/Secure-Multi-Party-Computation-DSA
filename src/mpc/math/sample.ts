@@ -1,10 +1,15 @@
-import { bitLength, gcd, randBytesSync, randBitsSync } from "bigint-crypto-utils";
+import {
+      bitLength,
+      gcd,
+      randBytesSync,
+      randBitsSync,
+} from "bigint-crypto-utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { randBetween } from "bigint-crypto-utils";
 import { bytesToNumberBE } from "@noble/curves/abstract/utils";
 
 import Fn from "./polynomial/Fn";
-import { AffinePoint } from "./types";
+import { AffinePoint } from "../types";
 import { jacobi } from "./arith";
 
 const SEC_PARAM = 256;

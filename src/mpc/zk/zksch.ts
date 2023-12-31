@@ -2,9 +2,9 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 
 import { Hasher } from "../utils/hasher";
 import { AffinePoint, AffinePointJSON } from "../types";
-import { sampleScalar } from "../sample";
-import { isIdentity, pointFromJSON, pointToJSON } from "../curve";
-import Fn from "../polynomial/Fn";
+import { sampleScalar } from "../math/sample";
+import { isIdentity, pointFromJSON, pointToJSON } from "../math/curve";
+import Fn from "../math/polynomial/Fn";
 
 export type ZkSchRandomness = {
       a: bigint;
