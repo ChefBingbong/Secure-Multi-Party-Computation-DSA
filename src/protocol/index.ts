@@ -4,6 +4,8 @@ import { redisClient } from "../db/redis";
 import App from "../http/app";
 import { MultiHandler } from "./messageProcessor";
 
+export let app: App;
+
 export const updatePeerReplica = async (port: number) => {
       const peers = await redisClient.getSingleData<number[]>("validators");
       const updatedPeers = peers.filter((peer) => peer !== port);
@@ -13,7 +15,7 @@ export const updatePeerReplica = async (port: number) => {
 export const startProtocol = async (): Promise<void> => {
       if (!redisClient.initialized) throw new Error(`redis not initialized`);
 
-      const app = new App();
+      app = new App();
       const port = Number(config.p2pPort);
       const log = app.getLogger("app");
 

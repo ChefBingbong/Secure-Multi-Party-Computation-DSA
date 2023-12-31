@@ -7,14 +7,21 @@ import hpp from "hpp";
 import { Server } from "http";
 import { Logger } from "winston";
 import config from "../config/config";
-import P2pserver from "../p2p/server";
+import P2pServer from "../p2p/server";
+import * as handlers from "./controllers/router";
 import errorHandlingMiddleware from "./middleware/errorHandler";
 import { AppLogger } from "./middleware/logger";
-import P2pServer from "../p2p/server";
-import { startKeygen } from "../protocol";
 
-export class App extends AppLogger {
-      public server: Server;
+interface AppInterface {
+      server: Server;
+      app: Express;
+      p2pServer: P2pServer;
+      start(peers: number[]): void;
+}
+
+export class App extends AppLogger implements AppInterface {
+      private server: Server;
+      private router: Express.Router;
       public app: Express;
       public p2pServer: P2pServer;
       public static log: Logger;
@@ -22,6 +29,8 @@ export class App extends AppLogger {
       constructor() {
             super();
             this.app = express();
+            this.router = express.Router();
+
             App.log = this.getLogger("on-ramp-api-logger");
 
             this.configureMiddlewares();
@@ -43,65 +52,16 @@ export class App extends AppLogger {
             this.app.use(compression());
             this.app.use(express.json());
             this.app.use(rateLimit);
+            this.app.use("/", this.router);
       }
 
       private configureRoutes(): void {
-            this.app.get("/", (req, res) => {
-                  res.status(200).send({ result: "ok" });
-            });
-
-            // New route to get partyIds
-            this.app.get("/validators", (req, res) => {
-                  try {
-                        const partyIds = P2pserver.getAllValidators(); // Replace with the actual method to get partyIds
-                        res.status(200).json({
-                              partyIds,
-                        });
-                  } catch (error) {
-                        res.status(500).json({
-                              error: "Internal Server Error",
-                        });
-                  }
-            });
-
-            this.app.post("/direct-message", (req, res) => {
-                  try {
-                        this.p2pServer.sendDirect(req.body.id, {
-                              name: "direct-message",
-                              text: `recieved message from node ${req.body.id}`,
-                        });
-                        res.status(200).json();
-                  } catch (error) {
-                        res.status(500).json({
-                              error: "Internal Server Error",
-                        });
-                  }
-            });
-
-            this.app.post("/broadcast", (req, res) => {
-                  try {
-                        this.p2pServer.broadcast({
-                              name: "broadcast-message",
-                              text: `recieved message from node ${config.p2pPort}`,
-                        });
-                        res.status(200).json();
-                  } catch (error) {
-                        res.status(500).json({
-                              error: "Internal Server Error",
-                        });
-                  }
-            });
-
-            this.app.post("/start", (req, res) => {
-                  try {
-                        startKeygen();
-                        res.status(200).json();
-                  } catch (error) {
-                        res.status(500).json({
-                              error: "Internal Server Error",
-                        });
-                  }
-            });
+            // Define routes
+            this.router.get("/", handlers.getRoot);
+            this.router.get("/validators", handlers.getValidators);
+            this.router.post("/direct-message", handlers.postDirectMessage);
+            this.router.post("/broadcast", handlers.postBroadcast);
+            this.router.post("/start", handlers.postStart);
       }
 
       private configureErrorHandling(): void {
