@@ -13,14 +13,12 @@ import errorHandlingMiddleware from "./middleware/errorHandler";
 import { AppLogger } from "./middleware/logger";
 
 interface AppInterface {
-      server: Server;
       app: Express;
       p2pServer: P2pServer;
       start(peers: number[]): void;
 }
 
 export class App extends AppLogger implements AppInterface {
-      private server: Server;
       private router: Express.Router;
       public app: Express;
       public p2pServer: P2pServer;
@@ -69,7 +67,7 @@ export class App extends AppLogger implements AppInterface {
       }
 
       public start(peers: number[]): void {
-            this.server = this.app.listen(Number(config.port), async () => {
+            this.app.listen(Number(config.port), async () => {
                   App.log.info(
                         `Server listening on port ${Number(config.port)}.`
                   );
