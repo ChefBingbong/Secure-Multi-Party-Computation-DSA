@@ -64,11 +64,25 @@ export class App extends AppLogger {
                   }
             });
 
-            this.app.post("/heartbeat", (req, res) => {
+            this.app.post("/direct-message", (req, res) => {
                   try {
-                        this.p2pServer.sendDirect("6001", {
-                              name: "evan",
-                              text: "welcome from evan",
+                        this.p2pServer.sendDirect(req.body.id, {
+                              name: "direct-message",
+                              text: `recieved message from node ${req.body.id}`,
+                        });
+                        res.status(200).json();
+                  } catch (error) {
+                        res.status(500).json({
+                              error: "Internal Server Error",
+                        });
+                  }
+            });
+
+            this.app.post("/broadcast", (req, res) => {
+                  try {
+                        this.p2pServer.broadcast({
+                              name: "broadcast-message",
+                              text: `recieved message from node ${config.p2pPort}`,
                         });
                         res.status(200).json();
                   } catch (error) {

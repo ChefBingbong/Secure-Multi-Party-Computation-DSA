@@ -5,7 +5,7 @@ import { sampleScalar } from "../sample";
 import { KeygenInputForRound1 } from "./types";
 
 export class KeygenSession {
-      public currentRound = "round1";
+      public currentRound = 0;
       public curve = "secp256k1";
       public finalRound: number = 5;
       public partyIds: Array<PartyId>;

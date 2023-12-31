@@ -190,9 +190,10 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   // console.log(packet);
                   if (this.seenMessages.has(packet.id) || packet.ttl < 1)
                         return;
-                  else this.seenMessages.add(packet.id);
 
                   if (packet.type === "broadcast") {
+                        console.log(packet);
+
                         this.emitter.emitBroadcast(
                               packet.message,
                               packet.origin
@@ -206,12 +207,14 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   }
 
                   if (packet.type === "direct") {
-                        if (packet.destination === this.validator.ID) {
+                        console.log(packet);
+                        if (packet.destination !== this.NODE_ID) {
                               this.emitter.emitDirect(
                                     packet.message,
                                     packet.origin
                               );
                         } else {
+                              // console.log(packet);
                               this.sendDirect(
                                     packet.destination,
                                     packet.message,
@@ -284,8 +287,14 @@ class P2pServer extends AppLogger implements P2PNetwork {
       };
 
       private sendPacket = (packet: any) => {
-            for (const $nodeId of this.neighbors.keys()) {
-                  this.send($nodeId, packet);
+            if (packet.type === "direct") {
+                  this.send(packet.destination, packet);
+                  this.seenMessages.add(packet.id);
+            } else {
+                  for (const $nodeId of this.neighbors.keys()) {
+                        this.send($nodeId, packet);
+                        this.seenMessages.add(packet.id);
+                  }
             }
       };
 
