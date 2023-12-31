@@ -1,9 +1,7 @@
 {
   "name": "privacy-implementations",
   "version": "0.0.0",
-  "description": "Implementations of pallier encryption",
-  "private": true,
-  "license": "Apache-2.0",
+  "description": "MPC Tss typescript implementation",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint './src/**/*.{js,json,ts}'",
@@ -58,5 +56,8 @@
     "winston": "^3.11.0",
     "ws": "^8.16.0",
     "zod": "^3.22.4"
+  },
+  "engines": {
+    "node": "^21.0.0"
   }
 }
