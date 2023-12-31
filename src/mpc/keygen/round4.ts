@@ -8,7 +8,7 @@ import {
       partyIdToScalar,
 } from "./partyKey";
 import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
-import { PedersenParams } from "../Pedersen/pendersen";
+import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
 import { Exponent } from "../math/polynomial/exponent";
 import {
       ZkFacProof,

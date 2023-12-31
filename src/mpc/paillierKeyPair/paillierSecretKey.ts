@@ -1,5 +1,5 @@
 import { modInv, modMultiply, modPow, randBetween } from "bigint-crypto-utils";
-import { PedersenParams } from "../Pedersen/pendersen";
+import { PedersenParams } from "./Pedersen/pendersen";
 import { sampleUnitModN } from "../math/sample";
 import { modSymmetric } from "./paillierCryptoUtils";
 import { PaillierPublicKey } from "./paillierPublicKey";

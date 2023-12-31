@@ -1,7 +1,7 @@
 import { modMultiply, modPow } from "bigint-crypto-utils";
 
 import { Hasher } from "../utils/hasher";
-import { PedersenParams } from "../Pedersen/pendersen";
+import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
 import {
       sampleIntervalLEpsRootN,
       sampleIntervalLN,

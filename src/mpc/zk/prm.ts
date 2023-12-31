@@ -2,7 +2,7 @@ import { modAdd, modMultiply, modPow } from "bigint-crypto-utils";
 
 import { Hasher } from "../utils/hasher";
 import { isValidModN } from "../math/arith";
-import { PedersenParams } from "../Pedersen/pendersen";
+import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
 import { STAT_PARAM, sampleModN } from "../math/sample";
 
 export type ZkPrmPublic = {

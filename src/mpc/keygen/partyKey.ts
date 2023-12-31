@@ -6,8 +6,8 @@ import {
       PaillierPublicKeyJSON,
       PaillierSecretKeyJSON,
 } from "../paillierKeyPair/types";
-import { PedersenParams } from "../Pedersen/pendersen";
-import { PedersenParametersJSON } from "../Pedersen/types";
+import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
+import { PedersenParametersJSON } from "../paillierKeyPair/Pedersen/types";
 import { lagrange } from "../math/polynomial/lagrange";
 import { bytesToNumberBE } from "@noble/curves/abstract/utils";
 import { utf8ToBytes } from "@noble/hashes/utils";

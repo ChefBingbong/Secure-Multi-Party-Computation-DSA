@@ -1,8 +1,8 @@
 import { PartyId } from "./partyKey";
 import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
 import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
-import { PedersenParams } from "../Pedersen/pendersen";
-import { PedersenParametersJSON } from "../Pedersen/types";
+import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
+import { PedersenParametersJSON } from "../paillierKeyPair/Pedersen/types";
 import { Exponent, ExponentJSON } from "../math/polynomial/exponent";
 import { Polynomial } from "../math/polynomial/polynomial";
 import { AffinePoint, AffinePointJSON } from "../types";

@@ -1,5 +1,5 @@
 import { gcd, modPow, modMultiply } from "bigint-crypto-utils";
-import { Hashable, IngestableBasic } from "../utils/hasher";
+import { Hashable, IngestableBasic } from "../../utils/hasher";
 
 export class PedersenParams implements Hashable {
       public n: bigint;
@@ -18,13 +18,19 @@ export class PedersenParams implements Hashable {
 
       public static validateParams(n: bigint, s: bigint, t: bigint): void {
             if (n <= 0n) {
-                  throw new Error("INVALID_PEDERSEN_PARAMETERS: n must be positive");
+                  throw new Error(
+                        "INVALID_PEDERSEN_PARAMETERS: n must be positive"
+                  );
             }
             if (s <= 0n) {
-                  throw new Error("INVALID_PEDERSEN_PARAMETERS: s must be positive");
+                  throw new Error(
+                        "INVALID_PEDERSEN_PARAMETERS: s must be positive"
+                  );
             }
             if (t <= 0n) {
-                  throw new Error("INVALID_PEDERSEN_PARAMETERS: t must be positive");
+                  throw new Error(
+                        "INVALID_PEDERSEN_PARAMETERS: t must be positive"
+                  );
             }
             if (s >= n) {
                   throw new Error(
@@ -63,7 +69,13 @@ export class PedersenParams implements Hashable {
             return modMultiply([sx, ty], this.n);
       }
 
-      public verify(a: bigint, b: bigint, e: bigint, S: bigint, T: bigint): boolean {
+      public verify(
+            a: bigint,
+            b: bigint,
+            e: bigint,
+            S: bigint,
+            T: bigint
+      ): boolean {
             try {
                   PedersenParams.validateParams(this.n, S, T);
             } catch (error) {
