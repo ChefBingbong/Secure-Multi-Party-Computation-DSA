@@ -6,15 +6,16 @@ import helmet from "helmet";
 import hpp from "hpp";
 import { Server } from "http";
 import { Logger } from "winston";
-import { node } from "..";
 import config from "../config/config";
 import P2pserver from "../p2p/server";
 import errorHandlingMiddleware from "./middleware/errorHandler";
 import { AppLogger } from "./middleware/logger";
+import P2pServer from "../p2p/server";
 
 export class App extends AppLogger {
       public server: Server;
       public app: Express;
+      public p2pServer: P2pServer;
       public static log: Logger;
 
       constructor() {
@@ -64,7 +65,7 @@ export class App extends AppLogger {
 
             this.app.post("/heartbeat", (req, res) => {
                   try {
-                        node.sendDirect("6001", {
+                        this.p2pServer.sendDirect("6001", {
                               name: "evan",
                               text: "welcome from evan",
                         });
@@ -81,12 +82,13 @@ export class App extends AppLogger {
             this.app.use(errorHandlingMiddleware);
       }
 
-      public start(): void {
+      public start(peers: number[]): void {
             this.server = this.app.listen(Number(config.port), async () => {
                   App.log.info(
                         `Server listening on port ${Number(config.port)}.`
                   );
-                  // P2pserver.listen();
+                  this.p2pServer = new P2pServer();
+                  this.p2pServer.listen(Number(config.p2pPort), peers);
             });
       }
 }

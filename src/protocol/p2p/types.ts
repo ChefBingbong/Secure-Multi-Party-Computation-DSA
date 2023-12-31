@@ -10,11 +10,7 @@ export interface P2PNetwork {
             ports: number[],
             cb?: () => void
       ): (cb?: any) => net.Server;
-      connect: (
-            ip: string,
-            port: number,
-            cb?: () => void
-      ) => (cb: Error) => net.Socket;
+      connect: (ip: string, port: number, cb?: () => void) => void;
       close: (cb: () => void) => void;
       broadcast: (
             message: any,

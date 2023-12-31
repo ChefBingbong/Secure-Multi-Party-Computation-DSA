@@ -7,6 +7,7 @@ import { P2PNetworkEventEmitter } from "./eventEmitter";
 import T from "./splitStream";
 import { P2PNetwork } from "./types";
 import config from "../config/config";
+import { redisClient } from "../db/redis";
 
 class P2pServer extends AppLogger implements P2PNetwork {
       public readonly connections: Map<string, net.Socket>;
@@ -33,7 +34,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
             this.log = this.getLogger("p2p-log");
             this.server = net.createServer((socket: net.Socket) =>
-                  this.handleNewSocket(socket, false)
+                  this.handleNewSocket(socket)
             );
             P2pServer.validators = new Map([
                   [config.p2pPort, this.validator.toString()],
@@ -64,7 +65,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         this.log.info(`New node connected: ${nodeId}`);
                   });
 
-                  this.on("disconnect", ({ nodeId }) => {
+                  this.on("disconnect", async ({ nodeId }) => {
                         this.log.info(`Node disconnected: ${nodeId}`);
                   });
 
@@ -89,6 +90,11 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
       public connect = (ip: string, port: number, cb?: () => void) => {
             const socket = new net.Socket();
+
+            socket.on("error", (err) => {
+                  console.error(`Socket connection error: ${err.message}`);
+                  // You can perform error handling logic here
+            });
 
             socket.connect(port, ip, () => {
                   this.handleNewSocket(socket);
@@ -224,6 +230,11 @@ class P2pServer extends AppLogger implements P2PNetwork {
             const connectionId = v4();
             this.connections.set(connectionId, socket);
             if (emitConnect) this.emitter.emitConnect(connectionId, false);
+
+            socket.on("error", (err) => {
+                  console.error(`Socket connection error: ${err.message}`);
+                  // You can perform error handling logic here
+            });
 
             socket.on("close", () => {
                   this.connections.delete(connectionId);

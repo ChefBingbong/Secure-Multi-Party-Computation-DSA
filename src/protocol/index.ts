@@ -1,59 +1,56 @@
-import { EventEmitter } from "stream";
 import config from "./config/config";
+import { redisClient } from "./db/redis";
 import App from "./http/app";
-import P2pServer from "./p2p/server";
-// const emitter = new EventEmitter();
-export let node: P2pServer;
-function generatePortRangeRecursive(endPort, startPort = 6001) {
-      if (endPort < startPort) {
-            // throw new Error("End port must be greater than or equal to 3001");
-      }
 
-      if (startPort === endPort) {
-            return [startPort];
-      }
-
-      const restOfPorts = generatePortRangeRecursive(endPort, startPort + 1);
-      return [startPort, ...restOfPorts];
-}
+export const updatePeerReplica = async (port: number) => {
+      const peers = await redisClient.getSingleData<number[]>("validators");
+      const updatedPeers = peers.filter((peer) => peer !== port);
+      await redisClient.setSignleData("validators", updatedPeers);
+};
 
 export const startProtocol = async (): Promise<void> => {
+      if (!redisClient.initialized) throw new Error(`redis not initialized`);
+
       const app = new App();
-      app.start();
+      const port = Number(config.p2pPort);
       const log = app.getLogger("app");
+
+      let peers = await redisClient.getSingleData<number[]>("validators");
+      peers = [...peers, port].filter((value, index, self) => {
+            return self.indexOf(value) === index;
+      });
+
+      await redisClient.setSignleData("validators", peers);
+
+      app.start(peers);
+
       process
-            .on("SIGINT", (reason) => {
+            .on("SIGINT", async (reason) => {
                   log.error(`SIGINT. ${reason}`);
+                  await updatePeerReplica(port);
                   process.exit();
             })
-            .on("SIGTERM", (reason) => {
+            .on("SIGTERM", async (reason) => {
                   log.error(`SIGTERM. ${reason}`);
+                  await updatePeerReplica(port);
                   process.exit();
             })
-            .on("unhandledRejection", (reason) => {
+            .on("unhandledRejection", async (reason) => {
                   log.error(
                         `Unhandled Rejection at Promise. Reason: ${reason}`
                   );
+                  await updatePeerReplica(port);
                   process.exit(-1);
             })
-            .on("uncaughtException", (reason) => {
+            .on("uncaughtException", async (reason) => {
                   log.error(
                         `Uncaught Exception Rejection at Promise. Reason: ${reason}`
                   );
+                  await updatePeerReplica(port);
                   process.exit(-2);
             });
 };
 
 startProtocol().then(() => {
-      const p2pPort = Number(config.p2pPort);
-      const ports = generatePortRangeRecursive(p2pPort);
-      console.log(p2pPort);
-      node = new P2pServer();
-
-      // p2p.setOnNodeJoinCallback((socket) => {
-      //       console.log(`New node joined with ID: ${1}`);
-      // });
-      node.listen(p2pPort, ports);
-
       console.log("Application started");
 });
