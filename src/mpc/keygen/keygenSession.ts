@@ -3,6 +3,7 @@ import { PartyId } from "./partyKey";
 import { Polynomial } from "../math/polynomial/polynomial";
 import { sampleScalar } from "../math/sample";
 import { KeygenInputForRound1 } from "./types";
+import { Helper, Info } from "../../protocol/helper/helper";
 
 export class KeygenSession {
       public currentRound = 0;
@@ -13,6 +14,7 @@ export class KeygenSession {
       public selfId: PartyId;
       public threshold: number;
       public hasher: Hasher;
+      public ssid: Hasher;
 
       public inputForRound1: KeygenInputForRound1;
 
@@ -39,6 +41,8 @@ export class KeygenSession {
             this.hasher.update(this.protocolId);
             this.hasher.update(this.curve);
             this.hasher.update(BigInt(this.threshold));
+            this.ssid = this.cloneHashForId(this.selfId);
+
             for (let partyId of this.partyIds) {
                   this.hasher.update(partyId);
             }
@@ -69,17 +73,27 @@ export class KeygenSession {
             const vssConstant = sampleScalar();
             const vssSecret = Polynomial.new(this.threshold, vssConstant);
 
-            this.inputForRound1 = {
-                  ...this,
+            const info: Info = {
+                  ProtocolID: this.protocolId,
+                  FinalRoundNumber: this.finalRound,
+                  SelfID: this.selfId,
+                  PartyIDs: this.partyIds,
+                  Threshold: this.threshold,
+                  hash: this.hasher,
+            };
+
+            const helper = new Helper(info);
+
+            return (this.inputForRound1 = {
                   vssSecret,
+                  helper,
                   precomputedPaillierPrimes: this.precomputedPaillierPrimes,
 
                   // TODO: these are for refresh? not implemented yet
                   previousSecretECDSA: null,
                   previousPublicSharesECDSA: null,
                   previousChainKey: null,
-            };
-            return this;
+            });
       };
 
       public cloneHashForId(id: PartyId): Hasher {

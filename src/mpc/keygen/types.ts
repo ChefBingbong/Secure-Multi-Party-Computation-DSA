@@ -14,9 +14,11 @@ import {
       KeygenDirectMessageForRound4,
       KeygenInputForRound4,
 } from "./round4";
+import { Helper, Info } from "../../protocol/helper/helper";
 
 export type KeygenInputForRound1 = {
       vssSecret: Polynomial;
+      helper?: Helper;
       precomputedPaillierPrimes?: {
             p: bigint;
             q: bigint;
@@ -26,11 +28,6 @@ export type KeygenInputForRound1 = {
       previousSecretECDSA: null;
       previousPublicSharesECDSA: null;
       previousChainKey: null;
-};
-
-export type KeygenRound1Output = {
-      broadcasts: Array<KeygenBroadcastForRound2>;
-      inputForRound2: KeygenInputForRound2;
 };
 
 export type KeygenInputForRound2 = {
@@ -50,9 +47,19 @@ export type KeygenInputForRound2 = {
       decommitment: Uint8Array;
 };
 
+export type KeygenRound1Output = {
+      broadcasts: Array<KeygenBroadcastForRound2>;
+      inputForRound2: KeygenInputForRound2;
+};
 export type KeygenRound2Output = {
       broadcasts: Array<KeygenBroadcastForRound3>;
       inputForRound3: KeygenInputForRound3;
+};
+
+export type KeygenRound3Output = {
+      broadcasts: Array<KeygenBroadcastForRound4>;
+      directMessages: Array<KeygenDirectMessageForRound4>;
+      inputForRound4: KeygenInputForRound4;
 };
 
 export type KeygenBroadcastForRound2JSON = {
@@ -69,12 +76,6 @@ export type KeygenBroadcastForRound3JSON = {
       elGamalPublic: AffinePointJSON;
       pedersenPublic: PedersenParametersJSON;
       decommitmentHex: string;
-};
-
-export type KeygenRound3Output = {
-      broadcasts: Array<KeygenBroadcastForRound4>;
-      directMessages: Array<KeygenDirectMessageForRound4>;
-      inputForRound4: KeygenInputForRound4;
 };
 
 export type KeygenInputForRound3 = {

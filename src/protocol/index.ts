@@ -2,7 +2,7 @@ import { KeygenSession } from "../mpc/keygen/keygenSession";
 import config from "../config/config";
 import { redisClient } from "../db/redis";
 import App from "../http/app";
-import { MultiHandler } from "./messageProcessor";
+// import { MultiHandler } from "./messageProcessor";
 
 export let app: App;
 
@@ -72,7 +72,7 @@ export const startKeygen = async () => {
                         // precomputedPaillierPrimesA
                   );
             const startFunc = keygenSession().start;
-            const protocolHandler = new MultiHandler(startFunc, null);
+            // const protocolHandler = new MultiHandler(startFunc, null);
       }
 };
 startProtocol().then(() => {
