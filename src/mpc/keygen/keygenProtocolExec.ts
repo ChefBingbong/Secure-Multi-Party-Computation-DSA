@@ -6,6 +6,7 @@ interface AbstractRound {
       output: any;
       process: () => Promise<any>;
       handleBroadcastMessage: (args: any) => void;
+      handleDirectMessage(dmsg: any): void;
 }
 export interface AbstractRound2 extends AbstractRound {}
 export type Round = {
@@ -15,9 +16,10 @@ export type Round = {
       finished: boolean;
 };
 export class KeygenSessionManager {
-      private sessionComplete: boolean = false;
-      public threshold: number;
-      public validators: string[];
+      public sessionComplete: boolean = false;
+      public isInitialized: boolean = false;
+      public threshold: number = undefined;
+      public validators: string[] = [];
       public finalRound: number = 5;
       public currentRound: number = undefined;
       public previousRound: number = undefined;
@@ -39,7 +41,7 @@ export class KeygenSessionManager {
       constructor() {}
 
       initNewRound(isFirst: boolean = false) {
-            if (this.sessionComplete) return;
+            if (this.sessionComplete || !this.isInitialized) return;
             const roundInput = isFirst
                   ? this.session.session.inputForRound1
                   : this.rounds[this.previousRound].round.output;
@@ -53,7 +55,6 @@ export class KeygenSessionManager {
                   roundResponses: 0,
                   finished: false,
             };
-            // console.log(this);
       }
 
       startNewSession({ selfId, partyIds, threshold }): {
@@ -62,7 +63,11 @@ export class KeygenSessionManager {
             roundResponses: number;
             finished: boolean;
       } {
+            if (this.isInitialized) return;
+            if (this.sessionComplete) this.resetSessionState();
+
             this.sessionComplete = false;
+            this.isInitialized = true;
             this.threshold = threshold;
             this.validators = this.validators;
 
@@ -77,8 +82,19 @@ export class KeygenSessionManager {
             return this.session;
       }
 
+      resetSessionState() {
+            this.sessionComplete = false;
+            this.threshold = undefined;
+            this.validators = [];
+            this.finalRound = 5;
+            this.currentRound = undefined;
+            this.previousRound = undefined;
+            this.session = undefined;
+            this.rounds = undefined;
+      }
+
       incrementRound(round: number): void {
-            if (this.sessionComplete) return;
+            if (this.sessionComplete || !this.isInitialized) return;
             if (this.currentRound === 0) {
                   this.session.roundResponses += 1;
                   if (this.session.roundResponses >= 3) {
@@ -96,26 +112,23 @@ export class KeygenSessionManager {
                   }
 
                   if (this.rounds[round].finished) {
-                        this.previousRound = this.currentRound;
-                        this.currentRound += 1;
-                        this.initNewRound();
-                  }
-
-                  if (
-                        round === this.finalRound &&
-                        this.rounds[this.finalRound]?.finished
-                  ) {
-                        this.sessionComplete = true;
+                        if (round === this.finalRound) {
+                              this.sessionComplete = true;
+                        } else {
+                              this.previousRound = this.currentRound;
+                              this.currentRound += 1;
+                              this.initNewRound();
+                        }
                   }
             }
       }
 
       logState() {
             const s = this.getCurrentState();
-            console.log({
-                  session: s.currentProtocol,
-                  rounds: s.rounds,
-            });
+            // console.log({
+            //       session: s.currentProtocol,
+            //       rounds: s.rounds,
+            // });
       }
 
       getCurrentState(): {

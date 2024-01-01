@@ -111,9 +111,7 @@ export class KeygenBroadcastForRound3 {
                   RID: BigInt(`0x${json.RIDhex}`),
                   C: BigInt(`0x${json.Chex}`),
                   vssPolynomial: Exponent.fromJSON(json.vssPolynomial),
-                  schnorrCommitment: ZkSchCommitment.fromJSON(
-                        json.schnorrCommitment
-                  ),
+                  schnorrCommitment: ZkSchCommitment.fromJSON(json.schnorrCommitment),
                   elGamalPublic: pointFromJSON(json.elGamalPublic),
                   pedersenPublic: new PedersenParams(
                         BigInt("0x" + json.pedersenPublic.nHex),
@@ -147,13 +145,10 @@ export class KeygenRound3 {
 
             Hasher.validateCommitment(bmsg.decommitment);
 
-            const vssSecret =
-                  this.inputForRound3.inputForRound2.inputRound1.vssSecret;
+            const vssSecret = this.inputForRound3.inputForRound2.inputRound1.vssSecret;
             const vssPolynomial = bmsg.vssPolynomial;
             if ((vssSecret.constant() === 0n) !== vssPolynomial.isConstant) {
-                  throw new Error(
-                        `vss polynomial has incorrect constant from ${from}`
-                  );
+                  throw new Error(`vss polynomial has incorrect constant from ${from}`);
             }
             if (vssPolynomial.degree() !== this.session.threshold) {
                   throw new Error(
@@ -169,27 +164,21 @@ export class KeygenRound3 {
 
             const decomValid = this.session
                   .cloneHashForId(from)
-                  .decommit(
-                        this.inputForRound3.commitments[from],
-                        bmsg.decommitment,
-                        [
-                              bmsg.RID,
-                              bmsg.C,
-                              vssPolynomial,
-                              bmsg.schnorrCommitment.C,
-                              bmsg.elGamalPublic,
-                              bmsg.pedersenPublic,
-                        ]
-                  );
+                  .decommit(this.inputForRound3.commitments[from], bmsg.decommitment, [
+                        bmsg.RID,
+                        bmsg.C,
+                        vssPolynomial,
+                        bmsg.schnorrCommitment.C,
+                        bmsg.elGamalPublic,
+                        bmsg.pedersenPublic,
+                  ]);
             if (!decomValid) {
                   throw new Error(`failed to decommit from ${from}`);
             }
 
             this.RIDs[from] = bmsg.RID;
             this.ChainKeys[from] = bmsg.C;
-            this.PaillierPublic[from] = new PaillierPublicKey(
-                  bmsg.pedersenPublic.n
-            );
+            this.PaillierPublic[from] = new PaillierPublicKey(bmsg.pedersenPublic.n);
             this.Pedersen[from] = bmsg.pedersenPublic;
             this.vssPolynomials[from] = vssPolynomial;
             this.SchnorrCommitments[from] = bmsg.schnorrCommitment;
@@ -198,8 +187,7 @@ export class KeygenRound3 {
 
       public process(): KeygenRound3Output {
             let chainKey: bigint | null =
-                  this.inputForRound3.inputForRound2.inputRound1
-                        .previousChainKey;
+                  this.inputForRound3.inputForRound2.inputRound1.previousChainKey;
             if (chainKey === null) {
                   chainKey = 0n;
                   for (const j of this.session.partyIds) {
@@ -274,11 +262,9 @@ export class KeygenRound3 {
                         hashWithRidAndPartyId.clone()
                   );
 
-                  const { vssSecret } =
-                        this.inputForRound3.inputForRound2.inputRound1;
+                  const { vssSecret } = this.inputForRound3.inputForRound2.inputRound1;
                   const share = vssSecret.evaluate(partyIdToScalar(j));
-                  const { ciphertext: C } =
-                        this.PaillierPublic[j].encrypt(share);
+                  const { ciphertext: C } = this.PaillierPublic[j].encrypt(share);
 
                   directMessages.push(
                         KeygenDirectMessageForRound4.from({

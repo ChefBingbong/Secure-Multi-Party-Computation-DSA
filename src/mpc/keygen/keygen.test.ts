@@ -150,5 +150,9 @@ describe("keygen 2/3", async () => {
                   Hasher.create().update(outputs[0].UpdatedConfig).digestBigint(),
                   Hasher.create().update(outputs[2].UpdatedConfig).digestBigint()
             );
+            assert.deepEqual(
+                  Hasher.create().update(outputs[1].UpdatedConfig).digestBigint(),
+                  Hasher.create().update(outputs[2].UpdatedConfig).digestBigint()
+            );
       });
 });

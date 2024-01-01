@@ -10,24 +10,9 @@ import {
 import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
 import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
 import { Exponent } from "../math/polynomial/exponent";
-import {
-      ZkFacProof,
-      ZkFacProofJSON,
-      ZkFacPublic,
-      zkFacVerifyProof,
-} from "../zk/fac";
-import {
-      ZkModProof,
-      ZkModProofJSON,
-      ZkModPublic,
-      zkModVerifyProof,
-} from "../zk/mod";
-import {
-      ZkPrmProof,
-      ZkPrmProofJSON,
-      ZkPrmPublic,
-      zkPrmVerifyProof,
-} from "../zk/prm";
+import { ZkFacProof, ZkFacProofJSON, ZkFacPublic, zkFacVerifyProof } from "../zk/fac";
+import { ZkModProof, ZkModProofJSON, ZkModPublic, zkModVerifyProof } from "../zk/mod";
+import { ZkPrmProof, ZkPrmProofJSON, ZkPrmPublic, zkPrmVerifyProof } from "../zk/prm";
 import { KeygenInputForRound3 } from "./types";
 import { KeygenSession } from "./keygenSession";
 import { AffinePoint } from "../types";
@@ -46,11 +31,7 @@ export class KeygenBroadcastForRound4 {
       public readonly modProof: ZkModProof;
       public readonly prmProof: ZkPrmProof;
 
-      private constructor(
-            from: PartyId,
-            modProof: ZkModProof,
-            prmProof: ZkPrmProof
-      ) {
+      private constructor(from: PartyId, modProof: ZkModProof, prmProof: ZkPrmProof) {
             this.from = from;
             this.modProof = modProof;
             this.prmProof = prmProof;
@@ -126,12 +107,7 @@ export class KeygenDirectMessageForRound4 {
             share: bigint;
             facProof: ZkFacProof;
       }): KeygenDirectMessageForRound4 {
-            const d = new KeygenDirectMessageForRound4(
-                  from,
-                  to,
-                  share,
-                  facProof
-            );
+            const d = new KeygenDirectMessageForRound4(from, to, share, facProof);
             Object.freeze(d);
             return d;
       }
@@ -178,10 +154,7 @@ export class KeygenRound4 {
       private ShareReceived: Record<PartyId, bigint> = {};
       public output: KeygenInputForRound5;
 
-      constructor(
-            private session: KeygenSession,
-            private input: KeygenInputForRound4
-      ) {}
+      constructor(private session: KeygenSession, private input: KeygenInputForRound4) {}
 
       public handleBroadcastMessage(bmsg: KeygenBroadcastForRound4) {
             const { from, modProof, prmProof } = bmsg;
@@ -240,27 +213,23 @@ export class KeygenRound4 {
 
             // store
             const DecryptedShare =
-                  this.input.inputForRound3.inputForRound2.paillierSecret.decrypt(
-                        share
-                  );
+                  this.input.inputForRound3.inputForRound2.paillierSecret.decrypt(share);
             const Share = Fn.mod(DecryptedShare);
             console.log(Share, DecryptedShare);
             if (Share !== DecryptedShare) {
                   throw new Error(`decrypted share is not in correct range`);
             }
 
-            const ExpectedPublicShare = this.input.vssPolynomials[
-                  from
-            ].evaluate(partyIdToScalar(this.session.selfId));
+            const ExpectedPublicShare = this.input.vssPolynomials[from].evaluate(
+                  partyIdToScalar(this.session.selfId)
+            );
             const PublicShare = secp256k1.ProjectivePoint.BASE.multiply(Share);
             if (
-                  !secp256k1.ProjectivePoint.fromAffine(
-                        ExpectedPublicShare
-                  ).equals(PublicShare)
+                  !secp256k1.ProjectivePoint.fromAffine(ExpectedPublicShare).equals(
+                        PublicShare
+                  )
             ) {
-                  throw new Error(
-                        `${to} failed to validate VSS share from ${from}`
-                  );
+                  throw new Error(`${to} failed to validate VSS share from ${from}`);
             }
 
             this.ShareReceived[from] = Share;
@@ -271,17 +240,13 @@ export class KeygenRound4 {
                   this.input.inputForRound3.inputForRound2.selfShare;
             let UpdatedSecretECDSA = 0n;
             if (
-                  this.input.inputForRound3.inputForRound2.inputRound1
-                        .previousSecretECDSA
+                  this.input.inputForRound3.inputForRound2.inputRound1.previousSecretECDSA
             ) {
                   // TODO: on refresh
                   throw new Error("not implemented");
             }
             for (const j of this.session.partyIds) {
-                  UpdatedSecretECDSA = Fn.add(
-                        UpdatedSecretECDSA,
-                        this.ShareReceived[j]
-                  );
+                  UpdatedSecretECDSA = Fn.add(UpdatedSecretECDSA, this.ShareReceived[j]);
             }
 
             const ShamirPublicPolynomials: Exponent[] = [];
@@ -289,9 +254,7 @@ export class KeygenRound4 {
                   ShamirPublicPolynomials.push(this.input.vssPolynomials[j]);
             }
 
-            const ShamirPublicPolynomial = Exponent.sum(
-                  ShamirPublicPolynomials
-            );
+            const ShamirPublicPolynomial = Exponent.sum(ShamirPublicPolynomials);
 
             const PublicData: Record<PartyId, PartyPublicKeyConfig> = {};
             for (const j of this.session.partyIds) {
@@ -319,10 +282,8 @@ export class KeygenRound4 {
                   partyId: this.session.selfId,
                   threshold: this.session.threshold,
                   ecdsa: UpdatedSecretECDSA,
-                  elgamal: this.input.inputForRound3.inputForRound2
-                        .elGamalSecret,
-                  paillier: this.input.inputForRound3.inputForRound2
-                        .paillierSecret,
+                  elgamal: this.input.inputForRound3.inputForRound2.elGamalSecret,
+                  paillier: this.input.inputForRound3.inputForRound2.paillierSecret,
                   rid: this.input.RID,
                   chainKey: this.input.ChainKey,
                   publicPartyData: PublicData,

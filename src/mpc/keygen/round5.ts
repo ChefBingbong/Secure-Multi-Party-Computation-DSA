@@ -62,10 +62,7 @@ export type KeygenRound5Output = {
 };
 
 export class KeygenRound5 {
-      constructor(
-            private session: KeygenSession,
-            private input: KeygenInputForRound5
-      ) {}
+      constructor(private session: KeygenSession, private input: KeygenInputForRound5) {}
 
       public handleBroadcastMessage(bmsg: KeygenBroadcastForRound5) {
             const { from, SchnorrResponse } = bmsg;
@@ -81,9 +78,7 @@ export class KeygenRound5 {
                   this.input.inputForRound4.SchnorrCommitments[from]
             );
             if (!verified) {
-                  throw new Error(
-                        `failed to validate schnorr response from ${from}`
-                  );
+                  throw new Error(`failed to validate schnorr response from ${from}`);
             }
       }
 
