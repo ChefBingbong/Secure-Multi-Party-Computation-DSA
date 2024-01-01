@@ -32,6 +32,16 @@ import {
 import { KeygenBroadcastForRound5, KeygenRound5Output } from "../mpc/keygen/round5";
 import { Hasher } from "../mpc/utils/hasher";
 
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const PEER_DELAY = {
+      "6001": 40,
+      "6002": 150,
+      "6003": 300,
+      "6004": 450,
+      "6005": 550,
+      "6006": 700,
+};
 class P2pServer extends AppLogger implements P2PNetwork {
       public readonly connections: Map<string, net.Socket>;
       public readonly NODE_ID: string;
@@ -60,7 +70,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
       constructor() {
             super();
-            this.threshold = 3;
+            this.threshold = 6;
             this.connections = new Map();
             this.neighbors = new Map();
             this.NODE_ID = config.p2pPort;
@@ -76,8 +86,8 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.sessionManager = new KeygenSessionManager();
             this.sessionManager.startNewSession({
                   selfId: this.NODE_ID,
-                  partyIds: ["6001", "6002", "6003"],
-                  threshold: 3,
+                  partyIds: ["6001", "6002", "6003", "6004", "6005", "6006"],
+                  threshold: 6,
             });
             this.initState();
       }
@@ -109,72 +119,107 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
                   this.on(
                         "broadcast",
-                        ({
+                        async ({
                               message: {
                                     name,
                                     text,
                                     type = "broadcast",
                                     options = undefined,
+                                    senderNode = undefined,
                               },
                         }) => {
                               this.log.info(`${name}: ${text}`);
-
                               const manager = this.sessionManager;
 
-                              const sessionState = manager.getCurrentState();
-                              const protocol = sessionState.currentProtocol;
-                              manager.incrementRound(manager.currentRound);
+                              try {
+                                    const sessionState = manager.getCurrentState();
+                                    const protocol = sessionState.currentProtocol;
+                                    manager.incrementRound(manager.currentRound);
 
-                              if (type === `keygenRound1`) {
-                                    this.broadcasts = [...this.broadcasts, ...options];
-                                    console.log(this.broadcasts);
-                              } else if (type === `keygenRound2`) {
-                                    this.broadcasts3 = [...this.broadcasts3, ...options];
-                                    console.log(this.broadcasts3);
-                              } else if (type === `keygenRound3`) {
-                                    const { broadcasts, directMessages } = options;
-                                    this.broadcasts4 = [
-                                          ...this.broadcasts4,
-                                          ...broadcasts,
-                                    ];
-                                    this.directMessages = [
-                                          ...this.directMessages,
-                                          ...directMessages,
-                                    ];
+                                    if (type === `keygenRound1`) {
+                                          this.broadcasts = [
+                                                ...this.broadcasts,
+                                                ...options,
+                                          ];
+                                          console.log(this.broadcasts);
+                                    } else if (type === `keygenRound2`) {
+                                          this.broadcasts3 = [
+                                                ...this.broadcasts3,
+                                                ...options,
+                                          ];
+                                          console.log(this.broadcasts3);
+                                    } else if (type === `keygenRound3`) {
+                                          const { broadcasts, directMessages } = options;
+                                          this.broadcasts4 = [
+                                                ...this.broadcasts4,
+                                                ...broadcasts,
+                                          ];
+                                          this.directMessages = [
+                                                ...this.directMessages,
+                                                ...directMessages,
+                                          ];
 
-                                    console.log(this.broadcasts4, directMessages);
-                              } else if (type === `keygenRound4`) {
-                                    const { broadcasts } = options;
-                                    this.broadcasts5 = [
-                                          ...this.broadcasts5,
-                                          ...broadcasts,
-                                    ];
+                                          console.log(this.broadcasts4, directMessages);
+                                    } else if (type === `keygenRound4`) {
+                                          const { broadcasts } = options;
+                                          this.broadcasts5 = [
+                                                ...this.broadcasts5,
+                                                ...broadcasts,
+                                          ];
 
-                                    console.log(this.broadcasts5);
-                              } else if (type === `keygenRound5`) {
-                                    const { proof } = options;
-                                    console.log(proof);
-                                    const cp = BigInt(proof);
-                                    console.log(cp);
+                                          console.log(this.broadcasts5);
+                                    } else if (type === `keygenRound5`) {
+                                          const { proof } = options;
+                                          const parsedProof = BigInt(proof);
 
-                                    this.proofs = [...this.proofs, proof];
+                                          this.proofs = [...this.proofs, proof];
 
-                                    if (protocol.roundResponses === this.threshold) {
-                                          assert.deepEqual(cp[0], cp[1]);
-                                          assert.deepEqual(cp[0], cp[2]);
-                                          assert.deepEqual(cp[1], cp[2]);
+                                          if (
+                                                protocol.roundResponses.number ===
+                                                this.threshold
+                                          ) {
+                                                assert.deepEqual(
+                                                      parsedProof[0],
+                                                      parsedProof[1]
+                                                );
+                                                // assert.deepEqual(
+                                                //       parsedProof[0],
+                                                //       parsedProof[2]
+                                                // );
+                                                assert.deepEqual(
+                                                      parsedProof[1],
+                                                      parsedProof[2]
+                                                );
 
-                                          this.log.info(`keygeneration was successful`);
-                                          this.log.info(
-                                                `keyGen session finished and round data reset`
-                                          );
+                                                this.log.info(
+                                                      `keygeneration was successful`
+                                                );
+                                                this.log.info(
+                                                      `keyGen session finished and round data reset`
+                                                );
+                                          }
                                     }
-                              }
 
-                              if (protocol.roundResponses === this.threshold) {
-                                    this.log.info(`ready to start keygen round 1`);
+                                    if (
+                                          protocol.roundResponses.number ===
+                                          this.threshold
+                                    ) {
+                                          this.log.info(`ready to start keygen round 1`);
+                                          if (this.NODE_ID === "6001") {
+                                                // await delay(PEER_DELAY[this.NODE_ID]);
+                                                this.startKeygen();
+                                          }
+                                    }
+                                    manager.logState();
+                                    if (
+                                          // this.NODE_ID !== senderNode ||
+                                          !protocol.roundResponses.peer[this.NODE_ID]
+                                    ) {
+                                          this.startKeygen();
+                                    }
+                              } catch (error) {
+                                    console.log(error);
                               }
-                              manager.logState();
                         }
                   );
 
@@ -260,7 +305,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   });
             });
 
-            this.emitter.on("_message", ({ connectionId, message }) => {
+            this.emitter.on("_message", async ({ connectionId, message }) => {
                   const { type, data } = message;
                   if (type === "handshake") {
                         const { nodeId } = data;
@@ -273,6 +318,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
                   if (type === "message") {
                         const nodeId = this.findNodeId(connectionId);
+                        await delay(PEER_DELAY[this.NODE_ID]);
                         this.emitter.emitMessage(nodeId, data, true);
                   }
             });
@@ -357,7 +403,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   this.throwError(
                         `Attempt to send data to connection that does not exist ${connectionId}`
                   );
-
             socket.write(JSON.stringify(message));
       };
 
@@ -408,7 +453,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             const roundInvalid = currentProtocol.finished;
 
             // console.log(roundInvalid, currentRound, !currentRound);
-            if (this.threshold < 3 || roundInvalid || currentRound === undefined)
+            if (this.threshold < 6 || roundInvalid || currentRound === undefined)
                   this.throwError(`need 3 peers to start keygen`);
 
             let inputForNextRound: KeygenRound1Output;
@@ -416,6 +461,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             let inputForNextRound3: KeygenRound3Output;
             let inputForNextRound4: KeygenRound4Output;
             let inputForNextRound5: KeygenRound5Output;
+            currentProtocol.roundResponses.peer[this.NODE_ID] = true;
 
             if (currentRound === 1) {
                   inputForNextRound = await (currentProtocol as Round).round.process();
@@ -425,6 +471,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         text: `${config.p2pPort}'s round2 input ${inputForNextRound}`,
                         type: `keygenRound1`,
                         options: inputForNextRound.broadcasts,
+                        senderNode: this.NODE_ID,
                   });
             } else if (currentRound === 2) {
                   // console.log(this.broadcasts);
@@ -441,6 +488,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         text: `${config.p2pPort}'s round3 input ${inputForNextRound2}`,
                         type: `keygenRound2`,
                         options: inputForNextRound2.broadcasts,
+                        senderNode: this.NODE_ID,
                   });
             } else if (currentRound === 3) {
                   const broadcastsFromLastRound = this.broadcasts3.map((b: any) =>
@@ -459,6 +507,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                               broadcasts: inputForNextRound3.broadcasts,
                               directMessages: inputForNextRound3.directMessages,
                         },
+                        senderNode: this.NODE_ID,
                   });
                   // console.log(inputForNextRound);
             } else if (currentRound === 4) {
@@ -485,6 +534,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         options: {
                               broadcasts: inputForNextRound4.broadcasts,
                         },
+                        senderNode: this.NODE_ID,
                   });
                   // console.log(inputForNextRound);
             } else if (currentRound === 5) {
@@ -506,6 +556,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         text: `${config.p2pPort}'s round3 input ${inputForNextRound5}`,
                         type: `keygenRound5`,
                         options: { proof: proof.toString() },
+                        senderNode: this.NODE_ID,
                   });
                   // console.log(inputForNextRound5.UpdatedConfig);
                   // console.log(inputForNextRound);
@@ -514,6 +565,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         name: "keygenSetup-response",
                         text: `message ${config.p2pPort} confirming they have computed round 1 input`,
                         type: "keygenSetup",
+                        senderNode: this.NODE_ID,
                   });
             }
 

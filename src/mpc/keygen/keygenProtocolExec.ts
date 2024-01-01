@@ -12,7 +12,7 @@ export interface AbstractRound2 extends AbstractRound {}
 export type Round = {
       round: AbstractRound2;
       initialized: boolean;
-      roundResponses: number;
+      roundResponses: { peer: { [id: string]: boolean }; number: number };
       finished: boolean;
 };
 export class KeygenSessionManager {
@@ -26,14 +26,14 @@ export class KeygenSessionManager {
       public session: {
             session: KeygenSession;
             initialized: boolean;
-            roundResponses: number;
+            roundResponses: { peer: { [id: string]: boolean }; number: number };
             finished: boolean;
       } = undefined;
       public rounds: {
             [x: number]: {
                   round: AbstractRound2;
                   initialized: boolean;
-                  roundResponses: number;
+                  roundResponses: { peer: { [id: string]: boolean }; number: number };
                   finished: boolean;
             };
       } = undefined;
@@ -52,7 +52,7 @@ export class KeygenSessionManager {
             this.rounds[this.currentRound] = {
                   round: round,
                   initialized: false,
-                  roundResponses: 0,
+                  roundResponses: { peer: {}, number: 0 },
                   finished: false,
             };
       }
@@ -60,7 +60,7 @@ export class KeygenSessionManager {
       startNewSession({ selfId, partyIds, threshold }): {
             session: KeygenSession;
             initialized: boolean;
-            roundResponses: number;
+            roundResponses: { peer: { [id: string]: boolean }; number: number };
             finished: boolean;
       } {
             if (this.isInitialized) return;
@@ -76,7 +76,7 @@ export class KeygenSessionManager {
             this.session = {
                   session: new KeygenSession(selfId, partyIds, threshold),
                   initialized: false,
-                  roundResponses: 0,
+                  roundResponses: { peer: {}, number: 0 },
                   finished: false,
             };
             return this.session;
@@ -96,8 +96,8 @@ export class KeygenSessionManager {
       incrementRound(round: number): void {
             if (this.sessionComplete || !this.isInitialized) return;
             if (this.currentRound === 0) {
-                  this.session.roundResponses += 1;
-                  if (this.session.roundResponses >= 3) {
+                  this.session.roundResponses.number += 1;
+                  if (this.session.roundResponses.number >= 6) {
                         this.session.finished = true;
                         this.currentRound += 1;
                         this.initNewRound(true);
@@ -105,9 +105,9 @@ export class KeygenSessionManager {
                   return;
             }
             if (this.rounds[round]) {
-                  this.rounds[round].roundResponses += 1;
+                  this.rounds[round].roundResponses.number += 1;
 
-                  if (this.rounds[round].roundResponses >= 3) {
+                  if (this.rounds[round].roundResponses.number >= 6) {
                         this.rounds[round].finished = true;
                   }
 
@@ -139,7 +139,10 @@ export class KeygenSessionManager {
                         [x: number]: {
                               round: AbstractRound2;
                               initialized: boolean;
-                              roundResponses: number;
+                              roundResponses: {
+                                    peer: { [id: string]: boolean };
+                                    number: number;
+                              };
                               finished: boolean;
                         };
                   }
@@ -147,20 +150,26 @@ export class KeygenSessionManager {
             session: {
                   session: KeygenSession;
                   initialized: boolean;
-                  roundResponses: number;
+                  roundResponses: { peer: { [id: string]: boolean }; number: number };
                   finished: boolean;
             };
             currentProtocol:
                   | {
                           round: AbstractRound2;
                           initialized: boolean;
-                          roundResponses: number;
+                          roundResponses: {
+                                peer: { [id: string]: boolean };
+                                number: number;
+                          };
                           finished: boolean;
                     }
                   | {
                           session: KeygenSession;
                           initialized: boolean;
-                          roundResponses: number;
+                          roundResponses: {
+                                peer: { [id: string]: boolean };
+                                number: number;
+                          };
                           finished: boolean;
                     };
       } {
