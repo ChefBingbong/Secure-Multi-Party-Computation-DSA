@@ -18,15 +18,9 @@ export class RedisClient extends AppLogger {
       }
 
       private setUpListeners(client: Redis) {
-            client.on("error", (err) =>
-                  this.log.info(`Redis Client Error. Error: ${err}`)
-            );
-            client.on("connect", () =>
-                  this.log.info("Redis Client is connect")
-            );
-            client.on("reconnecting", () =>
-                  this.log.info("Redis Client is reconnecting")
-            );
+            client.on("error", (err) => this.log.info(`Redis Client Error. Error: ${err}`));
+            client.on("connect", () => this.log.info("Redis Client is connect"));
+            client.on("reconnecting", () => this.log.info("Redis Client is reconnecting"));
             client.on("ready", () => this.log.info("Redis Client is ready"));
       }
 
@@ -52,15 +46,23 @@ export class RedisClient extends AppLogger {
 
       // get data methods
       async getSingleData<T>(key: string): Promise<T | null> {
-            const res = await this.client.get(key); // multiple-prices
-            if (res) {
-                  return JSON.parse(res);
+            try {
+                  const res = await this.client.get(key); // multiple-prices
+                  if (res) {
+                        return JSON.parse(res);
+                  }
+                  return null;
+            } catch (error) {
+                  console.log(error);
             }
-            return null;
       }
 
       async setSignleData<T>(key: string, data: T): Promise<void> {
-            await this.client.set(key, JSON.stringify(data));
+            try {
+                  await this.client.set(key, JSON.stringify(data));
+            } catch (error) {
+                  console.log(error);
+            }
       }
 }
 

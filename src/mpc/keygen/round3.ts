@@ -17,11 +17,7 @@ import {
       KeygenDirectMessageForRound4,
       KeygenInputForRound4,
 } from "./round4";
-import {
-      KeygenBroadcastForRound3JSON,
-      KeygenInputForRound3,
-      KeygenRound3Output,
-} from "./types";
+import { KeygenBroadcastForRound3JSON, KeygenInputForRound3, KeygenRound3Output } from "./types";
 
 export class KeygenBroadcastForRound3 {
       public readonly from: PartyId;
@@ -103,23 +99,25 @@ export class KeygenBroadcastForRound3 {
             };
       }
 
-      public static fromJSON(
-            json: KeygenBroadcastForRound3JSON
-      ): KeygenBroadcastForRound3 {
-            return KeygenBroadcastForRound3.from({
-                  from: json.from,
-                  RID: BigInt(`0x${json.RIDhex}`),
-                  C: BigInt(`0x${json.Chex}`),
-                  vssPolynomial: Exponent.fromJSON(json.vssPolynomial),
-                  schnorrCommitment: ZkSchCommitment.fromJSON(json.schnorrCommitment),
-                  elGamalPublic: pointFromJSON(json.elGamalPublic),
-                  pedersenPublic: new PedersenParams(
-                        BigInt("0x" + json.pedersenPublic.nHex),
-                        BigInt("0x" + json.pedersenPublic.sHex),
-                        BigInt("0x" + json.pedersenPublic.tHex)
-                  ),
-                  decommitment: hexToBytes(json.decommitmentHex),
-            });
+      public static fromJSON(json: KeygenBroadcastForRound3JSON): KeygenBroadcastForRound3 {
+            try {
+                  return KeygenBroadcastForRound3.from({
+                        from: json.from,
+                        RID: BigInt(`0x${json.RIDhex}`),
+                        C: BigInt(`0x${json.Chex}`),
+                        vssPolynomial: Exponent.fromJSON(json.vssPolynomial),
+                        schnorrCommitment: ZkSchCommitment.fromJSON(json.schnorrCommitment),
+                        elGamalPublic: pointFromJSON(json.elGamalPublic),
+                        pedersenPublic: new PedersenParams(
+                              BigInt("0x" + json.pedersenPublic.nHex),
+                              BigInt("0x" + json.pedersenPublic.sHex),
+                              BigInt("0x" + json.pedersenPublic.tHex)
+                        ),
+                        decommitment: hexToBytes(json.decommitmentHex),
+                  });
+            } catch (error) {
+                  console.log(error);
+            }
       }
 }
 
@@ -212,11 +210,7 @@ export class KeygenRound3 {
             const modPub: ZkModPublic = {
                   N: this.PaillierPublic[this.session.selfId].n,
             };
-            const modProof = zkModCreateProof(
-                  modPriv,
-                  modPub,
-                  hashWithRidAndPartyId.clone()
-            );
+            const modProof = zkModCreateProof(modPriv, modPub, hashWithRidAndPartyId.clone());
 
             const prmPriv: ZkPrmPrivate = {
                   Lambda: this.inputForRound3.inputForRound2.pedersenSecret,
@@ -227,11 +221,7 @@ export class KeygenRound3 {
             const prmPub: ZkPrmPublic = {
                   Aux: this.Pedersen[this.session.selfId],
             };
-            const prmProof = zkPrmCreateProof(
-                  prmPriv,
-                  prmPub,
-                  hashWithRidAndPartyId.clone()
-            );
+            const prmProof = zkPrmCreateProof(prmPriv, prmPub, hashWithRidAndPartyId.clone());
 
             const broadcasts: Array<KeygenBroadcastForRound4> = [
                   KeygenBroadcastForRound4.from({
@@ -256,11 +246,7 @@ export class KeygenRound3 {
                         N: this.PaillierPublic[this.session.selfId].n,
                         Aux: this.Pedersen[j],
                   };
-                  const facProof = zkFacCreateProof(
-                        facPriv,
-                        facPub,
-                        hashWithRidAndPartyId.clone()
-                  );
+                  const facProof = zkFacCreateProof(facPriv, facPub, hashWithRidAndPartyId.clone());
 
                   const { vssSecret } = this.inputForRound3.inputForRound2.inputRound1;
                   const share = vssSecret.evaluate(partyIdToScalar(j));

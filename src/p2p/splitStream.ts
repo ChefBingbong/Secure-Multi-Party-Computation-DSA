@@ -24,6 +24,7 @@ const T = () =>
                               const m = JSON.parse(possibleMessages[0]);
                               this.push(m);
                         } catch (e) {
+                              console.log(e);
                               if (possibleMessages.length > 1) {
                                     possibleMessages[0] = possibleMessages[0]
                                           .concat(possibleMessages.splice(1, 1))

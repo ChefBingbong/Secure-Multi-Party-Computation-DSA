@@ -1,4 +1,4 @@
-import { KGInstance1, KeygenSession, KeygenSessionMap, keygenRounds } from ".";
+import { KGInstance1, KeygenSession, KeygenSessionMap, keygenRounds } from "../mpc/keygen";
 
 interface AbstractRound {
       session: KeygenSession;
@@ -45,10 +45,7 @@ export class KeygenSessionManager {
             const roundInput = isFirst
                   ? this.session.session.inputForRound1
                   : this.rounds[this.previousRound].round.output;
-            const round = new KeygenSessionMap[this.currentRound](
-                  this.session.session,
-                  roundInput
-            );
+            const round = new KeygenSessionMap[this.currentRound](this.session.session, roundInput);
             this.rounds[this.currentRound] = {
                   round: round,
                   initialized: false,

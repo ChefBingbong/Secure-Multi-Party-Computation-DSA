@@ -12,16 +12,8 @@ import { KeygenSession } from "../mpc/keygen/keygenSession";
 import { PartyId } from "../mpc/keygen/partyKey";
 import { KGInstance } from "../mpc/keygen";
 import * as assert from "assert";
-import {
-      AbstractRound2,
-      KeygenSessionManager,
-      Round,
-} from "../mpc/keygen/keygenProtocolExec";
-import {
-      KeygenRound1Output,
-      KeygenRound2Output,
-      KeygenRound3Output,
-} from "../mpc/keygen/types";
+import { AbstractRound2, KeygenSessionManager, Round } from "../protocol/keygenProtocol";
+import { KeygenRound1Output, KeygenRound2Output, KeygenRound3Output } from "../mpc/keygen/types";
 import { KeygenBroadcastForRound2 } from "../mpc/keygen/round2";
 import { KeygenBroadcastForRound3 } from "../mpc/keygen/round3";
 import {
@@ -79,9 +71,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.emitter.off.bind(this.emitter);
 
             this.log = this.getLogger("p2p-log");
-            this.server = net.createServer((socket: net.Socket) =>
-                  this.handleNewSocket(socket)
-            );
+            this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
             P2pServer.validators = new Map([[config.p2pPort, this.validator.toString()]]);
             this.sessionManager = new KeygenSessionManager();
             this.sessionManager.startNewSession({
@@ -100,13 +90,8 @@ class P2pServer extends AppLogger implements P2PNetwork {
       };
 
       //public methods
-      public listen(
-            port: number,
-            ports: number[],
-            cb?: () => void
-      ): (cb?: any) => net.Server {
-            if (!this.isInitialized)
-                  this.throwError(`Cannot listen before server is initialized`);
+      public listen(port: number, ports: number[], cb?: () => void): (cb?: any) => net.Server {
+            if (!this.isInitialized) this.throwError(`Cannot listen before server is initialized`);
 
             this.server.listen(port, "0.0.0.0", () => {
                   this.on("connect", ({ nodeId }) => {
@@ -137,23 +122,14 @@ class P2pServer extends AppLogger implements P2PNetwork {
                                     manager.incrementRound(manager.currentRound);
 
                                     if (type === `keygenRound1`) {
-                                          this.broadcasts = [
-                                                ...this.broadcasts,
-                                                ...options,
-                                          ];
+                                          this.broadcasts = [...this.broadcasts, ...options];
                                           console.log(this.broadcasts);
                                     } else if (type === `keygenRound2`) {
-                                          this.broadcasts3 = [
-                                                ...this.broadcasts3,
-                                                ...options,
-                                          ];
+                                          this.broadcasts3 = [...this.broadcasts3, ...options];
                                           console.log(this.broadcasts3);
                                     } else if (type === `keygenRound3`) {
                                           const { broadcasts, directMessages } = options;
-                                          this.broadcasts4 = [
-                                                ...this.broadcasts4,
-                                                ...broadcasts,
-                                          ];
+                                          this.broadcasts4 = [...this.broadcasts4, ...broadcasts];
                                           this.directMessages = [
                                                 ...this.directMessages,
                                                 ...directMessages,
@@ -162,10 +138,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                                           console.log(this.broadcasts4, directMessages);
                                     } else if (type === `keygenRound4`) {
                                           const { broadcasts } = options;
-                                          this.broadcasts5 = [
-                                                ...this.broadcasts5,
-                                                ...broadcasts,
-                                          ];
+                                          this.broadcasts5 = [...this.broadcasts5, ...broadcasts];
 
                                           console.log(this.broadcasts5);
                                     } else if (type === `keygenRound5`) {
@@ -174,36 +147,22 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
                                           this.proofs = [...this.proofs, proof];
 
-                                          if (
-                                                protocol.roundResponses.number ===
-                                                this.threshold
-                                          ) {
-                                                assert.deepEqual(
-                                                      parsedProof[0],
-                                                      parsedProof[1]
-                                                );
+                                          if (protocol.roundResponses.number === this.threshold) {
+                                                assert.deepEqual(parsedProof[0], parsedProof[1]);
                                                 // assert.deepEqual(
                                                 //       parsedProof[0],
                                                 //       parsedProof[2]
                                                 // );
-                                                assert.deepEqual(
-                                                      parsedProof[1],
-                                                      parsedProof[2]
-                                                );
+                                                assert.deepEqual(parsedProof[1], parsedProof[2]);
 
-                                                this.log.info(
-                                                      `keygeneration was successful`
-                                                );
+                                                this.log.info(`keygeneration was successful`);
                                                 this.log.info(
                                                       `keyGen session finished and round data reset`
                                                 );
                                           }
                                     }
 
-                                    if (
-                                          protocol.roundResponses.number ===
-                                          this.threshold
-                                    ) {
+                                    if (protocol.roundResponses.number === this.threshold) {
                                           this.log.info(`ready to start keygen round 1`);
                                           if (this.NODE_ID === "6001") {
                                                 // await delay(PEER_DELAY[this.NODE_ID]);
@@ -522,9 +481,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   );
                   directMessagesFromLastRound
                         .filter((m) => m.to === this.NODE_ID)
-                        .forEach((b) =>
-                              (currentProtocol as Round).round.handleDirectMessage(b)
-                        );
+                        .forEach((b) => (currentProtocol as Round).round.handleDirectMessage(b));
 
                   inputForNextRound4 = await (currentProtocol as Round).round.process();
                   this.broadcast({
@@ -551,6 +508,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         .update(inputForNextRound5.UpdatedConfig)
                         .digestBigint();
 
+                  console.log(inputForNextRound);
                   this.broadcast({
                         name: "round5-response",
                         text: `${config.p2pPort}'s round3 input ${inputForNextRound5}`,
@@ -558,7 +516,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         options: { proof: proof.toString() },
                         senderNode: this.NODE_ID,
                   });
-                  // console.log(inputForNextRound5.UpdatedConfig);
+                  console.log(inputForNextRound5.UpdatedConfig);
                   // console.log(inputForNextRound);
             } else {
                   this.broadcast({
