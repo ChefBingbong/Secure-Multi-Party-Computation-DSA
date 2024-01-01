@@ -1,185 +1,166 @@
-import { KGInstance, KeygenRound5, KeygenSession } from ".";
-import { KeygenRound1 } from "./round1";
-import { KeygenRound2 } from "./round2";
-import { KeygenRound3 } from "./round3";
-import { KeygenRound4 } from "./round4";
+import { KGInstance1, KeygenSession, KeygenSessionMap, keygenRounds } from ".";
 
-type KeygenRound = {
-      process(): void;
+interface AbstractRound {
+      session: KeygenSession;
+      input: any;
+      output: any;
+      process: () => Promise<any>;
+      handleBroadcastMessage: (args: any) => void;
+}
+export interface AbstractRound2 extends AbstractRound {}
+export type Round = {
+      round: AbstractRound2;
+      initialized: boolean;
+      roundResponses: number;
+      finished: boolean;
 };
-
-export class KeygenSessionInstance {
-      sessionId: number;
-      currentRound: number;
-      rounds: Record<
-            number,
-            {
-                  session: KGInstance;
+export class KeygenSessionManager {
+      private sessionComplete: boolean = false;
+      public threshold: number;
+      public validators: string[];
+      public finalRound: number = 5;
+      public currentRound: number = undefined;
+      public previousRound: number = undefined;
+      public session: {
+            session: KeygenSession;
+            initialized: boolean;
+            roundResponses: number;
+            finished: boolean;
+      } = undefined;
+      public rounds: {
+            [x: number]: {
+                  round: AbstractRound2;
                   initialized: boolean;
                   roundResponses: number;
                   finished: boolean;
-            }
-      >;
+            };
+      } = undefined;
 
-      constructor() {
-            this.sessionId = 0;
+      constructor() {}
+
+      initNewRound(isFirst: boolean = false) {
+            if (this.sessionComplete) return;
+            const roundInput = isFirst
+                  ? this.session.session.inputForRound1
+                  : this.rounds[this.previousRound].round.output;
+            const round = new KeygenSessionMap[this.currentRound](
+                  this.session.session,
+                  roundInput
+            );
+            this.rounds[this.currentRound] = {
+                  round: round,
+                  initialized: false,
+                  roundResponses: 0,
+                  finished: false,
+            };
+            // console.log(this);
+      }
+
+      startNewSession({ selfId, partyIds, threshold }): {
+            session: KeygenSession;
+            initialized: boolean;
+            roundResponses: number;
+            finished: boolean;
+      } {
+            this.sessionComplete = false;
+            this.threshold = threshold;
+            this.validators = this.validators;
+
             this.currentRound = 0;
-            this.rounds = {
-                  0: {
-                        session: KeygenSession,
-                        initialized: false,
-                        roundResponses: 0,
-                        finished: false,
-                  },
-                  1: {
-                        session: KeygenRound1,
-                        initialized: false,
-                        roundResponses: 0,
-                        finished: false,
-                  },
-                  2: {
-                        session: KeygenRound2,
-                        initialized: false,
-                        roundResponses: 0,
-                        finished: false,
-                  },
-                  3: {
-                        session: KeygenRound3,
-                        initialized: false,
-                        roundResponses: 0,
-                        finished: false,
-                  },
-                  4: {
-                        session: KeygenRound4,
-                        initialized: false,
-                        roundResponses: 0,
-                        finished: false,
-                  },
-                  5: {
-                        session: KeygenRound5,
-                        initialized: false,
-                        roundResponses: 0,
-                        finished: false,
-                  },
+            this.rounds = {};
+            this.session = {
+                  session: new KeygenSession(selfId, partyIds, threshold),
+                  initialized: false,
+                  roundResponses: 0,
+                  finished: false,
             };
-      }
-}
-
-export class KeygenSessionManager {
-      private sessionIdCounter: number;
-      private sessions: Record<number, KeygenSessionInstance>;
-
-      constructor() {
-            this.sessionIdCounter = 0;
-            this.sessions = {};
+            return this.session;
       }
 
-      startNewSession(): number {
-            const sessionId = this.sessionIdCounter++;
-            const currentRound = 0;
-            const rounds: Record<
-                  number,
-                  {
-                        session: KGInstance;
-                        initialized: boolean;
-                        roundResponses: number;
-                        finished: boolean;
+      incrementRound(round: number): void {
+            if (this.sessionComplete) return;
+            if (this.currentRound === 0) {
+                  this.session.roundResponses += 1;
+                  if (this.session.roundResponses >= 3) {
+                        this.session.finished = true;
+                        this.currentRound += 1;
+                        this.initNewRound(true);
                   }
-            > = {
-                  0: {
-                        session: KeygenSession,
-                        initialized: false,
-                        roundResponses: 0,
-                        finished: false,
-                  },
-                  1: {
-                        session: KeygenRound1,
-                        initialized: false,
-                        roundResponses: 0,
-                        finished: false,
-                  },
-                  2: {
-                        session: KeygenRound2,
-                        initialized: false,
-                        roundResponses: 0,
-                        finished: false,
-                  },
-                  3: {
-                        session: KeygenRound3,
-                        initialized: false,
-                        roundResponses: 0,
-                        finished: false,
-                  },
-                  4: {
-                        session: KeygenRound4,
-                        initialized: false,
-                        roundResponses: 0,
-                        finished: false,
-                  },
-                  5: {
-                        session: KeygenRound5,
-                        initialized: false,
-                        roundResponses: 0,
-                        finished: false,
-                  },
-            };
-
-            this.sessions[sessionId] = {
-                  sessionId,
-                  currentRound,
-                  rounds,
-            };
-
-            return sessionId;
-      }
-
-      initializeRound(sessionId: number, round: number): KeygenSessionManager {
-            if (
-                  this.sessions[sessionId] &&
-                  this.sessions[sessionId].rounds[round]
-            ) {
-                  this.sessions[sessionId].rounds[round].initialized = true;
+                  return;
             }
+            if (this.rounds[round]) {
+                  this.rounds[round].roundResponses += 1;
 
-            return this;
-      }
+                  if (this.rounds[round].roundResponses >= 3) {
+                        this.rounds[round].finished = true;
+                  }
 
-      incrementRoundResponses(
-            sessionId: number,
-            round: number
-      ): KeygenSessionManager {
-            if (
-                  this.sessions[sessionId] &&
-                  this.sessions[sessionId].rounds[round]
-            ) {
-                  this.sessions[sessionId].rounds[round].roundResponses++;
+                  if (this.rounds[round].finished) {
+                        this.previousRound = this.currentRound;
+                        this.currentRound += 1;
+                        this.initNewRound();
+                  }
 
                   if (
-                        this.sessions[sessionId].rounds[round].roundResponses >=
-                        Object.keys(this.sessions[sessionId].rounds).length
+                        round === this.finalRound &&
+                        this.rounds[this.finalRound]?.finished
                   ) {
-                        this.sessions[sessionId].rounds[round].finished = true;
-                  }
-
-                  if (this.sessions[sessionId].rounds[round].finished) {
-                        return this.deleteFinishedSession(sessionId);
+                        this.sessionComplete = true;
                   }
             }
-
-            return this;
       }
 
-      deleteFinishedSession(sessionId: number): KeygenSessionManager {
-            if (this.sessions[sessionId]) {
-                  delete this.sessions[sessionId];
-                  // Create a new instance of KeygenSessionManager
-                  return new KeygenSessionManager();
-            }
-
-            return this; // Return the same instance if the session was not found
+      logState() {
+            const s = this.getCurrentState();
+            console.log({
+                  session: s.currentProtocol,
+                  rounds: s.rounds,
+            });
       }
 
-      getSession(sessionId: number): KeygenSessionInstance | undefined {
-            return this.sessions[sessionId];
+      getCurrentState(): {
+            currentRound: number;
+            rounds: Record<
+                  number,
+                  {
+                        [x: number]: {
+                              round: AbstractRound2;
+                              initialized: boolean;
+                              roundResponses: number;
+                              finished: boolean;
+                        };
+                  }
+            >;
+            session: {
+                  session: KeygenSession;
+                  initialized: boolean;
+                  roundResponses: number;
+                  finished: boolean;
+            };
+            currentProtocol:
+                  | {
+                          round: AbstractRound2;
+                          initialized: boolean;
+                          roundResponses: number;
+                          finished: boolean;
+                    }
+                  | {
+                          session: KeygenSession;
+                          initialized: boolean;
+                          roundResponses: number;
+                          finished: boolean;
+                    };
+      } {
+            const currentRound = this.currentRound;
+            const rounds = this.rounds;
+            const round = rounds[currentRound];
+            const session = this.session;
+            const currentProtocol = currentRound !== 0 ? round : session;
+            return {
+                  currentRound,
+                  rounds,
+                  session,
+                  currentProtocol,
+            };
       }
 }

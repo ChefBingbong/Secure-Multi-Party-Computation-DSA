@@ -11,12 +11,13 @@ import { generateElGamalKeyPair } from "../math/sample";
 import { zkSchCreateRandomness } from "../zk/zksch";
 import { KeygenSession } from "./keygenSession";
 import { KeygenBroadcastForRound2 } from "./round2";
-import { KeygenInputForRound1, KeygenRound1Output } from "./types";
+import { KeygenInputForRound1, KeygenInputForRound2, KeygenRound1Output } from "./types";
 // import { validatePaillierPrime } from "../paillierKeygen";
 
 export class KeygenRound1 {
       public session: KeygenSession;
       private input: KeygenInputForRound1;
+      public output: KeygenInputForRound2;
 
       constructor(session: KeygenSession, input: KeygenInputForRound1) {
             this.session = session;
@@ -70,24 +71,25 @@ export class KeygenRound1 {
                   }),
             ];
 
+            this.output = {
+                  inputRound1: this.input,
+                  selfVSSpolynomial,
+                  selfCommitment,
+                  selfRID,
+                  chainKey,
+                  selfShare,
+                  elGamalPublic,
+                  selfPaillierPublic,
+                  selfPedersenPublic,
+                  elGamalSecret,
+                  paillierSecret,
+                  pedersenSecret,
+                  schnorrRand,
+                  decommitment,
+            };
             return {
                   broadcasts,
-                  inputForRound2: {
-                        inputRound1: this.input,
-                        selfVSSpolynomial,
-                        selfCommitment,
-                        selfRID,
-                        chainKey,
-                        selfShare,
-                        elGamalPublic,
-                        selfPaillierPublic,
-                        selfPedersenPublic,
-                        elGamalSecret,
-                        paillierSecret,
-                        pedersenSecret,
-                        schnorrRand,
-                        decommitment,
-                  },
+                  inputForRound2: this.output,
             };
       }
 }

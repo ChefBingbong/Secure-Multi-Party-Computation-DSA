@@ -32,7 +32,7 @@ import { KeygenInputForRound3 } from "./types";
 import { KeygenSession } from "./keygenSession";
 import { AffinePoint } from "../types";
 import { ZkSchCommitment, zkSchProve } from "../zk/zksch";
-import { KeygenBroadcastForRound5 } from "./round5";
+import { KeygenBroadcastForRound5, KeygenInputForRound5 } from "./round5";
 // import { KeygenBroadcastForRound5, KeygenInputForRound5 } from "./KeygenRound5.j";
 
 export type KeygenBroadcastForRound4JSON = {
@@ -176,6 +176,7 @@ export type KeygenRound4Output = {
 
 export class KeygenRound4 {
       private ShareReceived: Record<PartyId, bigint> = {};
+      public output: KeygenInputForRound5;
 
       constructor(
             private session: KeygenSession,
@@ -350,12 +351,13 @@ export class KeygenRound4 {
 
             this.session.hasher.updateMulti([UpdatedConfig]);
 
+            this.output = {
+                  inputForRound4: this.input,
+                  UpdatedConfig,
+            };
             return {
                   broadcasts,
-                  inputForRound5: {
-                        inputForRound4: this.input,
-                        UpdatedConfig,
-                  },
+                  inputForRound5: this.output,
             };
       }
 }

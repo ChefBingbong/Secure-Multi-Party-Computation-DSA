@@ -5,23 +5,37 @@ import { KeygenRound3 } from "./round3";
 import { KeygenRound4 } from "./round4";
 import { KeygenRound5 } from "./round5";
 
-export type KGInstance = (
+export type KGInstance =
       | typeof KeygenSession
       | typeof KeygenRound1
       | typeof KeygenRound2
       | typeof KeygenRound3
       | typeof KeygenRound4
-      | typeof KeygenRound5
-)
+      | typeof KeygenRound5;
 
-const keygenSessionInstance: KGInstance = [
-      KeygenSession,
+export type KGInstance1 =
+      | KeygenSession
+      | KeygenRound1
+      | KeygenRound2
+      | KeygenRound3
+      | KeygenRound4
+      | KeygenRound5;
+
+const keygenRounds = [
       KeygenRound1,
       KeygenRound2,
       KeygenRound3,
       KeygenRound4,
       KeygenRound5,
 ];
+
+export const KeygenSessionMap = {
+      1: KeygenRound1,
+      2: KeygenRound2,
+      3: KeygenRound3,
+      4: KeygenRound4,
+      5: KeygenRound5,
+};
 
 export {
       KeygenSession,
@@ -30,17 +44,6 @@ export {
       KeygenRound3,
       KeygenRound4,
       KeygenRound5,
-      keygenSessionInstance,
+      keygenRounds,
 };
-{
-      sessionId: 0,
-      currentRound = 0
-      rounds: {
-      [0]: { session: [class KeygenSession], initialized: false, roundResponses: 0 },
-      [1]: { session: [class KeygenRound1], initialized: false, roundResponses: 0},
-      [2]: { session: [class KeygenRound2], initialized: false, roundResponses: 0 },
-      [3]: { session: [class KeygenRound3], initialized: false, roundResponses: 0 },
-      [4]: { session: [class KeygenRound4], initialized: false, roundResponses: 0 },
-      [5]: { session: [class KeygenRound5], initialized: false, roundResponses: 0 }
-      }
-    }
+const a = KeygenRound1;

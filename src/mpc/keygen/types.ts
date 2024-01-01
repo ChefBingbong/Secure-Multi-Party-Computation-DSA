@@ -13,8 +13,10 @@ import {
       KeygenBroadcastForRound4,
       KeygenDirectMessageForRound4,
       KeygenInputForRound4,
+      KeygenRound4Output,
 } from "./round4";
 import { Helper, Info } from "../../protocol/helper/helper";
+import { KeygenInputForRound5, KeygenRound5Output } from "./round5";
 
 export type KeygenInputForRound1 = {
       vssSecret: Polynomial;
@@ -82,3 +84,11 @@ export type KeygenInputForRound3 = {
       inputForRound2: KeygenInputForRound2;
       commitments: Record<PartyId, Uint8Array>;
 };
+
+export type RoundOutputss = [
+      KeygenInputForRound1,
+      KeygenInputForRound2,
+      KeygenInputForRound3,
+      KeygenInputForRound4,
+      KeygenInputForRound5
+];

@@ -12,11 +12,7 @@ import {
       KeygenRound4Output,
 } from "./round4";
 import { KeygenBroadcastForRound5, KeygenRound5 } from "./round5";
-import {
-      KeygenRound1Output,
-      KeygenRound2Output,
-      KeygenRound3Output,
-} from "./types";
+import { KeygenRound1Output, KeygenRound2Output, KeygenRound3Output } from "./types";
 
 // Global map to store round outputs
 const roundOutputsMap: Map<number, any[]> = new Map();
@@ -53,15 +49,15 @@ describe("keygen 2/3", async () => {
             const round1Outputs: KeygenRound1Output[] = roundOutputsMap.get(1);
 
             let allBroadcasts: KeygenBroadcastForRound2[] = [];
-            round1Outputs.forEach((session) =>
-                  allBroadcasts.push(...session.broadcasts)
-            );
+            round1Outputs.forEach((session) => allBroadcasts.push(...session.broadcasts));
 
+            console.log([
+                  ...round1Outputs[0].broadcasts,
+                  ...round1Outputs[1].broadcasts,
+                  ...round1Outputs[2].broadcasts,
+            ]);
             const [round2a, round2b, round2c] = sessions.map((session, i) => {
-                  const r = new KeygenRound2(
-                        session,
-                        round1Outputs[i].inputForRound2
-                  );
+                  const r = new KeygenRound2(session, round1Outputs[i].inputForRound2);
                   allBroadcasts.forEach((b) => r.handleBroadcastMessage(b));
                   return r;
             });
@@ -77,15 +73,10 @@ describe("keygen 2/3", async () => {
             const round2Outputs: KeygenRound2Output[] = roundOutputsMap.get(2);
 
             let allBroadcasts: KeygenBroadcastForRound3[] = [];
-            round2Outputs.forEach((session) =>
-                  allBroadcasts.push(...session.broadcasts)
-            );
+            round2Outputs.forEach((session) => allBroadcasts.push(...session.broadcasts));
 
             const [round3a, round3b, round3c] = sessions.map((session, i) => {
-                  const r = new KeygenRound3(
-                        session,
-                        round2Outputs[i].inputForRound3
-                  );
+                  const r = new KeygenRound3(session, round2Outputs[i].inputForRound3);
                   allBroadcasts.forEach((b) => r.handleBroadcastMessage(b));
                   return r;
             });
@@ -109,10 +100,7 @@ describe("keygen 2/3", async () => {
             });
 
             const [round4a, round4b, round4c] = sessions.map((session, i) => {
-                  const r = new KeygenRound4(
-                        session,
-                        round3Outputs[i].inputForRound4
-                  );
+                  const r = new KeygenRound4(session, round3Outputs[i].inputForRound4);
                   allBroadcasts.forEach((b) => r.handleBroadcastMessage(b));
                   allMessages
                         .filter((m) => m.to === partyIds[i])
@@ -141,10 +129,7 @@ describe("keygen 2/3", async () => {
             assert.equal(allBroadcasts.length, 3);
 
             const [round5a, round5b, round5c] = sessions.map((session, i) => {
-                  const r = new KeygenRound5(
-                        session,
-                        round4Outputs[i].inputForRound5
-                  );
+                  const r = new KeygenRound5(session, round4Outputs[i].inputForRound5);
                   allBroadcasts.forEach((b) => r.handleBroadcastMessage(b));
                   return r;
             });
@@ -158,20 +143,12 @@ describe("keygen 2/3", async () => {
 
             // Additional assertions or actions for round 5 can be added here
             assert.deepEqual(
-                  Hasher.create()
-                        .update(outputs[0].UpdatedConfig)
-                        .digestBigint(),
-                  Hasher.create()
-                        .update(outputs[1].UpdatedConfig)
-                        .digestBigint()
+                  Hasher.create().update(outputs[0].UpdatedConfig).digestBigint(),
+                  Hasher.create().update(outputs[1].UpdatedConfig).digestBigint()
             );
             assert.deepEqual(
-                  Hasher.create()
-                        .update(outputs[0].UpdatedConfig)
-                        .digestBigint(),
-                  Hasher.create()
-                        .update(outputs[2].UpdatedConfig)
-                        .digestBigint()
+                  Hasher.create().update(outputs[0].UpdatedConfig).digestBigint(),
+                  Hasher.create().update(outputs[2].UpdatedConfig).digestBigint()
             );
       });
 });

@@ -15,6 +15,7 @@ import { KeygenSession } from "./keygenSession";
 import {
       KeygenBroadcastForRound4,
       KeygenDirectMessageForRound4,
+      KeygenInputForRound4,
 } from "./round4";
 import {
       KeygenBroadcastForRound3JSON,
@@ -132,6 +133,7 @@ export class KeygenRound3 {
       private vssPolynomials: Record<PartyId, Exponent> = {};
       private SchnorrCommitments: Record<PartyId, ZkSchCommitment> = {};
       private ElGamalPublic: Record<PartyId, AffinePoint> = {};
+      public output: KeygenInputForRound4;
 
       constructor(
             private readonly session: KeygenSession,
@@ -289,20 +291,20 @@ export class KeygenRound3 {
             });
 
             this.session.hasher.update(rid);
-
+            this.output = {
+                  inputForRound3: this.inputForRound3,
+                  RID: rid,
+                  ChainKey: chainKey,
+                  PedersenPublic: this.Pedersen,
+                  PaillierPublic: this.PaillierPublic,
+                  vssPolynomials: this.vssPolynomials,
+                  ElGamalPublic: this.ElGamalPublic,
+                  SchnorrCommitments: this.SchnorrCommitments,
+            };
             return {
                   broadcasts,
                   directMessages,
-                  inputForRound4: {
-                        inputForRound3: this.inputForRound3,
-                        RID: rid,
-                        ChainKey: chainKey,
-                        PedersenPublic: this.Pedersen,
-                        PaillierPublic: this.PaillierPublic,
-                        vssPolynomials: this.vssPolynomials,
-                        ElGamalPublic: this.ElGamalPublic,
-                        SchnorrCommitments: this.SchnorrCommitments,
-                  },
+                  inputForRound4: this.output,
             };
       }
 }

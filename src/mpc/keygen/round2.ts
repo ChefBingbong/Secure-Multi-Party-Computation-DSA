@@ -6,6 +6,7 @@ import { KeygenBroadcastForRound3 } from "./round3";
 import {
       KeygenBroadcastForRound2JSON,
       KeygenInputForRound2,
+      KeygenInputForRound3,
       KeygenRound2Output,
 } from "./types";
 
@@ -48,6 +49,7 @@ export class KeygenBroadcastForRound2 {
 export class KeygenRound2 {
       private session: KeygenSession;
       private input: KeygenInputForRound2;
+      public output: KeygenInputForRound3;
 
       private commitments: Record<PartyId, Uint8Array> = {};
 
@@ -75,12 +77,13 @@ export class KeygenRound2 {
                   }),
             ];
 
+            this.output = {
+                  inputForRound2: this.input,
+                  commitments: this.commitments,
+            };
             return {
                   broadcasts,
-                  inputForRound3: {
-                        inputForRound2: this.input,
-                        commitments: this.commitments,
-                  },
+                  inputForRound3: this.output,
             };
       }
 }
