@@ -56,7 +56,8 @@ export class KeygenSessionManager {
             const roundInput = isFirst
                   ? this.session.session.inputForRound1
                   : this.rounds[this.previousRound].round.output;
-            const round = new KeygenSessionMap[this.currentRound](this.session.session, roundInput);
+            const round = new KeygenSessionMap[this.currentRound]();
+            round.init({ session: this.session.session, input: roundInput });
             this.rounds[this.currentRound] = {
                   round: round,
                   initialized: false,

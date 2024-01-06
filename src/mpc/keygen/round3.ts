@@ -12,12 +12,9 @@ import { ZkModPrivate, ZkModPublic, zkModCreateProof } from "../zk/mod";
 import { ZkPrmPrivate, ZkPrmPublic, zkPrmCreateProof } from "../zk/prm";
 import { ZkSchCommitment } from "../zk/zksch";
 import { KeygenSession } from "./keygenSession";
-import {
-      KeygenBroadcastForRound4,
-      KeygenDirectMessageForRound4,
-      KeygenInputForRound4,
-} from "./round4";
+import { KeygenBroadcastForRound4, KeygenDirectMessageForRound4, KeygenInputForRound4 } from "./round4";
 import { KeygenBroadcastForRound3JSON, KeygenInputForRound3, KeygenRound3Output } from "./types";
+import { AbstractKeygenRound } from "./abstractRound";
 
 export class KeygenBroadcastForRound3 {
       public readonly from: PartyId;
@@ -121,7 +118,12 @@ export class KeygenBroadcastForRound3 {
       }
 }
 
-export class KeygenRound3 {
+export class KeygenRound3 extends AbstractKeygenRound<
+      KeygenInputForRound3,
+      KeygenRound3Output,
+      KeygenBroadcastForRound3,
+      any
+> {
       private RIDs: Record<PartyId, bigint> = {};
       private ChainKeys: Record<PartyId, bigint> = {};
       private PaillierPublic: Record<PartyId, PaillierPublicKey> = {};
@@ -131,10 +133,11 @@ export class KeygenRound3 {
       private ElGamalPublic: Record<PartyId, AffinePoint> = {};
       public output: KeygenInputForRound4;
 
-      constructor(
-            private readonly session: KeygenSession,
-            private readonly inputForRound3: KeygenInputForRound3
-      ) {}
+      constructor() {
+            super();
+      }
+
+      public handleDirectMessage(bmsg: any): void {}
 
       public handleBroadcastMessage(bmsg: KeygenBroadcastForRound3): void {
             const from = bmsg.from;
@@ -143,7 +146,7 @@ export class KeygenRound3 {
 
             Hasher.validateCommitment(bmsg.decommitment);
 
-            const vssSecret = this.inputForRound3.inputForRound2.inputRound1.vssSecret;
+            const vssSecret = this.input.inputForRound2.inputRound1.vssSecret;
             const vssPolynomial = bmsg.vssPolynomial;
             if ((vssSecret.constant() === 0n) !== vssPolynomial.isConstant) {
                   throw new Error(`vss polynomial has incorrect constant from ${from}`);
@@ -162,7 +165,7 @@ export class KeygenRound3 {
 
             const decomValid = this.session
                   .cloneHashForId(from)
-                  .decommit(this.inputForRound3.commitments[from], bmsg.decommitment, [
+                  .decommit(this.input.commitments[from], bmsg.decommitment, [
                         bmsg.RID,
                         bmsg.C,
                         vssPolynomial,
@@ -183,9 +186,8 @@ export class KeygenRound3 {
             this.ElGamalPublic[from] = bmsg.elGamalPublic;
       }
 
-      public process(): KeygenRound3Output {
-            let chainKey: bigint | null =
-                  this.inputForRound3.inputForRound2.inputRound1.previousChainKey;
+      public async process(): Promise<KeygenRound3Output> {
+            let chainKey: bigint | null = this.input.inputForRound2.inputRound1.previousChainKey;
             if (chainKey === null) {
                   chainKey = 0n;
                   for (const j of this.session.partyIds) {
@@ -198,14 +200,12 @@ export class KeygenRound3 {
                   rid = rid ^ this.RIDs[j]; // XOR
             }
 
-            const hashWithRidAndPartyId = this.session.hasher
-                  .clone()
-                  .updateMulti([rid, this.session.selfId]);
+            const hashWithRidAndPartyId = this.session.hasher.clone().updateMulti([rid, this.session.selfId]);
 
             const modPriv: ZkModPrivate = {
-                  P: this.inputForRound3.inputForRound2.paillierSecret.p,
-                  Q: this.inputForRound3.inputForRound2.paillierSecret.q,
-                  Phi: this.inputForRound3.inputForRound2.paillierSecret.phi,
+                  P: this.input.inputForRound2.paillierSecret.p,
+                  Q: this.input.inputForRound2.paillierSecret.q,
+                  Phi: this.input.inputForRound2.paillierSecret.phi,
             };
             const modPub: ZkModPublic = {
                   N: this.PaillierPublic[this.session.selfId].n,
@@ -213,10 +213,10 @@ export class KeygenRound3 {
             const modProof = zkModCreateProof(modPriv, modPub, hashWithRidAndPartyId.clone());
 
             const prmPriv: ZkPrmPrivate = {
-                  Lambda: this.inputForRound3.inputForRound2.pedersenSecret,
-                  Phi: this.inputForRound3.inputForRound2.paillierSecret.phi,
-                  P: this.inputForRound3.inputForRound2.paillierSecret.p,
-                  Q: this.inputForRound3.inputForRound2.paillierSecret.q,
+                  Lambda: this.input.inputForRound2.pedersenSecret,
+                  Phi: this.input.inputForRound2.paillierSecret.phi,
+                  P: this.input.inputForRound2.paillierSecret.p,
+                  Q: this.input.inputForRound2.paillierSecret.q,
             };
             const prmPub: ZkPrmPublic = {
                   Aux: this.Pedersen[this.session.selfId],
@@ -239,8 +239,8 @@ export class KeygenRound3 {
                   // for other PartyIds:
 
                   const facPriv: ZkFacPrivate = {
-                        P: this.inputForRound3.inputForRound2.paillierSecret.p,
-                        Q: this.inputForRound3.inputForRound2.paillierSecret.q,
+                        P: this.input.inputForRound2.paillierSecret.p,
+                        Q: this.input.inputForRound2.paillierSecret.q,
                   };
                   const facPub: ZkFacPublic = {
                         N: this.PaillierPublic[this.session.selfId].n,
@@ -248,7 +248,7 @@ export class KeygenRound3 {
                   };
                   const facProof = zkFacCreateProof(facPriv, facPub, hashWithRidAndPartyId.clone());
 
-                  const { vssSecret } = this.inputForRound3.inputForRound2.inputRound1;
+                  const { vssSecret } = this.input.inputForRound2.inputRound1;
                   const share = vssSecret.evaluate(partyIdToScalar(j));
                   const { ciphertext: C } = this.PaillierPublic[j].encrypt(share);
 
@@ -264,7 +264,7 @@ export class KeygenRound3 {
 
             this.session.hasher.update(rid);
             this.output = {
-                  inputForRound3: this.inputForRound3,
+                  inputForRound3: this.input,
                   RID: rid,
                   ChainKey: chainKey,
                   PedersenPublic: this.Pedersen,

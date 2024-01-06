@@ -1,12 +1,7 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 
 import Fn from "../math/polynomial/Fn";
-import {
-      PartyId,
-      PartyPublicKeyConfig,
-      PartySecretKeyConfig,
-      partyIdToScalar,
-} from "./partyKey";
+import { PartyId, PartyPublicKeyConfig, PartySecretKeyConfig, partyIdToScalar } from "./partyKey";
 import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
 import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
 import { Exponent } from "../math/polynomial/exponent";
@@ -18,6 +13,7 @@ import { KeygenSession } from "./keygenSession";
 import { AffinePoint } from "../types";
 import { ZkSchCommitment, zkSchProve } from "../zk/zksch";
 import { KeygenBroadcastForRound5, KeygenInputForRound5 } from "./round5";
+import { AbstractKeygenRound } from "./abstractRound";
 // import { KeygenBroadcastForRound5, KeygenInputForRound5 } from "./KeygenRound5.j";
 
 export type KeygenBroadcastForRound4JSON = {
@@ -59,9 +55,7 @@ export class KeygenBroadcastForRound4 {
             };
       }
 
-      public static fromJSON(
-            json: KeygenBroadcastForRound4JSON
-      ): KeygenBroadcastForRound4 {
+      public static fromJSON(json: KeygenBroadcastForRound4JSON): KeygenBroadcastForRound4 {
             const { from, modProof, prmProof } = json;
             return KeygenBroadcastForRound4.from({
                   from,
@@ -84,12 +78,7 @@ export class KeygenDirectMessageForRound4 {
       public readonly share: bigint;
       public readonly facProof: ZkFacProof;
 
-      private constructor(
-            from: PartyId,
-            to: PartyId,
-            share: bigint,
-            facProof: ZkFacProof
-      ) {
+      private constructor(from: PartyId, to: PartyId, share: bigint, facProof: ZkFacProof) {
             this.from = from;
             this.to = to;
             this.share = share;
@@ -121,9 +110,7 @@ export class KeygenDirectMessageForRound4 {
             };
       }
 
-      public static fromJSON(
-            json: KeygenDirectMessageForRound4JSON
-      ): KeygenDirectMessageForRound4 {
+      public static fromJSON(json: KeygenDirectMessageForRound4JSON): KeygenDirectMessageForRound4 {
             const { from, to, shareHex, facProof } = json;
             return KeygenDirectMessageForRound4.from({
                   from,
@@ -150,11 +137,18 @@ export type KeygenRound4Output = {
       inputForRound5: any;
 };
 
-export class KeygenRound4 {
+export class KeygenRound4 extends AbstractKeygenRound<
+      KeygenInputForRound4,
+      KeygenRound4Output,
+      KeygenBroadcastForRound4,
+      KeygenDirectMessageForRound4
+> {
       private ShareReceived: Record<PartyId, bigint> = {};
       public output: KeygenInputForRound5;
 
-      constructor(private session: KeygenSession, private input: KeygenInputForRound4) {}
+      constructor() {
+            super();
+      }
 
       public handleBroadcastMessage(bmsg: KeygenBroadcastForRound4) {
             const { from, modProof, prmProof } = bmsg;
@@ -162,11 +156,7 @@ export class KeygenRound4 {
             const modPub: ZkModPublic = {
                   N: this.input.PedersenPublic[from].n,
             };
-            const modVerified = zkModVerifyProof(
-                  modProof,
-                  modPub,
-                  this.session.cloneHashForId(from)
-            );
+            const modVerified = zkModVerifyProof(modProof, modPub, this.session.cloneHashForId(from));
             if (!modVerified) {
                   throw new Error(`failed to validate mod proof from ${from}`);
             }
@@ -174,11 +164,7 @@ export class KeygenRound4 {
             const prmPub: ZkPrmPublic = {
                   Aux: this.input.PedersenPublic[from],
             };
-            const prmVerified = zkPrmVerifyProof(
-                  prmProof,
-                  prmPub,
-                  this.session.cloneHashForId(from)
-            );
+            const prmVerified = zkPrmVerifyProof(prmProof, prmPub, this.session.cloneHashForId(from));
             if (!prmVerified) {
                   throw new Error(`failed to validate prm proof from ${from}`);
             }
@@ -189,9 +175,7 @@ export class KeygenRound4 {
 
             // verify
             if (to !== this.session.selfId) {
-                  throw new Error(
-                        `received direct message for ${to} but I am ${this.session.selfId}`
-                  );
+                  throw new Error(`received direct message for ${to} but I am ${this.session.selfId}`);
             }
 
             if (!this.input.PaillierPublic[to].validateCiphertext(share)) {
@@ -202,18 +186,13 @@ export class KeygenRound4 {
                   N: this.input.PaillierPublic[from].n,
                   Aux: this.input.PedersenPublic[to],
             };
-            const facVerified = zkFacVerifyProof(
-                  facProof,
-                  facPub,
-                  this.session.cloneHashForId(from)
-            );
+            const facVerified = zkFacVerifyProof(facProof, facPub, this.session.cloneHashForId(from));
             if (!facVerified) {
                   throw new Error(`failed to validate fac proof from ${from}`);
             }
 
             // store
-            const DecryptedShare =
-                  this.input.inputForRound3.inputForRound2.paillierSecret.decrypt(share);
+            const DecryptedShare = this.input.inputForRound3.inputForRound2.paillierSecret.decrypt(share);
             const Share = Fn.mod(DecryptedShare);
             console.log(Share, DecryptedShare);
             if (Share !== DecryptedShare) {
@@ -224,24 +203,17 @@ export class KeygenRound4 {
                   partyIdToScalar(this.session.selfId)
             );
             const PublicShare = secp256k1.ProjectivePoint.BASE.multiply(Share);
-            if (
-                  !secp256k1.ProjectivePoint.fromAffine(ExpectedPublicShare).equals(
-                        PublicShare
-                  )
-            ) {
+            if (!secp256k1.ProjectivePoint.fromAffine(ExpectedPublicShare).equals(PublicShare)) {
                   throw new Error(`${to} failed to validate VSS share from ${from}`);
             }
 
             this.ShareReceived[from] = Share;
       }
 
-      public process(): KeygenRound4Output {
-            this.ShareReceived[this.session.selfId] =
-                  this.input.inputForRound3.inputForRound2.selfShare;
+      public async process(): Promise<KeygenRound4Output> {
+            this.ShareReceived[this.session.selfId] = this.input.inputForRound3.inputForRound2.selfShare;
             let UpdatedSecretECDSA = 0n;
-            if (
-                  this.input.inputForRound3.inputForRound2.inputRound1.previousSecretECDSA
-            ) {
+            if (this.input.inputForRound3.inputForRound2.inputRound1.previousSecretECDSA) {
                   // TODO: on refresh
                   throw new Error("not implemented");
             }
@@ -258,13 +230,8 @@ export class KeygenRound4 {
 
             const PublicData: Record<PartyId, PartyPublicKeyConfig> = {};
             for (const j of this.session.partyIds) {
-                  const PublicECDSAShare = ShamirPublicPolynomial.evaluate(
-                        partyIdToScalar(j)
-                  );
-                  if (
-                        this.input.inputForRound3.inputForRound2.inputRound1
-                              .previousPublicSharesECDSA
-                  ) {
+                  const PublicECDSAShare = ShamirPublicPolynomial.evaluate(partyIdToScalar(j));
+                  if (this.input.inputForRound3.inputForRound2.inputRound1.previousPublicSharesECDSA) {
                         // TODO: on refresh
                         throw new Error("not implemented");
                   }
@@ -289,9 +256,7 @@ export class KeygenRound4 {
                   publicPartyData: PublicData,
             });
 
-            const hashTmp = this.session.hasher
-                  .clone()
-                  .updateMulti([UpdatedConfig, this.session.selfId]);
+            const hashTmp = this.session.hasher.clone().updateMulti([UpdatedConfig, this.session.selfId]);
 
             const proof = zkSchProve(
                   this.input.inputForRound3.inputForRound2.schnorrRand,

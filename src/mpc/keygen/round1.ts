@@ -1,9 +1,6 @@
 import { randBetween } from "bigint-crypto-utils";
 import { partyIdToScalar } from "./partyKey";
-import {
-      randomPaillierPrimes,
-      validatePaillierPrime,
-} from "../paillierKeyPair/paillierCryptoUtils";
+import { randomPaillierPrimes, validatePaillierPrime } from "../paillierKeyPair/paillierCryptoUtils";
 import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
 import { Exponent } from "../math/polynomial/exponent";
 import { Polynomial } from "../math/polynomial/polynomial";
@@ -12,17 +9,18 @@ import { zkSchCreateRandomness } from "../zk/zksch";
 import { KeygenSession } from "./keygenSession";
 import { KeygenBroadcastForRound2 } from "./round2";
 import { KeygenInputForRound1, KeygenInputForRound2, KeygenRound1Output } from "./types";
+import { AbstractKeygenRound } from "./abstractRound";
 // import { validatePaillierPrime } from "../paillierKeygen";
 
-export class KeygenRound1 {
-      public session: KeygenSession;
-      private input: KeygenInputForRound1;
+export class KeygenRound1 extends AbstractKeygenRound<KeygenInputForRound1, KeygenRound1Output, any, any> {
       public output: KeygenInputForRound2;
 
-      constructor(session: KeygenSession, input: KeygenInputForRound1) {
-            this.session = session;
-            this.input = input;
+      constructor() {
+            super();
       }
+
+      public handleBroadcastMessage(bmsg: any): void {}
+      public handleDirectMessage(bmsg: any): void {}
 
       public async process(): Promise<KeygenRound1Output> {
             // generate large random primes and use these to create a paillier keypair
@@ -32,18 +30,13 @@ export class KeygenRound1 {
             // a pedersen commit is used to add extra security with the
             // paillier key pair
             const selfPaillierPublic = paillierSecret.publicKey;
-            const { pedersen: selfPedersenPublic, lambda: pedersenSecret } =
-                  paillierSecret.generatePedersen();
+            const { pedersen: selfPedersenPublic, lambda: pedersenSecret } = paillierSecret.generatePedersen();
 
             const [elGamalSecret, elGamalPublic] = generateElGamalKeyPair();
 
-            const selfShare = this.session.inputForRound1.vssSecret.evaluate(
-                  partyIdToScalar(this.session.selfId)
-            );
+            const selfShare = this.session.inputForRound1.vssSecret.evaluate(partyIdToScalar(this.session.selfId));
 
-            const selfVSSpolynomial = Exponent.fromPoly(
-                  this.session.inputForRound1.vssSecret
-            );
+            const selfVSSpolynomial = Exponent.fromPoly(this.session.inputForRound1.vssSecret);
 
             // here we create randomness for a schnorr ZKP which
             // is used later for round proofs

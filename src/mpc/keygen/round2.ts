@@ -9,6 +9,7 @@ import {
       KeygenInputForRound3,
       KeygenRound2Output,
 } from "./types";
+import { AbstractKeygenRound } from "./abstractRound";
 
 export class KeygenBroadcastForRound2 {
       public readonly from: PartyId;
@@ -38,32 +39,33 @@ export class KeygenBroadcastForRound2 {
             };
       }
 
-      public static fromJSON(
-            json: KeygenBroadcastForRound2JSON
-      ): KeygenBroadcastForRound2 {
+      public static fromJSON(json: KeygenBroadcastForRound2JSON): KeygenBroadcastForRound2 {
             const commitment = hexToBytes(json.commitmentHex);
             return new KeygenBroadcastForRound2(json.from, commitment);
       }
 }
 
-export class KeygenRound2 {
-      private session: KeygenSession;
-      private input: KeygenInputForRound2;
+export class KeygenRound2 extends AbstractKeygenRound<
+      KeygenInputForRound2,
+      KeygenRound2Output,
+      KeygenBroadcastForRound2,
+      any
+> {
       public output: KeygenInputForRound3;
-
       private commitments: Record<PartyId, Uint8Array> = {};
 
-      constructor(session: KeygenSession, input: KeygenInputForRound2) {
-            this.session = session;
-            this.input = input;
+      constructor() {
+            super();
       }
+
+      public handleDirectMessage(bmsg: any): void {}
 
       public handleBroadcastMessage(bmsg: KeygenBroadcastForRound2): void {
             Hasher.validateCommitment(bmsg.commitment);
             this.commitments[bmsg.from] = bmsg.commitment;
       }
 
-      public process(): KeygenRound2Output {
+      public async process(): Promise<KeygenRound2Output> {
             const broadcasts: Array<KeygenBroadcastForRound3> = [
                   KeygenBroadcastForRound3.from({
                         from: this.session.selfId,
