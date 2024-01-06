@@ -13,8 +13,6 @@ import { AbstractKeygenRound } from "./abstractRound";
 // import { validatePaillierPrime } from "../paillierKeygen";
 
 export class KeygenRound1 extends AbstractKeygenRound<KeygenInputForRound1, KeygenRound1Output, any, any> {
-      public output: KeygenInputForRound2;
-
       constructor() {
             super();
       }

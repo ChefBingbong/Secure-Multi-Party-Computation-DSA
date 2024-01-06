@@ -25,6 +25,7 @@ export class KeygenBroadcastForRound3 {
       public readonly elGamalPublic: AffinePoint;
       public readonly pedersenPublic: PedersenParams;
       public readonly decommitment: Uint8Array;
+      public readonly commitment: any;
 
       private constructor(
             from: PartyId,

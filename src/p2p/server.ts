@@ -10,7 +10,6 @@ import config from "../config/config";
 import { redisClient } from "../db/redis";
 import { KeygenSession } from "../mpc/keygen/keygenSession";
 import { PartyId } from "../mpc/keygen/partyKey";
-import { KGInstance } from "../mpc/keygen";
 import * as assert from "assert";
 import { AbstractRound2, KeygenSessionManager, Round } from "../protocol/keygenProtocol";
 import { KeygenRound1Output, KeygenRound2Output, KeygenRound3Output } from "../mpc/keygen/types";
@@ -69,12 +68,13 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.log = this.getLogger("p2p-log");
             this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
             P2pServer.validators = new Map([[config.p2pPort, this.validator.toString()]]);
-            this.sessionManager = new KeygenSessionManager();
-            this.sessionManager.startNewSession({
+
+            KeygenSessionManager.startNewSession({
                   selfId: this.NODE_ID,
                   partyIds: ["6001", "6002", "6003"],
                   threshold: 3,
             });
+
             this.initState();
       }
 
@@ -110,26 +110,25 @@ class P2pServer extends AppLogger implements P2PNetwork {
                               },
                         }) => {
                               this.log.info(`${name}: ${text}`);
-                              const manager = this.sessionManager;
+                              const manager = KeygenSessionManager;
 
                               try {
                                     const sessionState = manager.getCurrentState();
-                                    const protocol = sessionState.currentProtocol;
-                                    manager.incrementRound(manager.currentRound);
+                                    const currentRound = sessionState.currentRound;
+                                    const protocol = currentRound > 0 ? sessionState.round : sessionState.session;
+                                    manager.incrementRound(currentRound);
 
                                     if (type === `keygenRoundHandler`) {
                                           const { broadcasts, directMessages, proof } = options;
                                           if (broadcasts) {
-                                                KeygenSessionManager.messages[sessionState.currentRound] = [
-                                                      ...KeygenSessionManager.messages[sessionState.currentRound],
+                                                KeygenSessionManager.messages[currentRound] = [
+                                                      ...KeygenSessionManager.messages[currentRound],
                                                       ...broadcasts,
                                                 ];
                                           }
                                           if (directMessages) {
-                                                KeygenSessionManager.directMessages[sessionState.currentRound] = [
-                                                      ...KeygenSessionManager.directMessages[
-                                                            sessionState.currentRound
-                                                      ],
+                                                KeygenSessionManager.directMessages[currentRound] = [
+                                                      ...KeygenSessionManager.directMessages[currentRound],
                                                       ...directMessages,
                                                 ];
                                           }
@@ -156,7 +155,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                                                 this.startKeygen();
                                           }
                                     }
-                                    manager.logState();
+                                    // manager.logState();
                                     if (
                                           // this.NODE_ID !== senderNode ||
                                           !protocol.roundResponses.peer[this.NODE_ID]
@@ -385,50 +384,59 @@ class P2pServer extends AppLogger implements P2PNetwork {
       };
 
       public startKeygen = async () => {
-            const keygenSession = this.sessionManager.getCurrentState();
-            const currentRound = keygenSession.currentRound;
-            const currentProtocol = keygenSession.currentProtocol;
-            const roundInvalid = currentProtocol.finished;
+            try {
+                  const keygenSession = KeygenSessionManager.getCurrentState();
+                  const currentRound = keygenSession.currentRound;
+                  const currentProtocol = currentRound > 0 ? keygenSession.round : keygenSession.session;
+                  const roundInvalid = currentProtocol.finished;
 
-            if (this.threshold < 3 || roundInvalid || currentRound === undefined)
-                  this.throwError(`need 3 peers to start keygen`);
+                  if (this.threshold < 3 || roundInvalid || currentRound === undefined)
+                        this.throwError(`need 3 peers to start keygen`);
 
-            currentProtocol.roundResponses.peer[this.NODE_ID] = true;
+                  currentProtocol.roundResponses.peer[this.NODE_ID] = true;
 
-            if (currentRound >= 1) {
-                  KeygenSessionManager.messages[currentRound - 1]
-                        .map((b) => KeygenSessionManager.getKeygenBroadcast(currentRound, b))
-                        .forEach((b) => (currentProtocol as Round).round.handleBroadcastMessage(b));
+                  if (currentRound >= 1) {
+                        keygenSession.messages
+                              .map((b) => KeygenSessionManager.getKeygenBroadcast(currentRound, b))
+                              .forEach((b) => (currentProtocol as any).round.handleBroadcastMessage(b));
 
-                  KeygenSessionManager.directMessages[currentRound - 1]
-                        .map((b: any) => KeygenDirectMessageForRound4.fromJSON(b))
-                        .filter((m) => m.to === this.NODE_ID)
-                        .forEach((b) => (currentProtocol as Round).round.handleDirectMessage(b));
+                        keygenSession.directMessages
+                              .map((b: any) => KeygenDirectMessageForRound4.fromJSON(b))
+                              .filter((m) => m.to === this.NODE_ID)
+                              .forEach((b) => (currentProtocol as any).round.handleDirectMessage(b));
 
-                  const inputForNextRound = await (currentProtocol as Round).round.process();
+                        const inputForNextRound = await (currentProtocol as any).round.process();
 
-                  this.broadcast({
-                        name: `round${currentRound}-response`,
-                        text: `${config.p2pPort}'s round${currentRound} input ${inputForNextRound}`,
-                        type: "keygenRoundHandler",
-                        options: {
-                              broadcasts: currentRound === 5 ? undefined : inputForNextRound.broadcasts,
-                              directMessages: currentRound === 3 ? inputForNextRound.directMessages : undefined,
-                              proof: KeygenSessionManager.getProofForOptions(currentRound, inputForNextRound),
-                        },
-                        senderNode: this.NODE_ID,
-                  });
-                  if (currentRound === 5) console.log(inputForNextRound.UpdatedConfig);
-            } else {
-                  this.broadcast({
-                        name: "keygenSetup-response",
-                        text: `message ${config.p2pPort} confirming they have computed round 1 input`,
-                        type: "keygenSetup",
-                        senderNode: this.NODE_ID,
-                  });
+                        console.log(KeygenSessionManager.directMessages, KeygenSessionManager.messages);
+                        this.broadcast({
+                              name: `round${currentRound}-response`,
+                              text: `${config.p2pPort}'s round${currentRound} input ${inputForNextRound}`,
+                              type: "keygenRoundHandler",
+                              options: {
+                                    broadcasts: currentRound === 5 ? undefined : inputForNextRound.broadcasts,
+                                    directMessages:
+                                          currentRound === 3 ? inputForNextRound.directMessages : undefined,
+                                    proof: KeygenSessionManager.getProofForOptions(
+                                          currentRound,
+                                          inputForNextRound
+                                    ),
+                              },
+                              senderNode: this.NODE_ID,
+                        });
+                        if (currentRound === 5) console.log(inputForNextRound.UpdatedConfig);
+                  } else {
+                        this.broadcast({
+                              name: "keygenSetup-response",
+                              text: `message ${config.p2pPort} confirming they have computed round 1 input`,
+                              type: "keygenSetup",
+                              senderNode: this.NODE_ID,
+                        });
+                  }
+
+                  currentProtocol.initialized = true;
+            } catch (err) {
+                  console.log(err);
             }
-
-            currentProtocol.initialized = true;
       };
 }
 

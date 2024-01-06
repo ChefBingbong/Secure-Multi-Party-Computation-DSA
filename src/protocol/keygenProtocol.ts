@@ -1,8 +1,16 @@
-import { KGInstance1, KeygenSession, KeygenSessionMap, keygenRounds } from "../mpc/keygen";
+import { AllKeyGenRounds } from "../mpc/keygen";
+import { AbstractKeygenRound } from "../mpc/keygen/abstractRound";
+import { KeygenSession } from "../mpc/keygen/keygenSession";
 import { KeygenBroadcastForRound2 } from "../mpc/keygen/round2";
 import { KeygenBroadcastForRound3 } from "../mpc/keygen/round3";
 import { KeygenBroadcastForRound4 } from "../mpc/keygen/round4";
 import { KeygenBroadcastForRound5 } from "../mpc/keygen/round5";
+import {
+      GenericKeygenRoundBroadcast,
+      GenericKeygenRoundDirectMessage,
+      GenericKeygenRoundInput,
+      GenericKeygenRoundOutput,
+} from "../mpc/keygen/types";
 import { Hasher } from "../mpc/utils/hasher";
 
 interface AbstractRound {
@@ -14,59 +22,71 @@ interface AbstractRound {
       handleDirectMessage(dmsg: any): void;
 }
 export interface AbstractRound2 extends AbstractRound {}
-export type Round = {
-      round: AbstractRound2;
+
+type RoundResponse = { peer: { [id: string]: boolean }; number: number };
+type Session = {
+      session: KeygenSession;
       initialized: boolean;
-      roundResponses: { peer: { [id: string]: boolean }; number: number };
+      roundResponses: RoundResponse;
       finished: boolean;
 };
+type AbstractR = AbstractKeygenRound<
+      GenericKeygenRoundInput,
+      GenericKeygenRoundOutput,
+      GenericKeygenRoundBroadcast,
+      GenericKeygenRoundDirectMessage
+>;
+export type Round = {
+      round: AbstractKeygenRound<
+            GenericKeygenRoundInput,
+            GenericKeygenRoundOutput,
+            GenericKeygenRoundBroadcast,
+            GenericKeygenRoundDirectMessage
+      >;
+      initialized: boolean;
+      roundResponses: RoundResponse;
+      finished: boolean;
+};
+type Rounds = { [x: number]: Round };
+type Message = { [round: number]: any };
+
 export class KeygenSessionManager {
-      public sessionComplete: boolean = false;
-      public isInitialized: boolean = false;
-      public threshold: number = undefined;
-      public validators: string[] = [];
-      public finalRound: number = 5;
-      public currentRound: number = undefined;
-      public previousRound: number = undefined;
-      public session: {
-            session: KeygenSession;
-            initialized: boolean;
-            roundResponses: { peer: { [id: string]: boolean }; number: number };
-            finished: boolean;
-      } = undefined;
-      public rounds: {
-            [x: number]: {
-                  round: AbstractRound2;
-                  initialized: boolean;
-                  roundResponses: { peer: { [id: string]: boolean }; number: number };
-                  finished: boolean;
-            };
-      } = undefined;
-      public static messages: {
-            [round: number]: any;
-      };
-      public static directMessages: {
-            [round: number]: any;
-      };
+      public static sessionComplete: boolean | undefined;
+      public static isInitialized: boolean | undefined;
+      public static threshold: number | undefined;
+      public static validators: string[] = [];
+      public static finalRound: number = 5;
+      public static currentRound: number | undefined;
+      public static previousRound: number | undefined;
+      public static session: Session | undefined;
+      public static rounds: Rounds | undefined;
+
+      public static messages: Message;
+      public static directMessages: Message;
 
       constructor() {}
 
-      initNewRound(isFirst: boolean = false) {
+      public static initNewRound(isFirst: boolean = false) {
             if (this.sessionComplete || !this.isInitialized) return;
-            const roundInput = isFirst
+
+            const session = this.session.session;
+            const input = isFirst
                   ? this.session.session.inputForRound1
                   : this.rounds[this.previousRound].round.output;
-            const round = new KeygenSessionMap[this.currentRound]();
-            round.init({ session: this.session.session, input: roundInput });
+
+            console.log(this.currentRound);
+            const round = this.rounds[this.currentRound].round;
+            round.init({ session, input });
+
             this.rounds[this.currentRound] = {
-                  round: round,
+                  round,
                   initialized: false,
                   roundResponses: { peer: {}, number: 0 },
                   finished: false,
             };
       }
 
-      startNewSession({ selfId, partyIds, threshold }): {
+      public static startNewSession({ selfId, partyIds, threshold }): {
             session: KeygenSession;
             initialized: boolean;
             roundResponses: { peer: { [id: string]: boolean }; number: number };
@@ -81,7 +101,17 @@ export class KeygenSessionManager {
             this.validators = this.validators;
 
             this.currentRound = 0;
-            this.rounds = {};
+            this.rounds = Object.values(AllKeyGenRounds).reduce((accumulator, round, i) => {
+                  accumulator[i + 1] = {
+                        round,
+                        initialized: false,
+                        roundResponses: { peer: {}, number: 0 },
+                        finished: false,
+                  };
+                  return accumulator;
+            }, {} as Record<number, Round>);
+
+            console.log(this.rounds);
             this.session = {
                   session: new KeygenSession(selfId, partyIds, threshold),
                   initialized: false,
@@ -93,7 +123,7 @@ export class KeygenSessionManager {
             return this.session;
       }
 
-      resetSessionState() {
+      private static resetSessionState() {
             this.sessionComplete = false;
             this.threshold = undefined;
             this.validators = [];
@@ -104,7 +134,7 @@ export class KeygenSessionManager {
             this.rounds = undefined;
       }
 
-      incrementRound(round: number): void {
+      public static incrementRound(round: number): void {
             if (this.sessionComplete || !this.isInitialized) return;
             if (this.currentRound === 0) {
                   this.session.roundResponses.number += 1;
@@ -134,66 +164,23 @@ export class KeygenSessionManager {
             }
       }
 
-      logState() {
-            const s = this.getCurrentState();
-            // console.log({
-            //       session: s.currentProtocol,
-            //       rounds: s.rounds,
-            // });
-      }
-
-      getCurrentState(): {
+      public static getCurrentState(): {
             currentRound: number;
-            rounds: Record<
-                  number,
-                  {
-                        [x: number]: {
-                              round: AbstractRound2;
-                              initialized: boolean;
-                              roundResponses: {
-                                    peer: { [id: string]: boolean };
-                                    number: number;
-                              };
-                              finished: boolean;
-                        };
-                  }
-            >;
-            session: {
-                  session: KeygenSession;
-                  initialized: boolean;
-                  roundResponses: { peer: { [id: string]: boolean }; number: number };
-                  finished: boolean;
-            };
-            currentProtocol:
-                  | {
-                          round: AbstractRound2;
-                          initialized: boolean;
-                          roundResponses: {
-                                peer: { [id: string]: boolean };
-                                number: number;
-                          };
-                          finished: boolean;
-                    }
-                  | {
-                          session: KeygenSession;
-                          initialized: boolean;
-                          roundResponses: {
-                                peer: { [id: string]: boolean };
-                                number: number;
-                          };
-                          finished: boolean;
-                    };
+            round: Round;
+            session: Session;
+            messages: any;
+            directMessages: any;
       } {
             const currentRound = this.currentRound;
-            const rounds = this.rounds;
-            const round = rounds[currentRound];
-            const session = this.session;
-            const currentProtocol = currentRound !== 0 ? round : session;
+            const round = this.rounds[currentRound];
+            const messages = this.messages[currentRound - 1];
+            const directMessages = this.directMessages[currentRound - 1];
             return {
                   currentRound,
-                  rounds,
-                  session,
-                  currentProtocol,
+                  round,
+                  session: this.session,
+                  messages,
+                  directMessages,
             };
       }
 
@@ -246,4 +233,22 @@ export class KeygenSessionManager {
                         throw new Error(`Unsupported round: ${currentRound}`);
             }
       }
+
+      // function getKeygenRound(currentRound: number, inputData: any): KeyGenRound {
+      //       const session = new YourSession(); // You can customize this instantiation based on your actual session class
+
+      //       switch (currentRound) {
+      //         case 2:
+      //           return new KeygenRound2(session, inputData) as KeyGenRound;
+      //         case 3:
+      //           return new KeygenRound3(session, inputData) as KeyGenRound;
+      //         case 4:
+      //           return new KeygenRound4(session, inputData) as KeyGenRound;
+      //         case 5:
+      //           return new KeygenRound5(session, inputData) as KeyGenRound;
+      //         // Add more cases as needed
+      //         default:
+      //           throw new Error(`Unsupported round: ${currentRound}`);
+      //       }
+      //     }
 }

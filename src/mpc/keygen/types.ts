@@ -101,9 +101,9 @@ export type GenericKeygenRoundInput = Partial<
             KeygenInputForRound5
 >;
 export type GenericKeygenRoundOutput = Partial<
-      KeygenRound1Output & KeygenRound2Output & KeygenRound3Output & KeygenRound4Output & KeygenRound5Output
+      KeygenRound1Output | KeygenRound2Output | KeygenRound3Output | KeygenRound4Output | KeygenRound5Output
 >;
 export type GenericKeygenRoundBroadcast = Partial<
-      KeygenBroadcastForRound2 & KeygenBroadcastForRound3 & KeygenBroadcastForRound4
+      KeygenBroadcastForRound2 | KeygenBroadcastForRound3 | KeygenBroadcastForRound4
 >;
 export type GenericKeygenRoundDirectMessage = Partial<KeygenDirectMessageForRound4>;

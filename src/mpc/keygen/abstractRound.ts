@@ -1,14 +1,16 @@
 import { KeygenSession } from "./keygenSession";
 
-export interface BaseKeygenRound<I, O, B, D> {
+export interface BaseKeygenRound<O, B, D> {
+      output: any;
       handleBroadcastMessage(bmsg: B): void;
       handleDirectMessage(dmsg: D): void;
       process(): Promise<O>;
 }
 
-export abstract class AbstractKeygenRound<I, O, B, D> implements BaseKeygenRound<I, O, B, D> {
+export abstract class AbstractKeygenRound<I, O, B, D> implements BaseKeygenRound<O, B, D> {
       protected session: KeygenSession | undefined;
       protected input: I | undefined;
+      public output: any;
 
       public abstract handleBroadcastMessage(bmsg: B): void;
       public abstract handleDirectMessage(dmsg: D): void;
