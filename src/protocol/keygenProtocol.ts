@@ -1,4 +1,9 @@
 import { KGInstance1, KeygenSession, KeygenSessionMap, keygenRounds } from "../mpc/keygen";
+import { KeygenBroadcastForRound2 } from "../mpc/keygen/round2";
+import { KeygenBroadcastForRound3 } from "../mpc/keygen/round3";
+import { KeygenBroadcastForRound4 } from "../mpc/keygen/round4";
+import { KeygenBroadcastForRound5 } from "../mpc/keygen/round5";
+import { Hasher } from "../mpc/utils/hasher";
 
 interface AbstractRound {
       session: KeygenSession;
@@ -37,6 +42,12 @@ export class KeygenSessionManager {
                   finished: boolean;
             };
       } = undefined;
+      public static messages: {
+            [round: number]: any;
+      };
+      public static directMessages: {
+            [round: number]: any;
+      };
 
       constructor() {}
 
@@ -76,6 +87,8 @@ export class KeygenSessionManager {
                   roundResponses: { peer: {}, number: 0 },
                   finished: false,
             };
+            KeygenSessionManager.messages = KeygenSessionManager.messageQueue(5);
+            KeygenSessionManager.directMessages = KeygenSessionManager.messageQueue(5);
             return this.session;
       }
 
@@ -94,7 +107,7 @@ export class KeygenSessionManager {
             if (this.sessionComplete || !this.isInitialized) return;
             if (this.currentRound === 0) {
                   this.session.roundResponses.number += 1;
-                  if (this.session.roundResponses.number >= 6) {
+                  if (this.session.roundResponses.number >= 3) {
                         this.session.finished = true;
                         this.currentRound += 1;
                         this.initNewRound(true);
@@ -104,7 +117,7 @@ export class KeygenSessionManager {
             if (this.rounds[round]) {
                   this.rounds[round].roundResponses.number += 1;
 
-                  if (this.rounds[round].roundResponses.number >= 6) {
+                  if (this.rounds[round].roundResponses.number >= 3) {
                         this.rounds[round].finished = true;
                   }
 
@@ -181,5 +194,55 @@ export class KeygenSessionManager {
                   session,
                   currentProtocol,
             };
+      }
+
+      public static messageQueue(rounds: number): { [round: number]: any[] } {
+            const q: { [round: number]: any[] } = {};
+
+            for (let i = 0; i <= rounds; i++) {
+                  const roundMap = [];
+                  q[i] = roundMap;
+            }
+
+            return q;
+      }
+
+      public static getDirectMessagesForOptions(currentRound: number, inputForNextRound: any) {
+            // Implement logic to get direct messages for options based on the current round and input
+            switch (currentRound) {
+                  case 3:
+                        return inputForNextRound.directMessages;
+                  // Add more cases as needed
+                  default:
+                        return undefined;
+            }
+      }
+
+      public static getProofForOptions(currentRound: number, inputForNextRound: any) {
+            // Implement logic to get proof for options based on the current round and input
+            switch (currentRound) {
+                  case 5:
+                        return Hasher.create().update(inputForNextRound.UpdatedConfig).digestBigint().toString();
+                  // Add more cases as needed
+                  default:
+                        return undefined;
+            }
+      }
+
+      public static getKeygenBroadcast(currentRound: number, data: any) {
+            // Implement logic to create KeygenBroadcast based on the current round and data
+            switch (currentRound) {
+                  case 2:
+                        return KeygenBroadcastForRound2.fromJSON(data);
+                  case 3:
+                        return KeygenBroadcastForRound3.fromJSON(data);
+                  case 4:
+                        return KeygenBroadcastForRound4.fromJSON(data);
+                  case 5:
+                        return KeygenBroadcastForRound5.fromJSON(data);
+                  // Add more cases as needed
+                  default:
+                        throw new Error(`Unsupported round: ${currentRound}`);
+            }
       }
 }
