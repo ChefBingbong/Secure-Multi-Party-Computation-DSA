@@ -9,6 +9,7 @@ import { KeygenBroadcastForRound4 } from "../mpc/keygen/round4";
 import { KeygenBroadcastForRound5 } from "../mpc/keygen/round5";
 import { Hasher } from "../mpc/utils/hasher";
 import { Message as Msg } from "./message/message";
+import { ServerMessage } from "../p2p/server";
 
 type Session = {
       session: KeygenSession;
@@ -40,6 +41,7 @@ export class KeygenSessionManager {
 
       public static messages: Message;
       public static directMessages: Message;
+      public static proofs: Array<bigint> = [];
 
       constructor(threshold: number, validators: string[]) {
             KeygenSessionManager.threshold = threshold;
@@ -69,7 +71,7 @@ export class KeygenSessionManager {
             this.rounds[0].round.init({ sessionConfig });
       }
 
-      public static initNewRound() {
+      public static initNewRound(): Round {
             if (this.sessionComplete || !this.isInitialized) return;
 
             const input = this.rounds[this.previousRound].round.output;
@@ -82,38 +84,37 @@ export class KeygenSessionManager {
                   roundResponses: { peer: {}, number: 0 },
                   finished: false,
             };
+            return this.rounds[this.currentRound];
       }
 
       public static keygenRoundProcessor = async (
-            options: any,
-            broadcast: (message: any, id?: string, origin?: string, ttl?: number) => void
+            data: ServerMessage,
+            broadcast: (message: any, id?: string, origin?: string, ttl?: number) => void,
+            sendDirect: (destination: string, message: any, id?: string, origin?: string, ttl?: number) => void
       ) => {
-            const { broadcasts, directMessages, proof } = options;
+            const { broadcasts, directMessages, proof } = data.data;
             const { round, roundState, currentRound } = this.getCurrentState();
             const roundResponses = roundState.roundResponses;
 
             if (!roundResponses.peer[config.p2pPort]) this.keygenRoundVerifier(broadcast);
 
+            if (round.isBroadcastRound && broadcasts?.Data) {
+                  this.updateRoundMessages(broadcasts?.Data, currentRound);
+            }
+            if (round.isDirectMessageRound && this.canAccept(directMessages, config.p2pPort)) {
+                  this.updateRoundDirectMessages(directMessages?.Data, currentRound);
+            }
+
             this.incrementRound(currentRound);
 
-            if (round.isBroadcastRound) {
-                  this.updateRoundMessages(broadcasts, currentRound);
-            }
-            if (round.isDirectMessageRound) {
-                  this.updateRoundDirectMessages(directMessages, currentRound);
-            }
+            if (proof) this.verifyProof(proof, roundResponses);
 
-            if (proof && roundResponses.number === this.threshold) {
-                  const parsedProof = BigInt(proof);
-                  assert.deepEqual(parsedProof[0], parsedProof[1]);
-                  assert.deepEqual(parsedProof[1], parsedProof[2]);
-
-                  console.log(`keygeneration was successful`);
-            }
-
-            if (roundResponses.number === this.threshold) {
-                  console.log(`ready to start keygen round 1`);
-                  if (config.p2pPort === "6001") this.keygenRoundVerifier(broadcast);
+            if (roundResponses.number === this.threshold && this.finalRound !== currentRound) {
+                  if (config.p2pPort === "6003")
+                        sendDirect("6001", {
+                              message: `startNextRound ${currentRound}`,
+                              type: `processNextRound`,
+                        });
             }
       };
 
@@ -122,6 +123,7 @@ export class KeygenSessionManager {
       ) => {
             try {
                   const { round, roundState, currentRound } = this.getCurrentState();
+                  roundState.initialized = true;
                   const roundResponses = roundState.roundResponses;
 
                   if (this.threshold < 3 || roundState.finished) {
@@ -131,24 +133,19 @@ export class KeygenSessionManager {
                   this.validateRoundBroadcasts();
                   this.validateRoundDirectMessages(config.p2pPort);
 
-                  const inputForNextRound = await round.process();
+                  const roundOutput = await round.process();
                   roundResponses.peer[config.p2pPort] = true;
 
+                  const broadcasts = this.createMessage(round, roundOutput?.broadcasts, currentRound);
+                  const directMessages = this.createMessage(round, roundOutput?.directMessages, currentRound);
+                  const proof = this.getProofForOptions(currentRound, roundOutput);
+
                   broadcast({
-                        name: `round${currentRound}-response`,
-                        text: `${config.p2pPort}'s round${currentRound} input ${inputForNextRound}`,
+                        message: `${config.p2pPort}'s round${currentRound} input ${roundOutput}`,
                         type: "keygenRoundHandler",
-                        options: {
-                              broadcasts: inputForNextRound?.broadcasts,
-                              directMessages: inputForNextRound?.directMessages,
-
-                              proof: KeygenSessionManager.getProofForOptions(currentRound, inputForNextRound),
-                        },
                         senderNode: config.p2pPort,
+                        data: { broadcasts, directMessages, proof },
                   });
-                  if (currentRound === 5) console.log(inputForNextRound.UpdatedConfig);
-
-                  roundState.initialized = true;
             } catch (err) {
                   console.log(err);
             }
@@ -156,34 +153,26 @@ export class KeygenSessionManager {
 
       private static resetSessionState() {
             this.sessionComplete = false;
-            // this.threshold = undefined;
-            // this.validators = [];
-            this.finalRound = 5;
             this.currentRound = 0;
-            // this.previousRound = undefined;
-            // this.session = undefined;
-            // this.rounds = undefined;
             this.isInitialized = true;
       }
 
       public static incrementRound(round: number): void {
             console.log(this.sessionComplete, this.isInitialized);
             if (this.sessionComplete || !this.isInitialized) return;
-            if (this.rounds[round]) {
-                  this.rounds[round].roundResponses.number += 1;
+            this.rounds[round].roundResponses.number += 1;
 
-                  if (this.rounds[round].roundResponses.number >= 3) {
-                        this.rounds[round].finished = true;
-                  }
+            if (this.rounds[round].roundResponses.number >= 3) {
+                  this.rounds[round].finished = true;
+            }
 
-                  if (this.rounds[round].finished) {
-                        if (round === this.finalRound) {
-                              this.sessionComplete = true;
-                        } else {
-                              this.previousRound = this.currentRound;
-                              this.currentRound += 1;
-                              this.initNewRound();
-                        }
+            if (this.rounds[round].finished) {
+                  if (round === this.finalRound) {
+                        this.sessionComplete = true;
+                  } else {
+                        this.previousRound = this.currentRound;
+                        this.currentRound += 1;
+                        this.initNewRound();
                   }
             }
       }
@@ -251,22 +240,19 @@ export class KeygenSessionManager {
       }
 
       public static updateRoundMessages(newMessages: any, r: any) {
-            KeygenSessionManager.messages[r] = [...KeygenSessionManager.messages[r], ...newMessages];
+            this.messages[r] = [...this.messages[r], ...newMessages];
       }
 
       public static updateRoundDirectMessages(newDirectMessages: any, r: any) {
-            KeygenSessionManager.directMessages[r] = [
-                  ...KeygenSessionManager.directMessages[r],
-                  ...newDirectMessages,
-            ];
+            this.directMessages[r] = [...this.directMessages[r], ...newDirectMessages];
       }
 
-      private static receivedAll(): boolean {
-            const isBroadcastRound = this.rounds[this.currentRound].round.isBroadcastRound;
-            const isDirectMessageRound = this.rounds[this.currentRound].round.isDirectMessageRound;
+      private static receivedAll(round: Round, currentRound: number): boolean {
+            const isBroadcastRound = round.round.isBroadcastRound;
+            const isDirectMessageRound = round.round.isDirectMessageRound;
 
-            const roundBroadcasts = this.messages[this.currentRound].length;
-            const roundMessages = this.directMessages[this.currentRound].length;
+            const roundBroadcasts = this.messages[currentRound].length;
+            const roundMessages = this.directMessages[currentRound].length;
             const partyId = this.validators.length;
 
             if (isBroadcastRound && isDirectMessageRound) {
@@ -287,17 +273,13 @@ export class KeygenSessionManager {
                   return false;
             }
 
-            if (this.session.session.protocolId !== message.Protocol) {
+            if (this.rounds[0].round.protocolId !== message.Protocol) {
                   console.log("protocol does not match");
 
                   return false;
             }
 
-            // if (!currentRound.output.SSID.equals(currentRound.SSID())) {
-            //   return false;
-            // }
-
-            if (!this.session.session.partyIds.includes(message.From)) {
+            if (!this.rounds[0].round.partyIds.includes(message.From)) {
                   console.log("partyids dont include from");
                   return false;
             }
@@ -307,10 +289,39 @@ export class KeygenSessionManager {
                   return false;
             }
 
-            if (this.session.session.finalRound < message.RoundNumber) {
+            if (this.rounds[0].round.finalRound < message.RoundNumber) {
                   return false;
             }
 
             return true;
       }
+
+      public static createMessage = (
+            round: AbstractKeygenRound<any, any, any, any>,
+            messageType: any,
+            currentRound: number
+      ) => {
+            const message = Msg.create<any>(
+                  config.p2pPort,
+                  messageType?.to ?? "",
+                  round.protocolId,
+                  currentRound,
+                  messageType ?? undefined,
+                  round.isDirectMessageRound
+            );
+            return message;
+      };
+
+      private static verifyProof = (proof: bigint, roundResponses: RoundResponse) => {
+            const parsedProof = BigInt(proof);
+            this.proofs = [...this.proofs, parsedProof];
+
+            if (roundResponses.number === this.threshold) {
+                  assert.deepEqual(this.proofs[0], this.proofs[1]);
+                  assert.deepEqual(this.proofs[1], this.proofs[2]);
+                  assert.deepEqual(this.proofs[0], this.proofs[2]);
+
+                  console.log(`keygeneration was successful, ${this.proofs}`);
+            }
+      };
 }

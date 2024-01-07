@@ -1,5 +1,4 @@
 export class Message<T> {
-      SSID: string;
       From: string;
       To: string;
       Protocol: string;
@@ -7,16 +6,7 @@ export class Message<T> {
       Data: T;
       Broadcast: boolean;
 
-      constructor(
-            SSID: string,
-            From: string,
-            To: string,
-            Protocol: string,
-            RoundNumber: number,
-            Data: T,
-            Broadcast: boolean
-      ) {
-            this.SSID = SSID;
+      constructor(From: string, To: string, Protocol: string, RoundNumber: number, Data: T, Broadcast: boolean) {
             this.From = From;
             this.To = To;
             this.Protocol = Protocol;
@@ -37,7 +27,6 @@ export class Message<T> {
       }
 
       static create<T>(
-            SSID: string,
             From: string,
             To: string,
             Protocol: string,
@@ -45,6 +34,6 @@ export class Message<T> {
             Data: T,
             Broadcast: boolean
       ): Message<T> {
-            return new Message<T>(SSID, From, To, Protocol, RoundNumber, Data, Broadcast);
+            return new Message<T>(From, To, Protocol, RoundNumber, Data, Broadcast);
       }
 }
