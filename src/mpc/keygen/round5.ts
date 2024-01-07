@@ -62,8 +62,13 @@ export class KeygenRound5 extends AbstractKeygenRound<
       any
 > {
       constructor() {
-            super();
+            super({ isBroadcastRound: false, isDriectMessageRound: false });
       }
+
+      public fromJSON(json: KeygenBroadcastForRound5JSON): KeygenBroadcastForRound5 {
+            return KeygenBroadcastForRound5.fromJSON(json);
+      }
+      public fromJSOND(json: any): void {}
 
       public handleDirectMessage(bmsg: any): void {}
 

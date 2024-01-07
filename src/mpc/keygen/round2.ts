@@ -55,7 +55,7 @@ export class KeygenRound2 extends AbstractKeygenRound<
       private commitments: Record<PartyId, Uint8Array> = {};
 
       constructor() {
-            super();
+            super({ isBroadcastRound: true, isDriectMessageRound: false });
       }
 
       public handleDirectMessage(bmsg: any): void {}
@@ -64,6 +64,11 @@ export class KeygenRound2 extends AbstractKeygenRound<
             Hasher.validateCommitment(bmsg.commitment);
             this.commitments[bmsg.from] = bmsg.commitment;
       }
+
+      public fromJSON(json: KeygenBroadcastForRound2JSON): KeygenBroadcastForRound2 {
+            return KeygenBroadcastForRound2.fromJSON(json);
+      }
+      public fromJSOND(json: any): void {}
 
       public async process(): Promise<KeygenRound2Output> {
             const broadcasts: Array<KeygenBroadcastForRound3> = [

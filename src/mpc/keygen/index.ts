@@ -19,14 +19,16 @@ export enum KeyGenRounds {
       KeygenRound4 = "KeygenRound4",
       KeygenRound5 = "KeygenRound5",
 }
+
 export const AllKeyGenRounds: {
-      [round in KeyGenRounds]: AbstractKeygenRound<
-            GenericKeygenRoundInput,
-            GenericKeygenRoundOutput,
-            any,
-            GenericKeygenRoundDirectMessage
-      >;
+      KeygenSession: KeygenSession;
+      KeygenRound1: KeygenRound1;
+      KeygenRound2: KeygenRound2;
+      KeygenRound3: KeygenRound3;
+      KeygenRound4: KeygenRound4;
+      KeygenRound5: KeygenRound5;
 } = {
+      KeygenSession: new KeygenSession() as KeygenSession,
       KeygenRound1: new KeygenRound1() as KeygenRound1,
       KeygenRound2: new KeygenRound2() as KeygenRound2,
       KeygenRound3: new KeygenRound3() as KeygenRound3,

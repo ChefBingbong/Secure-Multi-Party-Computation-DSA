@@ -13,9 +13,13 @@ import { AbstractKeygenRound } from "./abstractRound";
 // import { validatePaillierPrime } from "../paillierKeygen";
 
 export class KeygenRound1 extends AbstractKeygenRound<KeygenInputForRound1, KeygenRound1Output, any, any> {
+      public output: KeygenInputForRound2;
       constructor() {
-            super();
+            super({ isBroadcastRound: true, isDriectMessageRound: false });
       }
+
+      public fromJSON(json: any): void {}
+      public fromJSOND(json: any): void {}
 
       public handleBroadcastMessage(bmsg: any): void {}
       public handleDirectMessage(bmsg: any): void {}
@@ -32,9 +36,9 @@ export class KeygenRound1 extends AbstractKeygenRound<KeygenInputForRound1, Keyg
 
             const [elGamalSecret, elGamalPublic] = generateElGamalKeyPair();
 
-            const selfShare = this.session.inputForRound1.vssSecret.evaluate(partyIdToScalar(this.session.selfId));
+            const selfShare = this.session.output.vssSecret.evaluate(partyIdToScalar(this.session.selfId));
 
-            const selfVSSpolynomial = Exponent.fromPoly(this.session.inputForRound1.vssSecret);
+            const selfVSSpolynomial = Exponent.fromPoly(this.session.output.vssSecret);
 
             // here we create randomness for a schnorr ZKP which
             // is used later for round proofs
@@ -80,6 +84,7 @@ export class KeygenRound1 extends AbstractKeygenRound<KeygenInputForRound1, Keyg
             };
             return {
                   broadcasts,
+                  // @ts-ignore
                   inputForRound2: this.output,
             };
       }
