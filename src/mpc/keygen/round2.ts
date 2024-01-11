@@ -1,15 +1,9 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
-import { PartyId } from "./partyKey";
 import { Hasher } from "../utils/hasher";
-import { KeygenSession } from "./keygenSession";
-import { KeygenBroadcastForRound3 } from "./round3";
-import {
-      KeygenBroadcastForRound2JSON,
-      KeygenInputForRound2,
-      KeygenInputForRound3,
-      KeygenRound2Output,
-} from "./types";
 import { AbstractKeygenRound } from "./abstractRound";
+import { PartyId } from "./partyKey";
+import { KeygenBroadcastForRound3 } from "./round3";
+import { KeygenBroadcastForRound2JSON, KeygenInputForRound3, KeygenRound2Output } from "./types";
 
 export class KeygenBroadcastForRound2 {
       public readonly from: PartyId;
@@ -45,17 +39,12 @@ export class KeygenBroadcastForRound2 {
       }
 }
 
-export class KeygenRound2 extends AbstractKeygenRound<
-      KeygenInputForRound2,
-      KeygenRound2Output,
-      KeygenBroadcastForRound2,
-      any
-> {
+export class KeygenRound2 extends AbstractKeygenRound {
       public output: KeygenInputForRound3;
       private commitments: Record<PartyId, Uint8Array> = {};
 
       constructor() {
-            super({ isBroadcastRound: true, isDriectMessageRound: false });
+            super({ isBroadcastRound: true, isDriectMessageRound: false, currentRound: 2 });
       }
 
       public handleDirectMessage(bmsg: any): void {}

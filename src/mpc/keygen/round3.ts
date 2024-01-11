@@ -119,12 +119,7 @@ export class KeygenBroadcastForRound3 {
       }
 }
 
-export class KeygenRound3 extends AbstractKeygenRound<
-      KeygenInputForRound3,
-      KeygenRound3Output,
-      KeygenBroadcastForRound3,
-      any
-> {
+export class KeygenRound3 extends AbstractKeygenRound {
       private RIDs: Record<PartyId, bigint> = {};
       private ChainKeys: Record<PartyId, bigint> = {};
       private PaillierPublic: Record<PartyId, PaillierPublicKey> = {};
@@ -135,7 +130,7 @@ export class KeygenRound3 extends AbstractKeygenRound<
       public output: KeygenInputForRound4;
 
       constructor() {
-            super({ isBroadcastRound: true, isDriectMessageRound: true });
+            super({ isBroadcastRound: true, isDriectMessageRound: true, currentRound: 3 });
       }
 
       public fromJSON(json: KeygenBroadcastForRound3JSON): KeygenBroadcastForRound3 {

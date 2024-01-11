@@ -137,17 +137,12 @@ export type KeygenRound4Output = {
       inputForRound5: any;
 };
 
-export class KeygenRound4 extends AbstractKeygenRound<
-      KeygenInputForRound4,
-      KeygenRound4Output,
-      KeygenBroadcastForRound4,
-      KeygenDirectMessageForRound4
-> {
+export class KeygenRound4 extends AbstractKeygenRound {
       private ShareReceived: Record<PartyId, bigint> = {};
       public output: KeygenInputForRound5;
 
       constructor() {
-            super({ isBroadcastRound: true, isDriectMessageRound: false });
+            super({ isBroadcastRound: true, isDriectMessageRound: false, currentRound: 4 });
       }
 
       public fromJSON(json: KeygenBroadcastForRound4JSON): KeygenBroadcastForRound4 {

@@ -34,6 +34,8 @@ export class Message<T> {
             Data: T,
             Broadcast: boolean
       ): Message<T> {
-            return new Message<T>(From, To, Protocol, RoundNumber, Data, Broadcast);
+            const msg = new Message<T>(From, To, Protocol, RoundNumber, Data, Broadcast);
+            Object.freeze(msg);
+            return msg;
       }
 }

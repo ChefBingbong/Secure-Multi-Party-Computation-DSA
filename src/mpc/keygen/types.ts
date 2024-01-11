@@ -1,4 +1,4 @@
-import { PartyId } from "./partyKey";
+import { PartyId, PartySecretKeyConfig } from "./partyKey";
 import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
 import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
 import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
@@ -6,7 +6,7 @@ import { PedersenParametersJSON } from "../paillierKeyPair/Pedersen/types";
 import { Exponent, ExponentJSON } from "../math/polynomial/exponent";
 import { Polynomial } from "../math/polynomial/polynomial";
 import { AffinePoint, AffinePointJSON } from "../types";
-import { ZkSchCommitmentJSON, ZkSchRandomness } from "../zk/zksch";
+import { ZkSchCommitment, ZkSchCommitmentJSON, ZkSchRandomness } from "../zk/zksch";
 import { KeygenBroadcastForRound2 } from "./round2";
 import { KeygenBroadcastForRound3 } from "./round3";
 import {
@@ -123,3 +123,52 @@ export type KeygenRoundOutputs = {
       4: KeygenInputForRound4;
       5: KeygenInputForRound5;
 };
+
+export type SessionConfig = {
+      selfId: PartyId;
+      partyIds: Array<PartyId>;
+      threshold: number;
+      precomputedPaillierPrimes?: {
+            p: bigint;
+            q: bigint;
+      };
+};
+
+export type GenericRoundOutput = Partial<{
+      vssSecret: Polynomial;
+      precomputedPaillierPrimes: {
+            p: bigint;
+            q: bigint;
+      };
+      previousSecretECDSA: null;
+      previousPublicSharesECDSA: null;
+      previousChainKey: null;
+      inputForRound1: KeygenInputForRound1;
+      inputForRound3: KeygenInputForRound3;
+      RIDs: Record<PartyId, bigint>;
+      ChainKeys: Record<PartyId, bigint>;
+      PaillierPublic: Record<PartyId, PaillierPublicKey>;
+      Pedersen: Record<PartyId, PedersenParams>;
+      vssPolynomials: Record<PartyId, Exponent>;
+      SchnorrCommitments: Record<PartyId, ZkSchCommitment>;
+      ElGamalPublic: Record<PartyId, AffinePoint>;
+      inputRound1: KeygenInputForRound1;
+      selfVSSpolynomial: Exponent;
+      selfCommitment: Uint8Array;
+      selfRID: bigint;
+      chainKey: bigint;
+      selfShare: bigint;
+      elGamalPublic: AffinePoint;
+      selfPaillierPublic: PaillierPublicKey;
+      selfPedersenPublic: PedersenParams;
+      elGamalSecret: bigint;
+      paillierSecret: PaillierSecretKey;
+      pedersenSecret: bigint;
+      schnorrRand: ZkSchRandomness;
+      decommitment: Uint8Array;
+      inputForRound2: KeygenInputForRound2;
+      commitments: Record<PartyId, Uint8Array>;
+      inputForRound4: KeygenInputForRound4;
+      UpdatedConfig: PartySecretKeyConfig;
+      inputForRound5: KeygenInputForRound5;
+}>;

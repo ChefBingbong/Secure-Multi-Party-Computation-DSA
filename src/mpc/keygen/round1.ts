@@ -1,21 +1,19 @@
 import { randBetween } from "bigint-crypto-utils";
-import { partyIdToScalar } from "./partyKey";
-import { randomPaillierPrimes, validatePaillierPrime } from "../paillierKeyPair/paillierCryptoUtils";
-import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
 import { Exponent } from "../math/polynomial/exponent";
-import { Polynomial } from "../math/polynomial/polynomial";
 import { generateElGamalKeyPair } from "../math/sample";
+import { randomPaillierPrimes } from "../paillierKeyPair/paillierCryptoUtils";
+import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
 import { zkSchCreateRandomness } from "../zk/zksch";
-import { KeygenSession } from "./keygenSession";
+import { AbstractKeygenRound } from "./abstractRound";
+import { partyIdToScalar } from "./partyKey";
 import { KeygenBroadcastForRound2 } from "./round2";
 import { KeygenInputForRound1, KeygenInputForRound2, KeygenRound1Output } from "./types";
-import { AbstractKeygenRound } from "./abstractRound";
 // import { validatePaillierPrime } from "../paillierKeygen";
 
-export class KeygenRound1 extends AbstractKeygenRound<KeygenInputForRound1, KeygenRound1Output, any, any> {
+export class KeygenRound1 extends AbstractKeygenRound {
       public output: KeygenInputForRound2;
       constructor() {
-            super({ isBroadcastRound: true, isDriectMessageRound: false });
+            super({ isBroadcastRound: true, isDriectMessageRound: false, currentRound: 1 });
       }
 
       public fromJSON(json: any): void {}

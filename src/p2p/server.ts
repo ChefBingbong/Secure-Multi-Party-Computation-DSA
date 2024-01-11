@@ -72,7 +72,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
                   if (type === "message") {
                         const nodeId = this.findNodeId(connectionId);
-                        // await delay(PEER_DELAY[this.NODE_ID]);
                         this.emitter.emitMessage(nodeId, data, true);
                   }
             });
@@ -87,16 +86,10 @@ class P2pServer extends AppLogger implements P2PNetwork {
             });
 
             this.emitter.on("message", ({ nodeId, data: packet }) => {
-                  // First of all we decide, whether this message at
-                  // any point has been send by us. We do it in one
-                  // place to replace with a strategy later TODO
-                  // console.log(packet);
                   if (this.seenMessages.has(packet.id) || packet.ttl < 1) return;
 
                   if (packet.type === "broadcast") {
                         if (packet.origin !== this.NODE_ID) {
-                              // console.log(packet);
-
                               this.emitter.emitBroadcast(packet.message, packet.origin);
                         } else {
                               this.broadcast(packet.message, packet.id, packet.origin, packet.ttl - 1);
@@ -104,11 +97,9 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   }
 
                   if (packet.type === "direct") {
-                        // console.log(packet);
                         if (packet.destination === this.NODE_ID) {
                               this.emitter.emitDirect(packet.message, packet.origin);
                         } else {
-                              // console.log(packet);
                               this.sendDirect(
                                     packet.destination,
                                     packet.message,
@@ -171,8 +162,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.emitter.on(event, listener);
       };
 
-      // 2 methods to send data either to all nodes in the network
-      // or to a specific node (direct message)
       public broadcast = (
             message: any,
             id: string = v4(),
@@ -206,7 +195,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
             socket.on("error", (err) => {
                   console.error(`Socket connection error: ${err.message}`);
-                  // You can perform error handling logic here
             });
 
             socket.on("close", () => {
@@ -219,8 +207,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
             });
       };
 
-      // A method to "raw" send data by the connection ID
-      // intended to internal use only
       private _send = (connectionId: string, message: any) => {
             const socket = this.connections.get(connectionId);
 
@@ -246,9 +232,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
       private send = (nodeId: string, data: any) => {
             const connectionId = this.neighbors.get(nodeId);
-
-            // TODO handle no connection id error
-
             this._send(connectionId, { type: "message", data });
       };
 
@@ -270,7 +253,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
       public startKeygen = async () => {
             this.broadcast({
-                  message: `${config.p2pPort}'s`,
+                  message: `${this.NODE_ID} is starting a new keygen session`,
                   type: "keygenInit",
                   senderNode: config.p2pPort,
             });
@@ -302,7 +285,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   this.log.info(`${message.message}`);
 
                   if (message.type === `keygenRoundHandler`) {
-                        await KeygenSessionManager.keygenRoundProcessor(message, this.broadcast, this.sendDirect);
+                        await KeygenSessionManager.keygenRoundProcessor(message, this.broadcast);
                   }
                   if (message.type === `keygenInit`) {
                         KeygenSessionManager.startNewSession({
@@ -310,7 +293,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                               partyIds: ["6001", "6002", "6003", "6004", "6005", "6006"],
                               threshold: 6,
                         });
-                        await KeygenSessionManager.processRound(this.broadcast);
+                        await KeygenSessionManager.finalizeCurrentRound(0, this.broadcast);
                   }
                   await callback();
             });
@@ -319,10 +302,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
       private handleDirectMessage = (callback?: () => Promise<void>) => {
             this.on("direct", async ({ message }: { message: ServerMessage }) => {
                   this.log.info(`${message.message}`);
-
-                  if (message.type === `processNextRound`) {
-                        await KeygenSessionManager.keygenRoundVerifier(this.broadcast);
-                  }
                   await callback();
             });
       };

@@ -55,14 +55,9 @@ export type KeygenRound5Output = {
       UpdatedConfig: PartySecretKeyConfig;
 };
 
-export class KeygenRound5 extends AbstractKeygenRound<
-      KeygenInputForRound5,
-      KeygenRound5Output,
-      KeygenBroadcastForRound5,
-      any
-> {
+export class KeygenRound5 extends AbstractKeygenRound {
       constructor() {
-            super({ isBroadcastRound: false, isDriectMessageRound: false });
+            super({ isBroadcastRound: false, isDriectMessageRound: false, currentRound: 5 });
       }
 
       public fromJSON(json: KeygenBroadcastForRound5JSON): KeygenBroadcastForRound5 {

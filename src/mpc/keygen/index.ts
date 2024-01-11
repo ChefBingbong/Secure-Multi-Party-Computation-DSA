@@ -35,3 +35,11 @@ export const AllKeyGenRounds: {
       KeygenRound4: new KeygenRound4() as KeygenRound4,
       KeygenRound5: new KeygenRound5() as KeygenRound5,
 };
+
+export type KeygenRoundTypes =
+      | KeygenSession
+      | KeygenRound1
+      | KeygenRound2
+      | KeygenRound3
+      | KeygenRound4
+      | KeygenRound5;
