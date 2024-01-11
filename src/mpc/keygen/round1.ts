@@ -5,19 +5,15 @@ import { randomPaillierPrimes } from "../paillierKeyPair/paillierCryptoUtils";
 import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
 import { zkSchCreateRandomness } from "../zk/zksch";
 import { AbstractKeygenRound } from "./abstractRound";
+import { KeygenBroadcastForRound2 } from "./keygenMessages/broadcasts";
 import { partyIdToScalar } from "./partyKey";
-import { KeygenBroadcastForRound2 } from "./round2";
-import { KeygenInputForRound1, KeygenInputForRound2, KeygenRound1Output } from "./types";
-// import { validatePaillierPrime } from "../paillierKeygen";
+import { KeygenInputForRound2, KeygenRound1Output, KeygenBroadcastForRound2JSON } from "./types";
 
 export class KeygenRound1 extends AbstractKeygenRound {
       public output: KeygenInputForRound2;
       constructor() {
             super({ isBroadcastRound: true, isDriectMessageRound: false, currentRound: 1 });
       }
-
-      public fromJSON(json: any): void {}
-      public fromJSOND(json: any): void {}
 
       public handleBroadcastMessage(bmsg: any): void {}
       public handleDirectMessage(bmsg: any): void {}
@@ -57,12 +53,10 @@ export class KeygenRound1 extends AbstractKeygenRound {
                   ]);
 
             //broadcast results to other parties
-            const broadcasts: Array<KeygenBroadcastForRound2> = [
-                  KeygenBroadcastForRound2.from({
-                        from: this.session.selfId,
-                        commitment: selfCommitment,
-                  }),
-            ];
+            const broadcasts: KeygenBroadcastForRound2JSON = new KeygenBroadcastForRound2(
+                  this.session.selfId,
+                  selfCommitment
+            ).toJSON();
 
             this.output = {
                   inputRound1: this.input,

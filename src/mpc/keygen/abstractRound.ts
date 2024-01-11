@@ -1,6 +1,13 @@
 import { KeygenSession } from "./keygenSession";
-import { PartyId } from "./partyKey";
-import { GenericRoundOutput, SessionConfig } from "./types";
+import {
+      GenericRoundOutput,
+      KeygenBroadcastForRound2JSON,
+      KeygenBroadcastForRound3JSON,
+      KeygenBroadcastForRound4JSON,
+      KeygenBroadcastForRound5JSON,
+      KeygenDirectMessageForRound4JSON,
+      SessionConfig,
+} from "./types";
 
 export interface BaseKeygenRound {
       output: any;
@@ -8,10 +15,19 @@ export interface BaseKeygenRound {
       isDirectMessageRound: boolean;
       handleBroadcastMessage(bmsg: any): void;
       handleDirectMessage(dmsg: any): void;
-      fromJSON(json: any): any | void;
-      fromJSOND(json: any): any | void;
-      process(): Promise<any>;
+      process(): Promise<RoundOutputExtended>;
 }
+
+export type RoundOutputExtended = GenericRoundOutput & {
+      directMessages?: KeygenDirectMessageForRound4JSON[];
+      broadcasts?: GenericKeygenRoundBroadcast;
+};
+export type GenericKeygenRoundBroadcast = Partial<
+      | KeygenBroadcastForRound2JSON
+      | KeygenBroadcastForRound3JSON
+      | KeygenBroadcastForRound4JSON
+      | KeygenBroadcastForRound5JSON
+>;
 
 export abstract class AbstractKeygenRound implements BaseKeygenRound {
       public currentRound: number;
@@ -23,9 +39,7 @@ export abstract class AbstractKeygenRound implements BaseKeygenRound {
 
       public abstract handleBroadcastMessage(bmsg: any): void;
       public abstract handleDirectMessage(dmsg: any): void;
-      public abstract process(): Promise<any>;
-      public abstract fromJSON(json: any): any | void;
-      public abstract fromJSOND(json: any): any | void;
+      public abstract process(): Promise<RoundOutputExtended>;
 
       constructor({
             isBroadcastRound,

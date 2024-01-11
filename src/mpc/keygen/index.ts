@@ -1,16 +1,9 @@
-import { AbstractKeygenRound } from "./abstractRound";
 import { KeygenSession } from "./keygenSession";
 import { KeygenRound1 } from "./round1";
 import { KeygenRound2 } from "./round2";
 import { KeygenRound3 } from "./round3";
 import { KeygenRound4 } from "./round4";
 import { KeygenRound5 } from "./round5";
-import {
-      GenericKeygenRoundBroadcast,
-      GenericKeygenRoundDirectMessage,
-      GenericKeygenRoundInput,
-      GenericKeygenRoundOutput,
-} from "./types";
 
 export enum KeyGenRounds {
       KeygenRound1 = "KeygenRound1",
@@ -35,11 +28,3 @@ export const AllKeyGenRounds: {
       KeygenRound4: new KeygenRound4() as KeygenRound4,
       KeygenRound5: new KeygenRound5() as KeygenRound5,
 };
-
-export type KeygenRoundTypes =
-      | KeygenSession
-      | KeygenRound1
-      | KeygenRound2
-      | KeygenRound3
-      | KeygenRound4
-      | KeygenRound5;

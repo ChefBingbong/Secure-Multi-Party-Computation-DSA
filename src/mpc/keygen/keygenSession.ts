@@ -58,8 +58,6 @@ export class KeygenSession extends AbstractKeygenRound {
             };
       }
 
-      public fromJSON(json: any): void {}
-      public fromJSOND(json: any): void {}
       public handleBroadcastMessage(bmsg: any): void {}
       public handleDirectMessage(bmsg: any): void {}
       public async process(): Promise<any> {}

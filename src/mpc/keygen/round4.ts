@@ -1,141 +1,16 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 
 import Fn from "../math/polynomial/Fn";
-import { PartyId, PartyPublicKeyConfig, PartySecretKeyConfig, partyIdToScalar } from "./partyKey";
-import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
-import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
 import { Exponent } from "../math/polynomial/exponent";
-import { ZkFacProof, ZkFacProofJSON, ZkFacPublic, zkFacVerifyProof } from "../zk/fac";
-import { ZkModProof, ZkModProofJSON, ZkModPublic, zkModVerifyProof } from "../zk/mod";
-import { ZkPrmProof, ZkPrmProofJSON, ZkPrmPublic, zkPrmVerifyProof } from "../zk/prm";
-import { KeygenInputForRound3 } from "./types";
-import { KeygenSession } from "./keygenSession";
-import { AffinePoint } from "../types";
-import { ZkSchCommitment, zkSchProve } from "../zk/zksch";
-import { KeygenBroadcastForRound5, KeygenInputForRound5 } from "./round5";
+import { ZkFacPublic, zkFacVerifyProof } from "../zk/fac";
+import { ZkModPublic, zkModVerifyProof } from "../zk/mod";
+import { ZkPrmPublic, zkPrmVerifyProof } from "../zk/prm";
+import { zkSchProve } from "../zk/zksch";
 import { AbstractKeygenRound } from "./abstractRound";
-// import { KeygenBroadcastForRound5, KeygenInputForRound5 } from "./KeygenRound5.j";
-
-export type KeygenBroadcastForRound4JSON = {
-      from: string;
-      modProof: ZkModProofJSON;
-      prmProof: ZkPrmProofJSON;
-};
-
-export class KeygenBroadcastForRound4 {
-      public readonly from: PartyId;
-      public readonly modProof: ZkModProof;
-      public readonly prmProof: ZkPrmProof;
-
-      private constructor(from: PartyId, modProof: ZkModProof, prmProof: ZkPrmProof) {
-            this.from = from;
-            this.modProof = modProof;
-            this.prmProof = prmProof;
-      }
-
-      public static from({
-            from,
-            modProof,
-            prmProof,
-      }: {
-            from: PartyId;
-            modProof: ZkModProof;
-            prmProof: ZkPrmProof;
-      }): KeygenBroadcastForRound4 {
-            const b = new KeygenBroadcastForRound4(from, modProof, prmProof);
-            Object.freeze(b);
-            return b;
-      }
-
-      public toJSON(): KeygenBroadcastForRound4JSON {
-            return {
-                  from: this.from,
-                  modProof: this.modProof.toJSON(),
-                  prmProof: this.prmProof.toJSON(),
-            };
-      }
-
-      public static fromJSON(json: KeygenBroadcastForRound4JSON): KeygenBroadcastForRound4 {
-            const { from, modProof, prmProof } = json;
-            return KeygenBroadcastForRound4.from({
-                  from,
-                  modProof: ZkModProof.fromJSON(modProof),
-                  prmProof: ZkPrmProof.fromJSON(prmProof),
-            });
-      }
-}
-
-export type KeygenDirectMessageForRound4JSON = {
-      from: string;
-      to: string;
-      shareHex: string;
-      facProof: ZkFacProofJSON;
-};
-
-export class KeygenDirectMessageForRound4 {
-      public readonly from: PartyId;
-      public readonly to: PartyId;
-      public readonly share: bigint;
-      public readonly facProof: ZkFacProof;
-
-      private constructor(from: PartyId, to: PartyId, share: bigint, facProof: ZkFacProof) {
-            this.from = from;
-            this.to = to;
-            this.share = share;
-            this.facProof = facProof;
-      }
-
-      public static from({
-            from,
-            to,
-            share,
-            facProof,
-      }: {
-            from: PartyId;
-            to: PartyId;
-            share: bigint;
-            facProof: ZkFacProof;
-      }): KeygenDirectMessageForRound4 {
-            const d = new KeygenDirectMessageForRound4(from, to, share, facProof);
-            Object.freeze(d);
-            return d;
-      }
-
-      public toJSON(): KeygenDirectMessageForRound4JSON {
-            return {
-                  from: this.from,
-                  to: this.to,
-                  shareHex: this.share.toString(16),
-                  facProof: this.facProof.toJSON(),
-            };
-      }
-
-      public static fromJSON(json: KeygenDirectMessageForRound4JSON): KeygenDirectMessageForRound4 {
-            const { from, to, shareHex, facProof } = json;
-            return KeygenDirectMessageForRound4.from({
-                  from,
-                  to,
-                  share: BigInt(`0x${shareHex}`),
-                  facProof: ZkFacProof.fromJSON(facProof),
-            });
-      }
-}
-
-export type KeygenInputForRound4 = {
-      inputForRound3: KeygenInputForRound3;
-      RID: bigint;
-      ChainKey: bigint;
-      PedersenPublic: Record<PartyId, PedersenParams>;
-      PaillierPublic: Record<PartyId, PaillierPublicKey>;
-      vssPolynomials: Record<PartyId, Exponent>;
-      ElGamalPublic: Record<PartyId, AffinePoint>;
-      SchnorrCommitments: Record<PartyId, ZkSchCommitment>;
-};
-
-export type KeygenRound4Output = {
-      broadcasts: Array<any>;
-      inputForRound5: any;
-};
+import { KeygenBroadcastForRound4, KeygenBroadcastForRound5 } from "./keygenMessages/broadcasts";
+import { KeygenDirectMessageForRound4 } from "./keygenMessages/directMessages";
+import { PartyId, PartyPublicKeyConfig, PartySecretKeyConfig, partyIdToScalar } from "./partyKey";
+import { KeygenBroadcastForRound5JSON, KeygenInputForRound5, KeygenRound4Output } from "./types";
 
 export class KeygenRound4 extends AbstractKeygenRound {
       private ShareReceived: Record<PartyId, bigint> = {};
@@ -143,14 +18,6 @@ export class KeygenRound4 extends AbstractKeygenRound {
 
       constructor() {
             super({ isBroadcastRound: true, isDriectMessageRound: false, currentRound: 4 });
-      }
-
-      public fromJSON(json: KeygenBroadcastForRound4JSON): KeygenBroadcastForRound4 {
-            return KeygenBroadcastForRound4.fromJSON(json);
-      }
-
-      public fromJSOND(json: KeygenDirectMessageForRound4JSON): KeygenDirectMessageForRound4 {
-            return KeygenDirectMessageForRound4.fromJSON(json);
       }
 
       public handleBroadcastMessage(bmsg: KeygenBroadcastForRound4) {
@@ -271,12 +138,10 @@ export class KeygenRound4 extends AbstractKeygenRound {
                   throw new Error(`failed to create schnorr proof`);
             }
 
-            const broadcasts: Array<any> = [
-                  KeygenBroadcastForRound5.from({
-                        from: this.session.selfId,
-                        SchnorrResponse: proof,
-                  }),
-            ];
+            const broadcasts: KeygenBroadcastForRound5JSON = new KeygenBroadcastForRound5(
+                  this.session.selfId,
+                  proof
+            ).toJSON();
 
             this.session.hasher.updateMulti([UpdatedConfig]);
 

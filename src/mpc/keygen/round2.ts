@@ -1,43 +1,8 @@
-import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { Hasher } from "../utils/hasher";
 import { AbstractKeygenRound } from "./abstractRound";
+import { KeygenBroadcastForRound2, KeygenBroadcastForRound3 } from "./keygenMessages/broadcasts";
 import { PartyId } from "./partyKey";
-import { KeygenBroadcastForRound3 } from "./round3";
-import { KeygenBroadcastForRound2JSON, KeygenInputForRound3, KeygenRound2Output } from "./types";
-
-export class KeygenBroadcastForRound2 {
-      public readonly from: PartyId;
-      public readonly commitment: Uint8Array;
-
-      private constructor(from: PartyId, commitment: Uint8Array) {
-            this.from = from;
-            this.commitment = commitment;
-      }
-
-      public static from({
-            from,
-            commitment,
-      }: {
-            from: PartyId;
-            commitment: Uint8Array;
-      }): KeygenBroadcastForRound2 {
-            const b = new KeygenBroadcastForRound2(from, commitment);
-            Object.freeze(b);
-            return b;
-      }
-
-      public toJSON(): KeygenBroadcastForRound2JSON {
-            return {
-                  from: this.from,
-                  commitmentHex: bytesToHex(this.commitment),
-            };
-      }
-
-      public static fromJSON(json: KeygenBroadcastForRound2JSON): KeygenBroadcastForRound2 {
-            const commitment = hexToBytes(json.commitmentHex);
-            return new KeygenBroadcastForRound2(json.from, commitment);
-      }
-}
+import { KeygenInputForRound3, KeygenRound2Output, KeygenBroadcastForRound3JSON } from "./types";
 
 export class KeygenRound2 extends AbstractKeygenRound {
       public output: KeygenInputForRound3;
@@ -54,24 +19,17 @@ export class KeygenRound2 extends AbstractKeygenRound {
             this.commitments[bmsg.from] = bmsg.commitment;
       }
 
-      public fromJSON(json: KeygenBroadcastForRound2JSON): KeygenBroadcastForRound2 {
-            return KeygenBroadcastForRound2.fromJSON(json);
-      }
-      public fromJSOND(json: any): void {}
-
       public async process(): Promise<KeygenRound2Output> {
-            const broadcasts: Array<KeygenBroadcastForRound3> = [
-                  KeygenBroadcastForRound3.from({
-                        from: this.session.selfId,
-                        RID: this.input.selfRID,
-                        C: this.input.chainKey,
-                        vssPolynomial: this.input.selfVSSpolynomial,
-                        schnorrCommitment: this.input.schnorrRand.commitment,
-                        elGamalPublic: this.input.elGamalPublic,
-                        pedersenPublic: this.input.selfPedersenPublic,
-                        decommitment: this.input.decommitment,
-                  }),
-            ];
+            const broadcasts: KeygenBroadcastForRound3JSON = new KeygenBroadcastForRound3(
+                  this.session.selfId,
+                  this.input.selfRID,
+                  this.input.chainKey,
+                  this.input.selfVSSpolynomial,
+                  this.input.schnorrRand.commitment,
+                  this.input.elGamalPublic,
+                  this.input.selfPedersenPublic,
+                  this.input.decommitment
+            ).toJSON();
 
             this.output = {
                   inputForRound2: this.input,

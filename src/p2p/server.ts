@@ -8,15 +8,10 @@ import Validator from "../protocol/validators/validator";
 import { P2PNetworkEventEmitter } from "./eventEmitter";
 import T from "./splitStream";
 import { P2PNetwork } from "./types";
+import { ServerMessage } from "../protocol/types";
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export type ServerMessage = {
-      message: string;
-      type: string;
-      data: any;
-      senderNode: string;
-};
 class P2pServer extends AppLogger implements P2PNetwork {
       public readonly connections: Map<string, net.Socket>;
       public readonly NODE_ID: string;
@@ -255,7 +250,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.broadcast({
                   message: `${this.NODE_ID} is starting a new keygen session`,
                   type: "keygenInit",
-                  senderNode: config.p2pPort,
             });
       };
 
