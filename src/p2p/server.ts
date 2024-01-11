@@ -9,7 +9,7 @@ import { P2PNetworkEventEmitter } from "./eventEmitter";
 import T from "./splitStream";
 import { P2PNetwork } from "./types";
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export type ServerMessage = {
       message: string;
@@ -33,7 +33,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
       constructor() {
             super();
-            this.threshold = 3;
+            this.threshold = 6;
             this.connections = new Map();
             this.neighbors = new Map();
             this.NODE_ID = config.p2pPort;
@@ -45,12 +45,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
             P2pServer.validators = new Map([[config.p2pPort, this.validator.toString()]]);
 
-            new KeygenSessionManager(3, ["6001", "6002", "6003"]);
-            KeygenSessionManager.startNewSession({
-                  selfId: this.NODE_ID,
-                  partyIds: ["6001", "6002", "6003"],
-                  threshold: 3,
-            });
+            new KeygenSessionManager(6, ["6001", "6002", "6003", "6004", "6005", "6006"]);
 
             this.initState();
       }
@@ -274,7 +269,11 @@ class P2pServer extends AppLogger implements P2PNetwork {
       };
 
       public startKeygen = async () => {
-            await KeygenSessionManager.keygenRoundVerifier(this.broadcast);
+            this.broadcast({
+                  message: `${config.p2pPort}'s`,
+                  type: "keygenInit",
+                  senderNode: config.p2pPort,
+            });
       };
 
       // static methods
@@ -304,6 +303,14 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
                   if (message.type === `keygenRoundHandler`) {
                         await KeygenSessionManager.keygenRoundProcessor(message, this.broadcast, this.sendDirect);
+                  }
+                  if (message.type === `keygenInit`) {
+                        KeygenSessionManager.startNewSession({
+                              selfId: this.NODE_ID,
+                              partyIds: ["6001", "6002", "6003", "6004", "6005", "6006"],
+                              threshold: 6,
+                        });
+                        await KeygenSessionManager.processRound(this.broadcast);
                   }
                   await callback();
             });
