@@ -39,138 +39,147 @@ export class KeygenRound3 extends AbstractKeygenRound {
             const from = bmsg.from;
 
             // TODO: check inputs
+            try {
+                  Hasher.validateCommitment(bmsg.decommitment);
 
-            Hasher.validateCommitment(bmsg.decommitment);
+                  const vssSecret = this.input.inputForRound2.inputRound1.vssSecret;
+                  const vssPolynomial = bmsg.vssPolynomial;
+                  if ((vssSecret.constant() === 0n) !== vssPolynomial.isConstant) {
+                        throw new Error(`vss polynomial has incorrect constant from ${from}`);
+                  }
+                  if (vssPolynomial.degree() !== this.session.threshold) {
+                        throw new Error(
+                              `vss polynomial has incorrect degree ${vssPolynomial.degree()} for threshold ${
+                                    this.session.threshold
+                              } from ${from}`
+                        );
+                  }
 
-            const vssSecret = this.input.inputForRound2.inputRound1.vssSecret;
-            const vssPolynomial = bmsg.vssPolynomial;
-            if ((vssSecret.constant() === 0n) !== vssPolynomial.isConstant) {
-                  throw new Error(`vss polynomial has incorrect constant from ${from}`);
+                  paillierValidateN(bmsg.pedersenPublic.n);
+
+                  bmsg.pedersenPublic.validate();
+
+                  const decomValid = this.session
+                        .cloneHashForId(from)
+                        .decommit(this.input.commitments[from], bmsg.decommitment, [
+                              bmsg.RID,
+                              bmsg.C,
+                              vssPolynomial,
+                              bmsg.schnorrCommitment.C,
+                              bmsg.elGamalPublic,
+                              bmsg.pedersenPublic,
+                        ]);
+                  if (!decomValid) {
+                        throw new Error(`failed to decommit from ${from}`);
+                  }
+
+                  this.RIDs[from] = bmsg.RID;
+                  this.ChainKeys[from] = bmsg.C;
+                  this.PaillierPublic[from] = new PaillierPublicKey(bmsg.pedersenPublic.n);
+                  this.Pedersen[from] = bmsg.pedersenPublic;
+                  this.vssPolynomials[from] = vssPolynomial;
+                  this.SchnorrCommitments[from] = bmsg.schnorrCommitment;
+                  this.ElGamalPublic[from] = bmsg.elGamalPublic;
+            } catch (error) {
+                  console.log(error);
             }
-            if (vssPolynomial.degree() !== this.session.threshold) {
-                  throw new Error(
-                        `vss polynomial has incorrect degree ${vssPolynomial.degree()} for threshold ${
-                              this.session.threshold
-                        } from ${from}`
-                  );
-            }
-
-            paillierValidateN(bmsg.pedersenPublic.n);
-
-            bmsg.pedersenPublic.validate();
-
-            const decomValid = this.session
-                  .cloneHashForId(from)
-                  .decommit(this.input.commitments[from], bmsg.decommitment, [
-                        bmsg.RID,
-                        bmsg.C,
-                        vssPolynomial,
-                        bmsg.schnorrCommitment.C,
-                        bmsg.elGamalPublic,
-                        bmsg.pedersenPublic,
-                  ]);
-            if (!decomValid) {
-                  throw new Error(`failed to decommit from ${from}`);
-            }
-
-            this.RIDs[from] = bmsg.RID;
-            this.ChainKeys[from] = bmsg.C;
-            this.PaillierPublic[from] = new PaillierPublicKey(bmsg.pedersenPublic.n);
-            this.Pedersen[from] = bmsg.pedersenPublic;
-            this.vssPolynomials[from] = vssPolynomial;
-            this.SchnorrCommitments[from] = bmsg.schnorrCommitment;
-            this.ElGamalPublic[from] = bmsg.elGamalPublic;
       }
 
       public async process(): Promise<KeygenRound3Output> {
-            let chainKey: bigint | null = this.input.inputForRound2.inputRound1.previousChainKey;
-            if (chainKey === null) {
-                  chainKey = 0n;
+            try {
+                  let chainKey: bigint | null = this.input.inputForRound2.inputRound1.previousChainKey;
+                  if (chainKey === null) {
+                        chainKey = 0n;
+                        for (const j of this.session.partyIds) {
+                              chainKey = chainKey ^ this.ChainKeys[j]; // XOR
+                        }
+                  }
+
+                  let rid = 0n;
                   for (const j of this.session.partyIds) {
-                        chainKey = chainKey ^ this.ChainKeys[j]; // XOR
+                        rid = rid ^ this.RIDs[j]; // XOR
                   }
-            }
 
-            let rid = 0n;
-            for (const j of this.session.partyIds) {
-                  rid = rid ^ this.RIDs[j]; // XOR
-            }
+                  const hashWithRidAndPartyId = this.session.hasher
+                        .clone()
+                        .updateMulti([rid, this.session.selfId]);
 
-            const hashWithRidAndPartyId = this.session.hasher.clone().updateMulti([rid, this.session.selfId]);
+                  const modPriv: ZkModPrivate = {
+                        P: this.input.inputForRound2.paillierSecret.p,
+                        Q: this.input.inputForRound2.paillierSecret.q,
+                        Phi: this.input.inputForRound2.paillierSecret.phi,
+                  };
+                  const modPub: ZkModPublic = {
+                        N: this.PaillierPublic[this.session.selfId].n,
+                  };
+                  const modProof = zkModCreateProof(modPriv, modPub, hashWithRidAndPartyId.clone());
 
-            const modPriv: ZkModPrivate = {
-                  P: this.input.inputForRound2.paillierSecret.p,
-                  Q: this.input.inputForRound2.paillierSecret.q,
-                  Phi: this.input.inputForRound2.paillierSecret.phi,
-            };
-            const modPub: ZkModPublic = {
-                  N: this.PaillierPublic[this.session.selfId].n,
-            };
-            const modProof = zkModCreateProof(modPriv, modPub, hashWithRidAndPartyId.clone());
-
-            const prmPriv: ZkPrmPrivate = {
-                  Lambda: this.input.inputForRound2.pedersenSecret,
-                  Phi: this.input.inputForRound2.paillierSecret.phi,
-                  P: this.input.inputForRound2.paillierSecret.p,
-                  Q: this.input.inputForRound2.paillierSecret.q,
-            };
-            const prmPub: ZkPrmPublic = {
-                  Aux: this.Pedersen[this.session.selfId],
-            };
-            const prmProof = zkPrmCreateProof(prmPriv, prmPub, hashWithRidAndPartyId.clone());
-
-            const broadcasts: KeygenBroadcastForRound4JSON = new KeygenBroadcastForRound4(
-                  this.session.selfId,
-                  modProof,
-                  prmProof
-            ).toJSON();
-
-            const directMessages: Array<KeygenDirectMessageForRound4JSON> = [];
-            this.session.partyIds.forEach((j) => {
-                  if (j === this.session.selfId) {
-                        return;
-                  }
-                  // for other PartyIds:
-
-                  const facPriv: ZkFacPrivate = {
+                  const prmPriv: ZkPrmPrivate = {
+                        Lambda: this.input.inputForRound2.pedersenSecret,
+                        Phi: this.input.inputForRound2.paillierSecret.phi,
                         P: this.input.inputForRound2.paillierSecret.p,
                         Q: this.input.inputForRound2.paillierSecret.q,
                   };
-                  const facPub: ZkFacPublic = {
-                        N: this.PaillierPublic[this.session.selfId].n,
-                        Aux: this.Pedersen[j],
+                  const prmPub: ZkPrmPublic = {
+                        Aux: this.Pedersen[this.session.selfId],
                   };
-                  const facProof = zkFacCreateProof(facPriv, facPub, hashWithRidAndPartyId.clone());
+                  const prmProof = zkPrmCreateProof(prmPriv, prmPub, hashWithRidAndPartyId.clone());
 
-                  const { vssSecret } = this.input.inputForRound2.inputRound1;
-                  const share = vssSecret.evaluate(partyIdToScalar(j));
-                  const { ciphertext: C } = this.PaillierPublic[j].encrypt(share);
+                  const broadcasts: KeygenBroadcastForRound4JSON = new KeygenBroadcastForRound4(
+                        this.session.selfId,
+                        modProof,
+                        prmProof
+                  ).toJSON();
 
-                  directMessages.push(
-                        KeygenDirectMessageForRound4.from({
-                              from: this.session.selfId,
-                              to: j,
-                              share: C,
-                              facProof,
-                        }).toJSON()
-                  );
-            });
+                  const directMessages: Array<KeygenDirectMessageForRound4JSON> = [];
+                  this.session.partyIds.forEach((j) => {
+                        if (j === this.session.selfId) {
+                              return;
+                        }
+                        // for other PartyIds:
 
-            this.session.hasher.update(rid);
-            this.output = {
-                  inputForRound3: this.input,
-                  RID: rid,
-                  ChainKey: chainKey,
-                  PedersenPublic: this.Pedersen,
-                  PaillierPublic: this.PaillierPublic,
-                  vssPolynomials: this.vssPolynomials,
-                  ElGamalPublic: this.ElGamalPublic,
-                  SchnorrCommitments: this.SchnorrCommitments,
-            };
-            return {
-                  broadcasts,
-                  directMessages,
-                  inputForRound4: this.output,
-            };
+                        const facPriv: ZkFacPrivate = {
+                              P: this.input.inputForRound2.paillierSecret.p,
+                              Q: this.input.inputForRound2.paillierSecret.q,
+                        };
+                        const facPub: ZkFacPublic = {
+                              N: this.PaillierPublic[this.session.selfId].n,
+                              Aux: this.Pedersen[j],
+                        };
+                        const facProof = zkFacCreateProof(facPriv, facPub, hashWithRidAndPartyId.clone());
+
+                        const { vssSecret } = this.input.inputForRound2.inputRound1;
+                        const share = vssSecret.evaluate(partyIdToScalar(j));
+                        const { ciphertext: C } = this.PaillierPublic[j].encrypt(share);
+
+                        directMessages.push(
+                              KeygenDirectMessageForRound4.from({
+                                    from: this.session.selfId,
+                                    to: j,
+                                    share: C,
+                                    facProof,
+                              }).toJSON()
+                        );
+                  });
+
+                  this.session.hasher.update(rid);
+                  this.output = {
+                        inputForRound3: this.input,
+                        RID: rid,
+                        ChainKey: chainKey,
+                        PedersenPublic: this.Pedersen,
+                        PaillierPublic: this.PaillierPublic,
+                        vssPolynomials: this.vssPolynomials,
+                        ElGamalPublic: this.ElGamalPublic,
+                        SchnorrCommitments: this.SchnorrCommitments,
+                  };
+                  return {
+                        broadcasts,
+                        directMessages,
+                        inputForRound4: this.output,
+                  };
+            } catch (error) {
+                  console.log(error);
+            }
       }
 }

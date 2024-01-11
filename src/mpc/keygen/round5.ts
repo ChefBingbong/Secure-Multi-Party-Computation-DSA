@@ -13,18 +13,22 @@ export class KeygenRound5 extends AbstractKeygenRound {
       public handleBroadcastMessage(bmsg: KeygenBroadcastForRound5) {
             const { from, SchnorrResponse } = bmsg;
 
-            if (!zkSchIsResponseValid(SchnorrResponse)) {
-                  throw new Error(`invalid schnorr response from ${from}`);
-            }
+            try {
+                  if (!zkSchIsResponseValid(SchnorrResponse)) {
+                        throw new Error(`invalid schnorr response from ${from}`);
+                  }
 
-            const verified = zkSchVerifyResponse(
-                  SchnorrResponse,
-                  this.session.cloneHashForId(from),
-                  this.input.UpdatedConfig.publicPartyData[from].ecdsa,
-                  this.input.inputForRound4.SchnorrCommitments[from]
-            );
-            if (!verified) {
-                  throw new Error(`failed to validate schnorr response from ${from}`);
+                  const verified = zkSchVerifyResponse(
+                        SchnorrResponse,
+                        this.session.cloneHashForId(from),
+                        this.input.UpdatedConfig.publicPartyData[from].ecdsa,
+                        this.input.inputForRound4.SchnorrCommitments[from]
+                  );
+                  if (!verified) {
+                        throw new Error(`failed to validate schnorr response from ${from}`);
+                  }
+            } catch (error) {
+                  console.log(error);
             }
       }
 

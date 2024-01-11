@@ -1,5 +1,6 @@
 import { KeygenSession } from "./keygenSession";
 import {
+      GenericKeygenRoundInput,
       GenericRoundOutput,
       KeygenBroadcastForRound2JSON,
       KeygenBroadcastForRound3JSON,
@@ -34,7 +35,7 @@ export abstract class AbstractKeygenRound implements BaseKeygenRound {
       public isBroadcastRound: boolean;
       public isDirectMessageRound: boolean;
       public session: KeygenSession | undefined;
-      protected input: any | undefined;
+      protected input: GenericKeygenRoundInput | undefined;
       public output: GenericRoundOutput;
 
       public abstract handleBroadcastMessage(bmsg: any): void;
@@ -55,12 +56,12 @@ export abstract class AbstractKeygenRound implements BaseKeygenRound {
             this.currentRound = currentRound;
       }
 
-      public init<I>({
+      public init({
             session,
             input,
       }: {
             session?: KeygenSession;
-            input?: I;
+            input?: GenericKeygenRoundInput;
             sessionConfig?: SessionConfig;
       }): void {
             this.session = session;

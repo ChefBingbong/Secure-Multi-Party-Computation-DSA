@@ -40,7 +40,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
             P2pServer.validators = new Map([[config.p2pPort, this.validator.toString()]]);
 
-            new KeygenSessionManager(6, ["6001", "6002", "6003", "6004", "6005", "6006"]);
+            new KeygenSessionManager(6, ["6001", "6002", "6003", "6004", "6005", "6006"], this.validator);
 
             this.initState();
       }

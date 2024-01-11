@@ -71,13 +71,11 @@ export type KeygenInputForRound5 = {
       UpdatedConfig: PartySecretKeyConfig;
 };
 
-export type GenericKeygenRoundInput = Partial<
-      | KeygenInputForRound1
-      | KeygenInputForRound2
-      | KeygenInputForRound3
-      | KeygenInputForRound4
-      | KeygenInputForRound5
->;
+export type GenericKeygenRoundInput = KeygenInputForRound1 &
+      KeygenInputForRound2 &
+      KeygenInputForRound3 &
+      KeygenInputForRound4 &
+      KeygenInputForRound5;
 
 // Keygen round output types
 export type KeygenRound1Output = {
