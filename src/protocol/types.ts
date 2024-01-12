@@ -29,3 +29,11 @@ export type ServerMessage = {
             proof?: string;
       };
 };
+
+export type ServerDirectMessage = {
+      message: string;
+      type: string;
+      data: {
+            directMessages?: Msg<KeygenDirectMessageForRound4JSON>;
+      };
+};
