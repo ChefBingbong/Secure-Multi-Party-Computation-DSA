@@ -1,0 +1,141 @@
+syntax = "proto3";
+
+message AffinePoint {
+  string xHex = 1;
+  string yHex = 2;
+}
+
+message Exponent {
+  bool isConstant = 1;
+  repeated AffinePoint coefficients = 2;
+}
+
+message PedersenParameters {
+  string nHex = 1;
+  string sHex = 2;
+  string tHex = 3;
+}
+
+message ZkSchCommitment {
+  AffinePoint C = 1;
+}
+
+message KeygenBroadcastForRound3 {
+  string from = 1;
+  string RIDhex = 2;
+  string Chex = 3;
+  Exponent vssPolynomial = 4;
+  ZkSchCommitment schnorrCommitment = 5;
+  AffinePoint elGamalPublic = 6;
+  PedersenParameters pedersenPublic = 7;
+  string decommitmentHex = 8;
+}
+
+message ZkModResponse {
+  bool A = 1;
+  bool B = 2;
+  int64 X = 3;
+  int64 Z = 4;
+}
+
+// Add ResponsesEntry
+message ResponsesEntry {
+  repeated ZkModResponse entry = 1;
+}
+
+message ZkModProof {
+  string Whex = 1;
+  repeated ZkModResponse Responses = 2;
+}
+
+message KeygenBroadcastForRound4 {
+  string from = 1;
+  ZkModProof modProof = 2;
+  ZkPrmProof prmProof = 3;
+}
+
+message ZkPrmPrivate {
+  int64 Lambda = 1;
+  int64 Phi = 2;
+  int64 P = 3;
+  int64 Q = 4;
+}
+
+message ZkPrmProof {
+  repeated string AsHex = 1;
+  repeated string ZsHex = 2;
+}
+
+message ZkSchResponse {
+  string Zhex = 1;
+}
+
+message KeygenBroadcastForRound5 {
+  string from = 1;
+  ZkSchResponse SchnorrResponse = 2;
+}
+
+message ZkFacPublic {
+  int64 N = 1;
+  PedersenParameters Aux = 2;
+}
+
+message ZkFacPrivate {
+  int64 P = 1;
+  int64 Q = 2;
+}
+
+message ZkFacCommitment {
+  int64 P = 1;
+  int64 Q = 2;
+  int64 A = 3;
+  int64 B = 4;
+  int64 T = 5;
+}
+
+message ZkFacProof {
+  message ZkFacProofInner {
+    string Pdec = 1;
+    string Qdec = 2;
+    string Adec = 3;
+    string Bdec = 4;
+    string Tdec = 5;
+  }
+  ZkFacProofInner comm = 1;
+  string sigmaDec = 2;
+  string Z1dec = 3;
+  string Z2dec = 4;
+  string W1dec = 5;
+  string W2dec = 6;
+  string Vdec = 7;
+}
+
+// New message for KeygenBroadcastForRound2JSON
+message KeygenBroadcastForRound2 {
+  string from = 1;
+  string commitmentHex = 2;
+}
+
+// The "Any" type for handling multiple types
+message AnyType {
+  oneof data {
+    AffinePoint affinePoint = 1;
+    Exponent exponent = 2;
+    PedersenParameters pedersenParameters = 3;
+    ZkSchCommitment zkSchCommitment = 4;
+    KeygenBroadcastForRound3 keygenBroadcastForRound3 = 5;
+    ZkModResponse zkModResponse = 6;
+    ZkModProof zkModProof = 7;
+    KeygenBroadcastForRound4 keygenBroadcastForRound4 = 8;
+    ZkPrmPrivate zkPrmPrivate = 9;
+    ZkPrmProof zkPrmProof = 10;
+    ZkSchResponse zkSchResponse = 11;
+    KeygenBroadcastForRound5 keygenBroadcastForRound5 = 12;
+    ZkFacPublic zkFacPublic = 13;
+    ZkFacPrivate zkFacPrivate = 14;
+    ZkFacCommitment zkFacCommitment = 15;
+    ZkFacProof zkFacProof = 16;
+    // Add KeygenBroadcastForRound2JSON
+    KeygenBroadcastForRound2 keygenBroadcastForRound2 = 17;
+  }
+}

@@ -1,4 +1,3 @@
-import { KeygenSession } from "../mpc/keygen/keygenSession";
 import config from "../config/config";
 import { redisClient } from "../db/redis";
 import App from "../http/app";
@@ -40,41 +39,17 @@ export const startProtocol = async (): Promise<void> => {
                   process.exit();
             })
             .on("unhandledRejection", async (reason) => {
-                  log.error(
-                        `Unhandled Rejection at Promise. Reason: ${reason}`
-                  );
+                  log.error(`Unhandled Rejection at Promise. Reason: ${reason}`);
                   await updatePeerReplica(port);
                   process.exit(-1);
             })
             .on("uncaughtException", async (reason) => {
-                  log.error(
-                        `Uncaught Exception Rejection at Promise. Reason: ${reason}`
-                  );
+                  log.error(`Uncaught Exception Rejection at Promise. Reason: ${reason}`);
                   await updatePeerReplica(port);
                   process.exit(-2);
             });
 };
 
-export const startKeygen = async () => {
-      const validators = await redisClient.getSingleData<number[]>(
-            "validators"
-      );
-      const partyIds = validators.map(String);
-      const threshold = validators.length - 1;
-      const message: Uint8Array = new TextEncoder().encode("hello");
-
-      // for (const selfId of partyIds) {
-      //       const keygenSession = () =>
-      //             new KeygenSession(
-      //                   selfId,
-      //                   partyIds,
-      //                   threshold
-      //                   // precomputedPaillierPrimesA
-      //             );
-      //       const startFunc = keygenSession().start;
-      //       // const protocolHandler = new MultiHandler(startFunc, null);
-      // }
-};
 startProtocol().then(() => {
       console.log("Application started");
 });

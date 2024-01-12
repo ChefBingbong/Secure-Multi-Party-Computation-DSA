@@ -2,14 +2,18 @@ import * as net from "net";
 import { v4 } from "uuid";
 import { Logger } from "winston";
 import config from "../config/config";
+import { P2P_PORTS } from "../config/constants";
 import { AppLogger } from "../http/middleware/logger";
 import { KeygenSessionManager } from "../protocol/keygenProtocol";
+import { ServerDirectMessage, ServerMessage } from "../protocol/types";
 import Validator from "../protocol/validators/validator";
 import { P2PNetworkEventEmitter } from "./eventEmitter";
-import T from "./splitStream";
 import { P2PNetwork } from "./types";
-import { ServerDirectMessage, ServerMessage } from "../protocol/types";
-import splitStream from "./splitStream";
+import protobuf from "protobufjs";
+const root = protobuf.loadSync("../../types_pb");
+
+// Obtain the message type
+const YourMessageType = root.lookupType("YourMessageType");
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -29,7 +33,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
       constructor() {
             super();
-            this.threshold = 6;
+            this.threshold = 3;
             this.connections = new Map();
             this.neighbors = new Map();
             this.NODE_ID = config.p2pPort;
@@ -41,33 +45,12 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
             P2pServer.validators = new Map([[config.p2pPort, this.validator.toString()]]);
 
-            new KeygenSessionManager(
-                  this.threshold,
-                  [
-                        "6001",
-                        "6002",
-                        "6003",
-                        "6004",
-                        "6005",
-                        "6006",
-                        // "6007",
-                        // "6008",
-                        // "6009",
-                        // "6010",
-                        // "6011",
-                        // "6012",
-                        // "6013",
-                        // "6014",
-                        // "6015",
-                  ],
-                  this.validator
-            );
+            new KeygenSessionManager(this.threshold, P2P_PORTS, this.validator);
 
             this.initState();
       }
 
       private initState() {
-            // Once connection is established, send the handshake message
             this.emitter.on("_connect", (connectionId) => {
                   this._send(connectionId.connectionId, {
                         type: "handshake",
@@ -219,9 +202,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             });
 
             socket.on("data", (message) => {
-                  // console.log(message);
                   const receivedData = JSON.parse(message.toString());
-                  // console.log(receivedData);
                   this.emitter.emitMessage(connectionId, receivedData, false);
             });
       };
@@ -301,6 +282,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
       private handleBroadcastMessage = (callback?: () => Promise<void>) => {
             this.on("broadcast", async ({ message }: { message: ServerMessage }) => {
                   this.log.info(`${message.message}`);
+                  this.validator.messages.set(0, message);
 
                   if (message.type === `keygenRoundHandler`) {
                         await KeygenSessionManager.keygenRoundProcessor(message);
@@ -308,23 +290,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   if (message.type === `keygenInit`) {
                         KeygenSessionManager.startNewSession({
                               selfId: this.NODE_ID,
-                              partyIds: [
-                                    "6001",
-                                    "6002",
-                                    "6003",
-                                    "6004",
-                                    "6005",
-                                    "6006",
-                                    // "6007",
-                                    // "6008",
-                                    // "6009",
-                                    // "6010",
-                                    // "6011",
-                                    // "6012",
-                                    // "6013",
-                                    // "6014",
-                                    // "6015",
-                              ],
+                              partyIds: P2P_PORTS,
                               threshold: this.threshold,
                         });
                         await KeygenSessionManager.finalizeCurrentRound(0);
@@ -336,8 +302,13 @@ class P2pServer extends AppLogger implements P2PNetwork {
       private handleDirectMessage = (callback?: () => Promise<void>) => {
             this.on("direct", async ({ message }: { message: ServerDirectMessage }) => {
                   this.log.info(`${message.message}`);
-
                   if (message.type === `keygenDirectMessageHandler`) {
+                        const dm = message.data.directMessages.Data;
+                        this.validator.directMessagesMap.set(
+                              KeygenSessionManager.currentRound,
+                              this.validator.nodeId,
+                              dm
+                        );
                         await KeygenSessionManager.keygenRoundDirectMessageProcessor(message);
                   }
                   await callback();
