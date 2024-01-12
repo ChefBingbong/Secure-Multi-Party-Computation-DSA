@@ -1,88 +1,38 @@
-import { PartyId, PartySecretKeyConfig } from "./partyKey";
-import {
-      ZkSchResponse,
-      ZkSchResponseJSON,
-      zkSchIsResponseValid,
-      zkSchVerifyResponse,
-} from "../zk/zksch";
-import { KeygenInputForRound4 } from "./round4";
-import { KeygenSession } from "./keygenSession";
+import { zkSchIsResponseValid, zkSchVerifyResponse } from "../zk/zksch";
+import { AbstractKeygenRound } from "./abstractRound";
+import { KeygenBroadcastForRound5 } from "./keygenMessages/broadcasts";
+import { KeygenRound5Output } from "./types";
 
-export type KeygenBroadcastForRound5JSON = {
-      from: string;
-      SchnorrResponse: ZkSchResponseJSON;
-};
-
-export class KeygenBroadcastForRound5 {
-      public readonly from: PartyId;
-      public readonly SchnorrResponse: ZkSchResponse;
-
-      private constructor(from: PartyId, SchnorrResponse: ZkSchResponse) {
-            this.from = from;
-            this.SchnorrResponse = SchnorrResponse;
+export class KeygenRound5 extends AbstractKeygenRound {
+      constructor() {
+            super({ isBroadcastRound: false, isDriectMessageRound: false, currentRound: 5 });
       }
 
-      public static from({
-            from,
-            SchnorrResponse,
-      }: {
-            from: PartyId;
-            SchnorrResponse: ZkSchResponse;
-      }): KeygenBroadcastForRound5 {
-            const b = new KeygenBroadcastForRound5(from, SchnorrResponse);
-            Object.freeze(b);
-            return b;
-      }
-
-      public toJSON(): KeygenBroadcastForRound5JSON {
-            return {
-                  from: this.from,
-                  SchnorrResponse: this.SchnorrResponse.toJSON(),
-            };
-      }
-
-      public static fromJSON(
-            json: KeygenBroadcastForRound5JSON
-      ): KeygenBroadcastForRound5 {
-            const { from, SchnorrResponse } = json;
-            return KeygenBroadcastForRound5.from({
-                  from,
-                  SchnorrResponse: ZkSchResponse.fromJSON(SchnorrResponse),
-            });
-      }
-}
-
-export type KeygenInputForRound5 = {
-      inputForRound4: KeygenInputForRound4;
-      UpdatedConfig: PartySecretKeyConfig;
-};
-
-export type KeygenRound5Output = {
-      UpdatedConfig: PartySecretKeyConfig;
-};
-
-export class KeygenRound5 {
-      constructor(private session: KeygenSession, private input: KeygenInputForRound5) {}
+      public handleDirectMessage(bmsg: any): void {}
 
       public handleBroadcastMessage(bmsg: KeygenBroadcastForRound5) {
             const { from, SchnorrResponse } = bmsg;
 
-            if (!zkSchIsResponseValid(SchnorrResponse)) {
-                  throw new Error(`invalid schnorr response from ${from}`);
-            }
+            try {
+                  if (!zkSchIsResponseValid(SchnorrResponse)) {
+                        throw new Error(`invalid schnorr response from ${from}`);
+                  }
 
-            const verified = zkSchVerifyResponse(
-                  SchnorrResponse,
-                  this.session.cloneHashForId(from),
-                  this.input.UpdatedConfig.publicPartyData[from].ecdsa,
-                  this.input.inputForRound4.SchnorrCommitments[from]
-            );
-            if (!verified) {
-                  throw new Error(`failed to validate schnorr response from ${from}`);
+                  const verified = zkSchVerifyResponse(
+                        SchnorrResponse,
+                        this.session.cloneHashForId(from),
+                        this.input.UpdatedConfig.publicPartyData[from].ecdsa,
+                        this.input.inputForRound4.SchnorrCommitments[from]
+                  );
+                  if (!verified) {
+                        throw new Error(`failed to validate schnorr response from ${from}`);
+                  }
+            } catch (error) {
+                  console.log(error);
             }
       }
 
-      process(): KeygenRound5Output {
+      public async process(): Promise<KeygenRound5Output> {
             return {
                   UpdatedConfig: this.input.UpdatedConfig,
             };

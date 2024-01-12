@@ -2,43 +2,54 @@ import { Transform } from "stream";
 
 const SPLIT_SEQUENCE = "}{";
 
-const T = () =>
-      new Transform({
-            objectMode: true,
-            write(chunk, enc, cb) {
-                  // Split int json messages by the following
-                  // sequence. But keep in mind we may see it
-                  // inside a string inside JSON
-                  let possibleMessages = chunk.toString().split(SPLIT_SEQUENCE);
+class SplitStream extends Transform {
+      private buffer: string;
 
+      constructor() {
+            super({ objectMode: true });
+            this.buffer = "";
+      }
+
+      _transform(chunk: any, encoding: BufferEncoding, callback: Function) {
+            try {
+                  // Concatenate the buffer with the incoming chunk
+                  this.buffer += chunk.toString();
+
+                  // Split the combined buffer by the split sequence
+                  const possibleMessages = this.buffer.split(SPLIT_SEQUENCE);
+
+                  // Process all complete messages (except the last one) in the buffer
                   for (let i = 0; i < possibleMessages.length - 1; ++i) {
-                        possibleMessages[i] = possibleMessages[i] + "}";
+                        const completeMessage = possibleMessages[i] + "}";
+                        const parsedMessage = JSON.parse(completeMessage);
+
+                        // Push the parsed message to the readable stream
+                        this.push(parsedMessage);
                   }
 
-                  for (let i = 1; i < possibleMessages.length; ++i) {
-                        possibleMessages[i] = "{" + possibleMessages[i];
+                  // Update the buffer with the last incomplete message
+                  this.buffer = possibleMessages[possibleMessages.length - 1];
+
+                  callback();
+            } catch (err) {
+                  // Handle parsing errors or incomplete messages
+                  callback(err);
+            }
+      }
+
+      _flush(callback: Function) {
+            try {
+                  // Parse any remaining message in the buffer
+                  if (this.buffer) {
+                        const parsedMessage = JSON.parse(this.buffer);
+                        this.push(parsedMessage);
                   }
 
-                  while (possibleMessages.length > 0) {
-                        try {
-                              const m = JSON.parse(possibleMessages[0]);
-                              this.push(m);
-                        } catch (e) {
-                              console.log(e);
-                              if (possibleMessages.length > 1) {
-                                    possibleMessages[0] = possibleMessages[0]
-                                          .concat(possibleMessages.splice(1, 1))
-                                          .join(SPLIT_SEQUENCE);
-                              } else {
-                                    return cb(e);
-                              }
-                        }
+                  callback();
+            } catch (err) {
+                  callback(err);
+            }
+      }
+}
 
-                        possibleMessages.splice(0, 1);
-                  }
-
-                  cb();
-            },
-      });
-
-export default T;
+export default new SplitStream();

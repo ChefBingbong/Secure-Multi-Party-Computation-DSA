@@ -1,12 +1,11 @@
-import { Hasher } from "../utils/hasher";
-import { PartyId } from "./partyKey";
 import { Polynomial } from "../math/polynomial/polynomial";
 import { sampleScalar } from "../math/sample";
-import { KeygenInputForRound1 } from "./types";
-import { Helper, Info } from "../../protocol/helper/helper";
+import { Hasher } from "../utils/hasher";
+import { AbstractKeygenRound } from "./abstractRound";
+import { PartyId } from "./partyKey";
+import { KeygenInputForRound1, SessionConfig } from "./types";
 
-export class KeygenSession {
-      public currentRound = 0;
+export class KeygenSession extends AbstractKeygenRound {
       public curve = "secp256k1";
       public finalRound: number = 5;
       public partyIds: Array<PartyId>;
@@ -23,19 +22,15 @@ export class KeygenSession {
             q: bigint;
       };
 
-      constructor(
-            selfId: PartyId,
-            partyIds: Array<PartyId>,
-            threshold: number,
-            precomputedPaillierPrimes?: {
-                  p: bigint;
-                  q: bigint;
-            }
-      ) {
-            this.partyIds = partyIds;
-            this.selfId = selfId;
-            this.threshold = threshold;
-            this.precomputedPaillierPrimes = precomputedPaillierPrimes;
+      constructor() {
+            super({ isBroadcastRound: false, isDriectMessageRound: false, currentRound: 0 });
+      }
+
+      init({ sessionConfig }: { sessionConfig?: SessionConfig }) {
+            this.partyIds = sessionConfig.partyIds;
+            this.selfId = sessionConfig.selfId;
+            this.threshold = sessionConfig.threshold;
+            this.precomputedPaillierPrimes = sessionConfig.precomputedPaillierPrimes;
 
             this.hasher = Hasher.create().update("CMP-BLAKE");
             this.hasher.update(this.protocolId);
@@ -52,7 +47,7 @@ export class KeygenSession {
             const vssConstant = sampleScalar();
             const vssSecret = Polynomial.new(this.threshold, vssConstant);
 
-            this.inputForRound1 = {
+            this.output = {
                   vssSecret,
                   precomputedPaillierPrimes: this.precomputedPaillierPrimes,
 
@@ -63,38 +58,9 @@ export class KeygenSession {
             };
       }
 
-      public start = async () => {
-            for (let partyId of this.partyIds) {
-                  this.hasher.update(partyId);
-            }
-
-            // set up for vss polynomial share generation. these are used for assigning shares
-            // or random polynomial between all parties
-            const vssConstant = sampleScalar();
-            const vssSecret = Polynomial.new(this.threshold, vssConstant);
-
-            const info: Info = {
-                  ProtocolID: this.protocolId,
-                  FinalRoundNumber: this.finalRound,
-                  SelfID: this.selfId,
-                  PartyIDs: this.partyIds,
-                  Threshold: this.threshold,
-                  hash: this.hasher,
-            };
-
-            const helper = new Helper(info);
-
-            return (this.inputForRound1 = {
-                  vssSecret,
-                  helper,
-                  precomputedPaillierPrimes: this.precomputedPaillierPrimes,
-
-                  // TODO: these are for refresh? not implemented yet
-                  previousSecretECDSA: null,
-                  previousPublicSharesECDSA: null,
-                  previousChainKey: null,
-            });
-      };
+      public handleBroadcastMessage(bmsg: any): void {}
+      public handleDirectMessage(bmsg: any): void {}
+      public async process(): Promise<any> {}
 
       public cloneHashForId(id: PartyId): Hasher {
             return this.hasher.clone().update(id);
