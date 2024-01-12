@@ -28,7 +28,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
       constructor() {
             super();
-            this.threshold = 6;
+            this.threshold = 3;
             this.connections = new Map();
             this.neighbors = new Map();
             this.NODE_ID = config.p2pPort;
@@ -277,6 +277,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
       private handleBroadcastMessage = (callback?: () => Promise<void>) => {
             this.on("broadcast", async ({ message }: { message: ServerMessage }) => {
                   this.log.info(`${message.message}`);
+                  this.validator.messages.set(0, message);
 
                   if (message.type === `keygenRoundHandler`) {
                         await KeygenSessionManager.keygenRoundProcessor(message);
@@ -296,8 +297,13 @@ class P2pServer extends AppLogger implements P2PNetwork {
       private handleDirectMessage = (callback?: () => Promise<void>) => {
             this.on("direct", async ({ message }: { message: ServerDirectMessage }) => {
                   this.log.info(`${message.message}`);
-
                   if (message.type === `keygenDirectMessageHandler`) {
+                        const dm = message.data.directMessages.Data;
+                        this.validator.directMessagesMap.set(
+                              KeygenSessionManager.currentRound,
+                              this.validator.nodeId,
+                              dm
+                        );
                         await KeygenSessionManager.keygenRoundDirectMessageProcessor(message);
                   }
                   await callback();

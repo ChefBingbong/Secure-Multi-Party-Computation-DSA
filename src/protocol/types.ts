@@ -10,7 +10,7 @@ export type Round = {
       finished?: boolean;
 };
 export type Rounds = { [x: number]: Round };
-export type Message<T> = { [round: number]: T };
+export type Message<T> = { [round: number]: T[] };
 export type RoundResponse = boolean[];
 
 export type KeygenCurrentState = {

@@ -2,36 +2,54 @@ import config from "../../config/config";
 import { GenericKeygenRoundBroadcast } from "../../mpc/keygen/abstractRound";
 import { KeygenSession } from "../../mpc/keygen/keygenSession";
 import { KeygenDirectMessageForRound4JSON } from "../../mpc/keygen/types";
+import { KeygenSessionManager } from "../keygenProtocol";
 import { Message } from "../message/message";
+import { MessageQueueArray, MessageQueueMap } from "../message/messageQueue";
+import { MessageQueue } from "../types";
 import ChainUtil from "./chainUtil";
+import { Message as Msg } from "../types";
 
 class Validator {
       private keyPair: any;
       private publicKey: string;
       public ID: string;
       public nodeId: string;
+      public messages: MessageQueueArray<any>;
+      public directMessagesMap: MessageQueueMap<KeygenDirectMessageForRound4JSON>;
 
       constructor() {
             this.ID = ChainUtil.id();
             this.keyPair = ChainUtil.genKeyPair(this.ID);
             this.publicKey = this.keyPair.getPublic("hex");
             this.nodeId = config.p2pPort;
+            this.directMessagesMap = new MessageQueueMap([this.nodeId], KeygenSessionManager.finalRound + 1);
+            this.messages = new MessageQueueArray(1);
       }
 
       // Used for printing the wallet details
-      toString(): string {
+      public toString(): string {
             return `Wallet - 
             publicKey: ${this.publicKey.toString()} -
             validatorId: ${this.ID}
             port: ${config.p2pPort}`;
       }
 
-      sign(dataHash: string): string {
+      public sign(dataHash: string): string {
             return this.keyPair.sign(dataHash).toHex();
       }
 
-      getPublicKey(): string {
+      public sgetPublicKey(): string {
             return this.publicKey;
+      }
+
+      public getDirectMessages(
+            round?: number
+      ): MessageQueue<KeygenDirectMessageForRound4JSON> | KeygenDirectMessageForRound4JSON[] {
+            return !round ? this.directMessagesMap.getAll() : this.directMessagesMap.getRoundValues(round);
+      }
+
+      public getMessages(round?: number): Msg<any> | any[] {
+            return !round ? this.messages.getAll() : this.messages.getRoundValues(round);
       }
 
       public canAccept<T extends Message<GenericKeygenRoundBroadcast> | Message<KeygenDirectMessageForRound4JSON>>(

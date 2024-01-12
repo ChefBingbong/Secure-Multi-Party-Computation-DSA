@@ -57,6 +57,8 @@ export class App extends AppLogger implements AppInterface {
             // Define routes
             this.router.get("/", handlers.getRoot);
             this.router.get("/validators", handlers.getValidators);
+            this.router.get("/get-direct-messages", handlers.getDirectMessages);
+            this.router.get("/get-messages", handlers.getMessages);
             this.router.post("/direct-message", handlers.postDirectMessage);
             this.router.post("/broadcast", handlers.postBroadcast);
             this.router.post("/start", handlers.postStart);
@@ -68,9 +70,7 @@ export class App extends AppLogger implements AppInterface {
 
       public start(peers: number[]): void {
             this.app.listen(Number(config.port), async () => {
-                  App.log.info(
-                        `Server listening on port ${Number(config.port)}.`
-                  );
+                  App.log.info(`Server listening on port ${Number(config.port)}.`);
                   this.p2pServer = new P2pServer();
                   this.p2pServer.listen(Number(config.p2pPort), peers);
             });
