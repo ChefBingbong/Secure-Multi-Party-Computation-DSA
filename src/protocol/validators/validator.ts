@@ -9,6 +9,12 @@ import { MessageQueue } from "../types";
 import ChainUtil from "./chainUtil";
 import { Message as Msg } from "../types";
 
+export interface WalletInfo {
+      publicKey: string;
+      validatorId: string;
+      port: string;
+}
+
 class Validator {
       private keyPair: any;
       private publicKey: string;
@@ -26,22 +32,6 @@ class Validator {
             this.messages = new MessageQueueArray(1);
       }
 
-      // Used for printing the wallet details
-      public toString(): string {
-            return `Wallet - 
-            publicKey: ${this.publicKey.toString()} -
-            validatorId: ${this.ID}
-            port: ${config.p2pPort}`;
-      }
-
-      public sign(dataHash: string): string {
-            return this.keyPair.sign(dataHash).toHex();
-      }
-
-      public sgetPublicKey(): string {
-            return this.publicKey;
-      }
-
       public getDirectMessages(
             round?: number
       ): MessageQueue<KeygenDirectMessageForRound4JSON> | KeygenDirectMessageForRound4JSON[] {
@@ -50,6 +40,23 @@ class Validator {
 
       public getMessages(round?: number): Msg<any> | any[] {
             return !round ? this.messages.getAll() : this.messages.getRoundValues(round);
+      }
+
+      public static parseWalletInfo(templateString: string): WalletInfo | null {
+            const matches = templateString.match(/publicKey: (.+?) -\s+validatorId: (.+?) -\s+port: (.+?)$/);
+
+            console.log(matches);
+            console.log(templateString);
+
+            if (matches) {
+                  const [_, publicKey, validatorId, port] = matches;
+                  return {
+                        publicKey,
+                        validatorId,
+                        port,
+                  };
+            }
+            return null;
       }
 
       public canAccept<T extends Message<GenericKeygenRoundBroadcast> | Message<KeygenDirectMessageForRound4JSON>>(
@@ -81,6 +88,21 @@ class Validator {
                   return false;
             }
             return true;
+      }
+
+      // Used for printing the wallet details
+      public toString(): string {
+            return `publicKey: ${this.publicKey.toString()} -
+                  validatorId: ${this.ID} -
+                  port: ${config.p2pPort}`;
+      }
+
+      public sign(dataHash: string): string {
+            return this.keyPair.sign(dataHash).toHex();
+      }
+
+      public sgetPublicKey(): string {
+            return this.publicKey;
       }
 }
 

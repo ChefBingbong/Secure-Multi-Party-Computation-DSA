@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response } from "express";
-import { app, startKeygen } from "../../protocol";
-import P2pServer from "../../p2p/server";
 import config from "../../config/config";
+import P2pServer from "../../p2p/server";
+import { app } from "../../protocol";
+import Validator from "../../protocol/validators/validator";
 
 export const getRoot = (req: Request, res: Response) => {
       res.status(200).send({ result: "ok" });
@@ -10,7 +11,8 @@ export const getRoot = (req: Request, res: Response) => {
 export const getValidators = (req: Request, res: Response, next: NextFunction) => {
       try {
             const partyIds = P2pServer.getAllValidators();
-            res.status(200).json({ partyIds });
+            const validatorInfo = partyIds.map((info) => Validator.parseWalletInfo(info));
+            res.status(200).json({ partyIds: validatorInfo });
       } catch (error) {
             next(error);
       }
