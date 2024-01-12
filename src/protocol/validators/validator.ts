@@ -36,9 +36,10 @@ class Validator {
 
       public canAccept<T extends Message<GenericKeygenRoundBroadcast> | Message<KeygenDirectMessageForRound4JSON>>(
             message: T,
-            session: KeygenSession
+            session: KeygenSession,
+            nodeId: string
       ): boolean {
-            if (!Message.isFor<T>(this.nodeId, message)) {
+            if (!Message.isFor<T>(nodeId, message)) {
                   console.log("messagwe not for you");
                   return false;
             }

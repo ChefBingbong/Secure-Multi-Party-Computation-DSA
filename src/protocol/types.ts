@@ -10,7 +10,7 @@ export type Round = {
       finished?: boolean;
 };
 export type Rounds = { [x: number]: Round };
-export type Message = { [round: number]: any };
+export type Message<T> = { [round: number]: T };
 export type RoundResponse = boolean[];
 
 export type KeygenCurrentState = {
@@ -28,6 +28,7 @@ export type ServerMessage = {
             directMessages?: Msg<KeygenDirectMessageForRound4JSON>[];
             proof?: string;
       };
+      senderNode: string;
 };
 
 export type ServerDirectMessage = {
@@ -36,4 +37,13 @@ export type ServerDirectMessage = {
       data: {
             directMessages?: Msg<KeygenDirectMessageForRound4JSON>;
       };
+      senderNode: string;
 };
+
+export interface Queue<T> {
+      [partyId: string]: T | null;
+}
+
+export interface MessageQueue<T> {
+      [roundNumber: number]: Queue<T>;
+}

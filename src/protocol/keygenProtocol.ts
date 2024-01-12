@@ -16,8 +16,18 @@ import { Hasher } from "../mpc/utils/hasher";
 import { delay } from "../p2p/server";
 import { app } from "./index";
 import { Message as Msg } from "./message/message";
-import { KeygenCurrentState, Message, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
+import {
+      KeygenCurrentState,
+      Message,
+      MessageQueue,
+      Queue,
+      Round,
+      Rounds,
+      ServerDirectMessage,
+      ServerMessage,
+} from "./types";
 import Validator from "./validators/validator";
+import { P2P_PORTS } from "../config/constants";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -35,8 +45,9 @@ export class KeygenSessionManager extends AppLogger {
       private static session: KeygenSession | undefined;
       private static rounds: Rounds | undefined;
 
-      private static messages: Message;
-      private static directMessages: Message;
+      private static directMessages: Message<KeygenDirectMessageForRound4JSON[]>;
+      private static messages: MessageQueue<GenericKeygenRoundBroadcast>;
+      private static directMessagesMap: MessageQueue<KeygenDirectMessageForRound4JSON>;
 
       constructor(threshold: number, validators: string[], validator: Validator) {
             super();
@@ -50,8 +61,9 @@ export class KeygenSessionManager extends AppLogger {
             if (this.sessionInitialized || this.currentRound > 0) {
                   throw new Error(`there is already a keygen session n progress`);
             }
-            this.messages = this.messageQueue(this.finalRound + 1);
-            this.directMessages = this.messageQueue(this.finalRound + 1);
+            this.directMessages = this.messageQueueArray(this.finalRound + 1);
+            this.directMessagesMap = this.messageQueueMap(P2P_PORTS, this.finalRound + 1);
+            this.messages = this.messageQueueMap(P2P_PORTS, this.finalRound + 1);
 
             this.rounds = KeygenRounds.reduce((accumulator, round, i) => {
                   accumulator[i] = {
@@ -105,7 +117,7 @@ export class KeygenSessionManager extends AppLogger {
                         return;
                   }
 
-                  const bcsLen = this.storePeerBroadcastResponse(broadcasts, round, currentRound);
+                  const bcsLen = this.storePeerBroadcastResponse(broadcasts, round, currentRound, data.senderNode);
                   const proofsLen = this.storePeerProofs(proof, currentRound);
 
                   if (proofsLen === this.threshold - 1) this.verifyAndEndSession(this.proofs);
@@ -123,6 +135,7 @@ export class KeygenSessionManager extends AppLogger {
             try {
                   const { directMessages } = data.data;
                   const { round, currentRound } = this.getCurrentState();
+
                   this.storePeerDirectMessageResponse(directMessages, round, currentRound);
             } catch (error) {
                   console.log(error);
@@ -148,16 +161,18 @@ export class KeygenSessionManager extends AppLogger {
                   const directMessages = this.createDirectMessage(round, dms, currentRound);
                   const proof = this.createKeygenProof(currentRound, roundOutput as KeygenRound5Output);
 
-                  if (round.isBroadcastRound) this.messages[currentRound].push(bcs);
+                  if (round.isBroadcastRound) this.messages[currentRound][this.selfId] = bcs;
 
                   app.p2pServer.broadcast({
                         message: `${this.selfId} is prcessing round ${currentRound}`,
                         type: "keygenRoundHandler",
                         data: { broadcasts, proof },
+                        senderNode: this.selfId,
                   });
 
                   if (round.isDirectMessageRound) {
                         directMessages.forEach(async (dm) => {
+                              this.directMessagesMap[currentRound][dm.To] = dm.Data;
                               await delay(500);
                               app.p2pServer.sendDirect(dm.To, {
                                     message: `${this.selfId} is sending direct message to ${dm.To}`,
@@ -193,8 +208,8 @@ export class KeygenSessionManager extends AppLogger {
             const previousRound = this.rounds[currentRound - 1]?.round;
             if (!previousRound?.isBroadcastRound) return;
 
-            this.messages[currentRound - 1]
-                  .map((broadcast) => AbstractKeygenBroadcast.fromJSON(broadcast))
+            Object.values(this.messages[currentRound - 1])
+                  .map((broadcast) => AbstractKeygenBroadcast.fromJSON(broadcast as any))
                   .forEach((broadcast) => activeRound.handleBroadcastMessage(broadcast));
       }
 
@@ -225,7 +240,7 @@ export class KeygenSessionManager extends AppLogger {
             return this.currentRound === this.finalRound;
       }
 
-      private static messageQueue(rounds: number): { [round: number]: any[] } {
+      private static messageQueueArray<T>(rounds: number): { [round: number]: T[] } {
             const q: { [round: number]: any[] } = {};
             for (let i = 0; i <= rounds; i++) {
                   q[i] = [];
@@ -233,15 +248,36 @@ export class KeygenSessionManager extends AppLogger {
             return q;
       }
 
+      private static messageQueueMap<T>(senders: string[], rounds: number): MessageQueue<T> {
+            const q: MessageQueue<T> = {};
+            for (let i = 0; i <= rounds; i++) {
+                  const queue: Queue<T> = {};
+                  senders.forEach((id) => {
+                        queue[id] = null;
+                  });
+                  q[i] = queue;
+            }
+            return q;
+      }
+
+      private static getMessagesLenfth(obj: any): number {
+            return Object.keys(obj).reduce((count, key) => (obj[key] !== null ? count + 1 : count), 0);
+      }
+
       private static storePeerBroadcastResponse(
             newMessage: Msg<GenericKeygenRoundBroadcast> | undefined,
             round: AbstractKeygenRound,
-            currentRound: number
+            currentRound: number,
+            senderNode: string
       ) {
-            if (round.isBroadcastRound && newMessage && this.validator.canAccept(newMessage, this.session)) {
-                  this.messages[currentRound].push(newMessage.Data);
+            if (
+                  round.isBroadcastRound &&
+                  newMessage &&
+                  this.validator.canAccept(newMessage, this.session, this.selfId)
+            ) {
+                  this.messages[currentRound][senderNode] = newMessage.Data;
             }
-            return this.messages[currentRound].length;
+            return this.getMessagesLenfth(this.messages[currentRound]);
       }
 
       private static storePeerDirectMessageResponse(
@@ -252,7 +288,7 @@ export class KeygenSessionManager extends AppLogger {
             if (
                   round.isDirectMessageRound &&
                   newDirectMessage &&
-                  this.validator.canAccept(newDirectMessage, this.session)
+                  this.validator.canAccept(newDirectMessage, this.session, this.selfId)
             ) {
                   this.directMessages[currentRound].push(newDirectMessage.Data);
             }
