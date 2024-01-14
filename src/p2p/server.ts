@@ -10,10 +10,10 @@ import Validator from "../protocol/validators/validator";
 import { P2PNetworkEventEmitter } from "./eventEmitter";
 import { P2PNetwork } from "./types";
 import protobuf from "protobufjs";
-const root = protobuf.loadSync("../../types_pb");
+// const root = protobuf.loadSync("../../types_pb");
 
-// Obtain the message type
-const YourMessageType = root.lookupType("YourMessageType");
+// // Obtain the message type
+// const YourMessageType = root.lookupType("YourMessageType");
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
