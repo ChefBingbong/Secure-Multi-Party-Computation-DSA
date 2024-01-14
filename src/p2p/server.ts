@@ -2,14 +2,13 @@ import * as net from "net";
 import { v4 } from "uuid";
 import { Logger } from "winston";
 import config from "../config/config";
-import { P2P_PORTS } from "../config/constants";
+import { redisClient } from "../db/redis";
 import { AppLogger } from "../http/middleware/logger";
 import { KeygenSessionManager } from "../protocol/keygenProtocol";
 import { ServerDirectMessage, ServerMessage } from "../protocol/types";
 import Validator from "../protocol/validators/validator";
 import { P2PNetworkEventEmitter } from "./eventEmitter";
 import { P2PNetwork } from "./types";
-import protobuf from "protobufjs";
 // const root = protobuf.loadSync("../../types_pb");
 
 // // Obtain the message type
@@ -22,6 +21,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
       public readonly NODE_ID: string;
       public readonly neighbors: Map<string, string>;
       public readonly validator: Validator = new Validator();
+      public validators: string[];
 
       public static validators: Map<string, string>;
       public threshold: number;
@@ -33,7 +33,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
       constructor() {
             super();
-            this.threshold = 3;
             this.connections = new Map();
             this.neighbors = new Map();
             this.NODE_ID = config.p2pPort;
@@ -43,11 +42,21 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
             this.log = this.getLogger("p2p-log");
             this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
+            this.updateReplica();
             P2pServer.validators = new Map([[config.p2pPort, this.validator.toString()]]);
 
-            new KeygenSessionManager(this.threshold, P2P_PORTS, this.validator);
+            new KeygenSessionManager(this.validator);
 
             this.initState();
+      }
+
+      private async updateReplica(): Promise<void> {
+            let peers = await redisClient.getSingleData<number[]>("validators");
+            peers = [...peers, Number(this.NODE_ID)].filter((value, index, self) => {
+                  return self.indexOf(value) === index;
+            });
+            this.validators = peers.map((p) => p.toString());
+            this.threshold = this.validators.length;
       }
 
       private initState() {
@@ -118,8 +127,8 @@ class P2pServer extends AppLogger implements P2PNetwork {
             if (!this.isInitialized) this.throwError(`Cannot listen before server is initialized`);
 
             this.server.listen(port, "0.0.0.0", () => {
-                  this.handlePeerConnection(async () => {});
-                  this.handlePeerDisconnect(async () => {});
+                  this.handlePeerConnection(async () => await this.updateReplica());
+                  this.handlePeerDisconnect(async () => await this.updateReplica());
 
                   this.handleBroadcastMessage(async () => {});
                   this.handleDirectMessage(async () => {});
@@ -290,7 +299,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   if (message.type === `keygenInit`) {
                         KeygenSessionManager.startNewSession({
                               selfId: this.NODE_ID,
-                              partyIds: P2P_PORTS,
+                              partyIds: this.validators,
                               threshold: this.threshold,
                         });
                         await KeygenSessionManager.finalizeCurrentRound(0);
