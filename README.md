@@ -61,7 +61,7 @@ you can start the process from any node but. i have not yet imoplemented a leade
 
 ### Other methods
 ```
-http://localhost:3001/validators
+GET- http://localhost:3001/validators
 ```
 returns a lost of all validators currently active in the network
 
