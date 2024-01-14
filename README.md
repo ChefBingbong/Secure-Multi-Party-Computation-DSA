@@ -37,3 +37,51 @@ I have also implemented a p2p network and http server to allow nodes to interact
 
 ### In Memory DB with redis
 ive implemented an in memory database to store the state of the validators array to Disk such that when a new node joins the network they dont need to provide an configuration about the existing state of the VM before they joined. this in combination with state relplication amoung nodes keeps the validators list up-to-date always amoungst all nodes, new and old.
+
+## Usage
+to use this and run the keygen process yourself. first clone the repo run 
+```
+yarn
+```
+make sure you have redis installed on your machine. if not you can download it from here https://redis.io/download/. Once redis in stalled initialize a local redis instance by running 
+```
+redis server
+```
+then in order to start a new node past the following config into your terminal ```
+```
+export PORT=portNumber P2P_PORT=p2pPort NODE_ENV=development
+nvm use 21.0.0
+yarn start:dev
+```
+You will then have a new node in the P2P network. run this command for maybe 4 or 5 nodes on their own terminal window to set up a demo playground. once done you can start the keygen process by calling
+```
+POST- http://localhost:3001/start
+```
+you can start the process from any node but. i have not yet imoplemented a leader election this will come soon. 
+
+### Other methods
+```
+http://localhost:3001/validators
+```
+returns a lost of all validators currently active in the network
+
+```
+POST- http://localhost:3001/direct-message?id=id
+```
+send a direct message to a node (test default message will add ability to send custom later)
+
+```
+POST- http://localhost:3001/broadcast
+```
+broadcast a message to all nodes (test default message will add ability to send custom later)
+
+```
+GET- http://localhost:3001/get-direct-message?roundId=roundId
+```
+get all direct messages sent to a particular node for a given roundId. if no value is passed for `roundId`, all direct messages for that node will be returned instead
+
+```
+GET- http://localhost:3001/get-message?roundOd=roundId
+```
+get all broadcast messages sent to a particular node for a given roundId. if no value is passed for `roundId`, all broadcast messages for that node will be returned instead
+`
