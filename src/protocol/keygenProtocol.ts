@@ -1,5 +1,4 @@
 import assert from "assert";
-import { P2P_PORTS } from "../config/constants";
 import { AppLogger } from "../http/middleware/logger";
 import { AllKeyGenRounds } from "../mpc/keygen";
 import { AbstractKeygenRound, GenericKeygenRoundBroadcast } from "../mpc/keygen/abstractRound";
@@ -18,7 +17,7 @@ import { delay } from "../p2p/server";
 import { app } from "./index";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
-import { KeygenCurrentState, Message, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
+import { KeygenCurrentState, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
 import Validator from "./validators/validator";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
@@ -40,20 +39,24 @@ export class KeygenSessionManager extends AppLogger {
       private static directMessages: MessageQueueArray<KeygenDirectMessageForRound4JSON>;
       private static messages: MessageQueueMap<GenericKeygenRoundBroadcast>;
 
-      constructor(threshold: number, validators: string[], validator: Validator) {
+      constructor(validator: Validator) {
             super();
-            KeygenSessionManager.threshold = threshold;
-            KeygenSessionManager.validators = validators;
             KeygenSessionManager.validator = validator;
             KeygenSessionManager.selfId = validator.nodeId;
+      }
+
+      private static async init(threshold: number, validators: string[]) {
+            this.threshold = threshold;
+            this.validators = validators;
       }
 
       public static startNewSession(sessionConfig: SessionConfig): void {
             if (this.sessionInitialized || this.currentRound > 0) {
                   throw new Error(`there is already a keygen session n progress`);
             }
+            this.init(sessionConfig.threshold, sessionConfig.partyIds);
             this.directMessages = new MessageQueueArray(this.finalRound + 1);
-            this.messages = new MessageQueueMap(P2P_PORTS, KeygenSessionManager.finalRound + 1);
+            this.messages = new MessageQueueMap(this.validators, KeygenSessionManager.finalRound + 1);
 
             this.rounds = KeygenRounds.reduce((accumulator, round, i) => {
                   accumulator[i] = {
