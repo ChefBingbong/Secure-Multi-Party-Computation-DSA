@@ -45,7 +45,7 @@ yarn
 ```
 make sure you have redis installed on your machine. if not you can download it from here https://redis.io/download/. Once redis in stalled initialize a local redis instance by running 
 ```
-redis server
+redis-server
 ```
 then in order to start a new node past the following config into your terminal ```
 ```
