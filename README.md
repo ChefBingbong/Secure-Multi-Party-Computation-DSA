@@ -35,4 +35,5 @@ Every party will then verifier every other parties message add it to the commits
 ### P2P Network and Http Api
 I have also implemented a p2p network and http server to allow nodes to interact over the network. the current state of the p2p network has full peer sync, broadcasting, and direct message capabilities aswell as REST endpoints for individually sending messages to other peers aswell as envoking the TSS protocol. The next step is to handle the keygen generation process over the p2p network.
 
-
+### In Memory DB with redis
+ive implemented an in memory database to store the state of the validators array to Disk such that when a new node joins the network they dont need to provide an configuration about the existing state of the VM before they joined. this in combination with state relplication amoung nodes keeps the validators list up-to-date always amoungst all nodes, new and old.
