@@ -42,7 +42,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
             this.log = this.getLogger("p2p-log");
             this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
-            this.updateReplica();
+            this.updateReplica(Number(this.NODE_ID), "CONNECT");
             P2pServer.validators = new Map([[config.p2pPort, this.validator.toString()]]);
 
             new KeygenSessionManager(this.validator);
@@ -50,17 +50,23 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.initState();
       }
 
-      private async updateReplica(): Promise<void> {
+      private async updateReplica(p: number, type: "DISCONNECT" | "CONNECT"): Promise<void> {
             let peers = await redisClient.getSingleData<number[]>("validators");
             if (!peers) {
-                  await redisClient.setSignleData("validators", [Number(config.p2pPort)]);
-                  peers = [Number(config.p2pPort)];
+                  await redisClient.setSignleData("validators", [p]);
+                  peers = [p];
             }
-            peers = [...peers, Number(this.NODE_ID)].filter((value, index, self) => {
-                  return self.indexOf(value) === index;
-            });
+            if (type === "DISCONNECT")
+                  peers = [...peers].filter((value, index, self) => {
+                        return self.indexOf(value) === index && value !== p;
+                  });
+            else
+                  peers = [...peers, p].filter((value, index, self) => {
+                        return self.indexOf(value) === index;
+                  });
+
             this.validators = peers.map((p) => p.toString());
-            this.threshold = this.validators.length;
+            this.threshold = this.validators.length - 1;
       }
 
       private initState() {
@@ -131,8 +137,8 @@ class P2pServer extends AppLogger implements P2PNetwork {
             if (!this.isInitialized) this.throwError(`Cannot listen before server is initialized`);
 
             this.server.listen(port, "0.0.0.0", () => {
-                  this.handlePeerConnection(async () => await this.updateReplica());
-                  this.handlePeerDisconnect(async () => await this.updateReplica());
+                  this.handlePeerConnection(async (p: number) => await this.updateReplica(p, "CONNECT"));
+                  this.handlePeerDisconnect(async (p: number) => await this.updateReplica(p, "DISCONNECT"));
 
                   this.handleBroadcastMessage(async () => {});
                   this.handleDirectMessage(async () => {});
@@ -278,17 +284,17 @@ class P2pServer extends AppLogger implements P2PNetwork {
             });
       };
 
-      private handlePeerConnection = (callback?: () => Promise<void>) => {
+      private handlePeerConnection = (callback?: (p: number, type: string) => Promise<void>) => {
             this.on("connect", async ({ nodeId }: { nodeId: string }) => {
                   this.log.info(`New node connected: ${nodeId}`);
-                  await callback();
+                  await callback(Number(nodeId), "CONNECT");
             });
       };
 
-      private handlePeerDisconnect = (callback?: () => Promise<void>) => {
+      private handlePeerDisconnect = (callback?: (p: number, type: string) => Promise<void>) => {
             this.on("disconnect", async ({ nodeId }: { nodeId: string }) => {
                   this.log.info(`Node disconnected: ${nodeId}`);
-                  await callback();
+                  await callback(Number(nodeId), "DISCONNECT");
             });
       };
 

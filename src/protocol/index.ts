@@ -27,7 +27,7 @@ export const startProtocol = async (): Promise<void> => {
 
       const peers = await updatePeerReplica(port);
       app.start(peers);
-
+      // await redisClient.client.flushall();
       process
             .on("SIGINT", async (reason) => {
                   log.error(`SIGINT. ${reason}`);
