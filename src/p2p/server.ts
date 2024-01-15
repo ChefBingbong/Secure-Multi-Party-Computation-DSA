@@ -66,7 +66,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   });
 
             this.validators = peers.map((p) => p.toString());
-            this.threshold = this.validators.length - 1;
+            this.threshold = this.validators.length;
       }
 
       private initState() {
@@ -288,6 +288,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.on("connect", async ({ nodeId }: { nodeId: string }) => {
                   this.log.info(`New node connected: ${nodeId}`);
                   await callback(Number(nodeId), "CONNECT");
+                  console.log(this.threshold, this.validators);
             });
       };
 
@@ -295,6 +296,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.on("disconnect", async ({ nodeId }: { nodeId: string }) => {
                   this.log.info(`Node disconnected: ${nodeId}`);
                   await callback(Number(nodeId), "DISCONNECT");
+                  console.log(this.threshold, this.validators);
             });
       };
 
