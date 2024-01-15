@@ -7,7 +7,7 @@ this work is not complete. so far i have only started working on the keygen step
 
 ## Scheme Overview
 This TSS protocol is based from the paper https://eprint.iacr.org/2021/060.pdf and consists of four phases; one phase for generating the (shared) key which is run once, one phase to refresh the secret key-shares and to generate the auxiliary information required for
-signing, one to preprocess signatures before the messages are known, and finally, one for calculating and communicating the signature-shares once the message to be signed is known. my implementation is also based on this golang implementation https://github.com/taurusgroup/multi-party-sig https://github.com/burmisov/mpc-tss-js/tree/main for guidance
+signing, one to preprocess signatures before the messages are known, and finally, one for calculating and communicating the signature-shares once the message to be signed is known. my implementation is also based on this golang implementation [https://github.com/taurusgroup/multi-party-sig https://github.com/burmisov/mpc-tss-js/tree/main](https://github.com/taurusgroup/multi-party-sig) for guidance
 
 ### Key Generation:
 Participants work together to create a shared private key without revealing it entirely. The public key is derived from this collaboration.
