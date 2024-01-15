@@ -52,6 +52,10 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
       private async updateReplica(): Promise<void> {
             let peers = await redisClient.getSingleData<number[]>("validators");
+            if (!peers) {
+                  await redisClient.setSignleData("validators", [Number(config.p2pPort)]);
+                  peers = [Number(config.p2pPort)];
+            }
             peers = [...peers, Number(this.NODE_ID)].filter((value, index, self) => {
                   return self.indexOf(value) === index;
             });
@@ -302,6 +306,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                               partyIds: this.validators,
                               threshold: this.threshold,
                         });
+                        // await delay(1000);
                         await KeygenSessionManager.finalizeCurrentRound(0);
                   }
                   await callback();

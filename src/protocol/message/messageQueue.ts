@@ -36,7 +36,7 @@ export class MessageQueueMap<T> {
       }
 
       public getRoundValues(round: number): Array<T | null> {
-            return this.queueMap[round] ? Object.values(this.queueMap[round]) : [];
+            return this.queueMap[round] ? Object.values(this.queueMap[round]).filter((item) => item !== null) : [];
       }
 
       public getRoundMessagesLen(round: number): number {
