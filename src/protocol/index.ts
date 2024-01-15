@@ -5,17 +5,22 @@ import App from "../http/app";
 
 export let app: App;
 
-export const updatePeerReplica = async (port: number): Promise<number[]> => {
+export const updatePeerReplica = async (port: number, type: "DISCONNECT" | "CONNECT"): Promise<number[]> => {
       let peers = await redisClient.getSingleData<number[]>("validators");
       if (!peers) {
-            await redisClient.setSignleData("validators", [Number(config.p2pPort)]);
-            peers = [Number(config.p2pPort)];
+            await redisClient.setSignleData("validators", [port]);
+            peers = [port];
       }
-      const updatedPeers = [...peers, port].filter((value, index, self) => {
-            return self.indexOf(value) === index;
-      });
-      await redisClient.setSignleData("validators", updatedPeers);
-      return updatedPeers;
+      if (type === "DISCONNECT")
+            peers = [...peers].filter((value, index, self) => {
+                  return self.indexOf(value) === index && value !== port;
+            });
+      else
+            peers = [...peers, port].filter((value, index, self) => {
+                  return self.indexOf(value) === index;
+            });
+      await redisClient.setSignleData("validators", peers);
+      return peers;
 };
 
 export const startProtocol = async (): Promise<void> => {
@@ -25,28 +30,28 @@ export const startProtocol = async (): Promise<void> => {
       const port = Number(config.p2pPort);
       const log = app.getLogger("app");
 
-      const peers = await updatePeerReplica(port);
+      const peers = await updatePeerReplica(port, "CONNECT");
       app.start(peers);
       // await redisClient.client.flushall();
       process
             .on("SIGINT", async (reason) => {
                   log.error(`SIGINT. ${reason}`);
-                  await updatePeerReplica(port);
+                  await updatePeerReplica(port, "DISCONNECT");
                   process.exit();
             })
             .on("SIGTERM", async (reason) => {
                   log.error(`SIGTERM. ${reason}`);
-                  await updatePeerReplica(port);
+                  await updatePeerReplica(port, "DISCONNECT");
                   process.exit();
             })
             .on("unhandledRejection", async (reason) => {
                   log.error(`Unhandled Rejection at Promise. Reason: ${reason}`);
-                  await updatePeerReplica(port);
+                  await updatePeerReplica(port, "DISCONNECT");
                   process.exit(-1);
             })
             .on("uncaughtException", async (reason) => {
                   log.error(`Uncaught Exception Rejection at Promise. Reason: ${reason}`);
-                  await updatePeerReplica(port);
+                  await updatePeerReplica(port, "DISCONNECT");
                   process.exit(-2);
             });
 };
