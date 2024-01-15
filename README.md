@@ -7,7 +7,7 @@ this work is not complete. so far i have only started working on the keygen step
 
 ## Scheme Overview
 This TSS protocol is based from the paper https://eprint.iacr.org/2021/060.pdf and consists of four phases; one phase for generating the (shared) key which is run once, one phase to refresh the secret key-shares and to generate the auxiliary information required for
-signing, one to preprocess signatures before the messages are known, and finally, one for calculating and communicating the signature-shares once the message to be signed is known. my implementation is also based on this golang implementation https://github.com/taurusgroup/multi-party-sig for guidance
+signing, one to preprocess signatures before the messages are known, and finally, one for calculating and communicating the signature-shares once the message to be signed is known. my implementation is also based on this golang implementation [https://github.com/taurusgroup/multi-party-sig https://github.com/burmisov/mpc-tss-js/tree/main](https://github.com/taurusgroup/multi-party-sig) for guidance
 
 ### Key Generation:
 Participants work together to create a shared private key without revealing it entirely. The public key is derived from this collaboration.
@@ -35,4 +35,53 @@ Every party will then verifier every other parties message add it to the commits
 ### P2P Network and Http Api
 I have also implemented a p2p network and http server to allow nodes to interact over the network. the current state of the p2p network has full peer sync, broadcasting, and direct message capabilities aswell as REST endpoints for individually sending messages to other peers aswell as envoking the TSS protocol. The next step is to handle the keygen generation process over the p2p network.
 
+### In Memory DB with redis
+ive implemented an in memory database to store the state of the validators array to Disk such that when a new node joins the network they dont need to provide an configuration about the existing state of the VM before they joined. this in combination with state relplication amoung nodes keeps the validators list up-to-date always amoungst all nodes, new and old.
 
+## Usage
+to use this and run the keygen process yourself. first clone the repo run 
+```
+yarn
+```
+make sure you have redis installed on your machine. if not you can download it from here https://redis.io/download/. Once redis in stalled initialize a local redis instance by running 
+```
+redis-server
+```
+then in order to start a new node past the following config into your terminal ```
+```
+export PORT=portNumber P2P_PORT=p2pPort NODE_ENV=development
+nvm use 21.0.0
+yarn start:dev
+```
+You will then have a new node in the P2P network. run this command for maybe 4 or 5 nodes on their own terminal window to set up a demo playground. once done you can start the keygen process by calling
+```
+POST- http://localhost:3001/start
+```
+you can start the process from any node but. i have not yet imoplemented a leader election this will come soon. 
+
+### Other methods
+```
+GET- http://localhost:3001/validators
+```
+returns a lost of all validators currently active in the network
+
+```
+POST- http://localhost:3001/direct-message?id=id
+```
+send a direct message to a node (test default message will add ability to send custom later)
+
+```
+POST- http://localhost:3001/broadcast
+```
+broadcast a message to all nodes (test default message will add ability to send custom later)
+
+```
+GET- http://localhost:3001/get-direct-message?roundId=roundId
+```
+get all direct messages sent to a particular node for a given roundId. if no value is passed for `roundId`, all direct messages for that node will be returned instead
+
+```
+GET- http://localhost:3001/get-message?roundOd=roundId
+```
+get all broadcast messages sent to a particular node for a given roundId. if no value is passed for `roundId`, all broadcast messages for that node will be returned instead
+`
