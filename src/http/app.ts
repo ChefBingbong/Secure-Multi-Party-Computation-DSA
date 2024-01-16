@@ -65,6 +65,12 @@ export class App extends AppLogger implements AppInterface {
             this.router.post("/broadcast", handlers.postBroadcast);
             this.router.post("/start", handlers.postStart);
             this.router.post("/elect-leader", handlers.postElectLeader);
+
+            this.router.get("/blocks", handlers.getBlocks);
+            this.router.get("/transactions", handlers.getTransactions);
+            this.router.get("/public-key", handlers.getPublicKey);
+            this.router.post("/create-transaction", handlers.createTransaction);
+            this.router.get("/balance", handlers.getBalance);
       }
 
       private configureErrorHandling(): void {

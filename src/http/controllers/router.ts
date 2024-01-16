@@ -8,6 +8,35 @@ export const getRoot = (req: Request, res: Response) => {
       res.status(200).send({ result: "ok" });
 };
 
+export const getBlocks = (req: Request, res: Response) => {
+      res.json(app.p2pServer.chain.chain);
+};
+
+export const getPublicKey = (req: Request, res: Response) => {
+      res.json({ publicKey: app.p2pServer.wallet.publicKey });
+};
+
+export const getBalance = (req: Request, res: Response) => {
+      res.json({ balance: app.p2pServer.chain.getBalance(app.p2pServer.wallet.publicKey) });
+};
+
+export const getTransactions = (req: Request, res: Response) => {
+      res.json(app.p2pServer.transactionPool.transactions);
+};
+
+export const createTransaction = (req: Request, res: Response) => {
+      const { to, amount, type } = req.body;
+      const transaction = app.p2pServer.wallet.createTransaction(
+            to,
+            amount,
+            type,
+            app.p2pServer.chain,
+            app.p2pServer.transactionPool
+      );
+      app.p2pServer.sendTransaction(transaction);
+      res.redirect("/transactions");
+};
+
 export const getValidators = (req: Request, res: Response, next: NextFunction) => {
       try {
             const partyIds = P2pServer.getAllValidators();

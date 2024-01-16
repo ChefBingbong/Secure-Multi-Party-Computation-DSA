@@ -13,7 +13,7 @@ enum TRANSACTION_TYPE {
 }
 
 class Blockchain {
-      private chain: Block[];
+      public chain: Block[];
       private stakes: Stake;
       private accounts: Account;
       private validators: Validators;
@@ -56,6 +56,7 @@ class Blockchain {
       }
 
       replaceChain(newChain: Block[]): void {
+            console.log(newChain.length, this.chain.length);
             if (newChain.length <= this.chain.length) {
                   console.log("Received chain is not longer than the current chain");
                   return;
@@ -88,8 +89,8 @@ class Blockchain {
             if (
                   block.lastHash === lastBlock.hash &&
                   block.hash === Block.blockHash(block) &&
-                  Block.verifyBlock(block) &&
-                  Block.verifyLeader(block, this.getLeader())
+                  Block.verifyBlock(block)
+                  // Block.verifyLeader(block, this.getLeader())
             ) {
                   console.log("block valid");
                   this.addBlock(block);
