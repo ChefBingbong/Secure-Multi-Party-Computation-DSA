@@ -1,135 +1,103 @@
-import Block from "./block";
-import Stake from "./stake";
-import Account from "./account";
-import { ValidatorsGroup } from "../protocol/validators/validators";
+import { Logger } from "winston";
+import { redisClient } from "../db/redis";
+import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import Wallet from "../wallet/wallet";
+import Block from "./block";
 
-let secret = "i am the first leader";
-
-enum TRANSACTION_TYPE {
-      transaction = "TRANSACTION",
-      stake = "STAKE",
-      validator_fee = "VALIDATOR_FEE",
+export interface BlockchainInterface {
+      addBlock(data: any): Promise<Block>;
+      createBlock(transactions: any, wallet: Wallet): Block;
+      isValidChain(chain: Block[]): boolean;
+      replaceChain(newChain: Block[]): Promise<void>;
+      isValidBlock(block: Block): boolean;
 }
 
-class Blockchain {
+class Blockchain implements BlockchainInterface {
       public chain: Block[];
-      private stakes: Stake;
-      private accounts: Account;
       public leader: string;
+      private logger: Logger;
 
-      constructor(initialAccount?: string) {
+      constructor(logger: Logger) {
+            this.logger = logger;
             this.chain = [Block.genesis()];
-            this.stakes = new Stake();
-            this.accounts = new Account(initialAccount);
       }
 
-      addBlock(data: any): Block {
-            const block = Block.createBlock(this.chain[this.chain.length - 1], data, new Wallet(secret));
+      public async addBlock(data: any): Promise<Block> {
+            try {
+                  const initialNode = new Wallet("initial node");
+                  const block = Block.createBlock(this.chain[this.chain.length - 1], data, initialNode);
 
-            this.chain.push(block);
-            console.log("NEW BLOCK ADDED");
-            return block;
+                  this.chain = [...this.chain, block];
+                  await redisClient.setSignleData<any>("chain", this.chain);
+
+                  return block;
+            } catch (error) {
+                  throw new ErrorWithCode(
+                        `Errored interbnally: Failed to create genesis block`,
+                        ProtocolError.INTERNAL_ERROR
+                  );
+            }
       }
 
-      createBlock(transactions: any, wallet: Wallet): Block {
+      public createBlock(transactions: any, wallet: Wallet): Block {
             const block = Block.createBlock(this.chain[this.chain.length - 1], transactions, wallet);
             return block;
       }
 
-      isValidChain(chain: Block[]): boolean {
+      public isValidChain(chain: Block[]): boolean {
             if (JSON.stringify(chain[0]) !== JSON.stringify(Block.genesis())) {
+                  this.logger.log(`info`, `the current geneisis state doest not match the orginal`);
                   return false;
             }
-
-            for (let i = 1; i < chain.length; i++) {
-                  const block = chain[i];
-                  const lastBlock = chain[i - 1];
+            for (let chainIndex = 1; chainIndex < chain.length; chainIndex++) {
+                  const block = chain[chainIndex];
+                  const lastBlock = chain[chainIndex - 1];
 
                   if (block.lastHash !== lastBlock.hash || block.hash !== Block.blockHash(block)) {
+                        this.logger.log(`info`, `chain not valid. Data between blockcks does not match`);
                         return false;
                   }
             }
-
             return true;
       }
 
-      replaceChain(newChain: Block[]): void {
-            console.log(newChain.length, this.chain.length);
-            if (newChain.length <= this.chain.length) {
-                  console.log("Received chain is not longer than the current chain");
-                  return;
-            } else if (!this.isValidChain(newChain)) {
-                  console.log("Received chain is invalid");
-                  return;
+      public async replaceChain(newChain: Block[]): Promise<void> {
+            try {
+                  if (newChain.length <= this.chain.length) {
+                        this.logger.log(`info`, `Received chain is not longer than the current chain`);
+                        return;
+                  }
+                  if (!this.isValidChain(newChain)) {
+                        this.logger.log(`info`, `Received chain is invalid`);
+                        return;
+                  }
+                  // this.executeChain(newChain);
+                  this.chain = newChain;
+                  await redisClient.setSignleData<any>("chain", newChain);
+            } catch (error) {
+                  throw new ErrorWithCode(
+                        `Errored interbnally: Failed to replace and sync chain`,
+                        ProtocolError.INTERNAL_ERROR
+                  );
             }
-
-            console.log("Replacing the current chain with a new chain");
-            this.resetState();
-            this.executeChain(newChain);
-            this.chain = newChain;
       }
 
-      getBalance(publicKey: string): number {
-            return this.accounts.getBalance(publicKey);
-      }
-
-      initialize(address: string): void {
-            this.accounts.initialize(address);
-            this.stakes.initialize(address);
-      }
-
-      isValidBlock(block: Block): boolean {
+      public isValidBlock(block: Block): boolean {
             const lastBlock = this.chain[this.chain.length - 1];
             if (
-                  block.lastHash === lastBlock.hash &&
-                  block.hash === Block.blockHash(block) &&
-                  Block.verifyBlock(block) &&
-                  Block.verifyLeader(block, this.leader)
-            ) {
-                  console.log("block valid");
-                  this.addBlock(block);
-                  this.executeTransactions(block);
-                  return true;
-            } else {
+                  block.lastHash !== lastBlock.hash ||
+                  block.hash !== Block.blockHash(block) ||
+                  !Block.verifyBlock(block) ||
+                  !Block.verifyLeader(block, this.leader)
+            )
                   return false;
-            }
+            this.addBlock(block);
+            return true;
       }
 
-      executeTransactions(block: Block): void {
-            block.data.forEach((transaction) => {
-                  switch (transaction.type) {
-                        case TRANSACTION_TYPE.transaction:
-                              this.accounts.update(transaction);
-                              this.accounts.transferFee(block, transaction);
-                              break;
-                        case TRANSACTION_TYPE.stake:
-                              this.stakes.update(transaction);
-                              this.accounts.decrement(transaction.input.from, transaction.output.amount);
-                              this.accounts.transferFee(block, transaction);
-                              break;
-                        case TRANSACTION_TYPE.validator_fee:
-                              console.log("VALIDATOR_FEE");
-                              // if (this.validators.update(transaction)) {
-                              //       this.accounts.decrement(transaction.input.from, transaction.output.amount);
-                              //       this.accounts.transferFee(block, transaction);
-                              // }
-                              break;
-                  }
-            });
-      }
-
-      executeChain(chain: Block[]): void {
-            chain.forEach((block) => {
-                  this.executeTransactions(block);
-            });
-      }
-
-      resetState(): void {
+      public resetState = (): void => {
             this.chain = [Block.genesis()];
-            this.stakes = new Stake();
-            this.accounts = new Account();
-      }
+      };
 }
 
 export default Blockchain;

@@ -1,11 +1,20 @@
 import ChainUtil from "../utils/chainUtil";
 import { TRANSACTION_FEE } from "../config/config";
+import { ErrorWithCode, ProtocolError } from "../utils/errors";
 
-class Transaction {
-      id: string;
-      type: string | null;
-      input: { timestamp: number; from: string; signature: string } | null;
-      output: { to: string; amount: number; fee: number } | null;
+export type TransactonInput = { timestamp: number; from: string; signature: string };
+export type TransactonOutput<T extends any> = { to: string; amount: T; fee: number };
+
+export interface BaseTransactionInterface<T> {
+      newTransaction(senderWallet: any, to: string, amount: T, type: string): Transaction<T> | undefined;
+      signTransaction(transaction: Transaction<any>, senderWallet: any): void;
+      verifyTransaction(transaction: Transaction<any>): boolean;
+}
+class Transaction<T extends any> implements BaseTransactionInterface<T> {
+      public id: string;
+      public type: string | null;
+      public input: TransactonInput | null;
+      public output: TransactonOutput<T> | null;
 
       constructor() {
             this.id = ChainUtil.id();
@@ -14,38 +23,45 @@ class Transaction {
             this.output = null;
       }
 
-      static newTransaction(
-            senderWallet: any, // Replace with the actual type of senderWallet
+      public newTransaction<DataFormat extends any>(
+            senderWallet: any,
             to: string,
-            amount: number,
+            amount: DataFormat,
             type: string
-      ): Transaction | undefined {
-            // if (amount + TRANSACTION_FEE > senderWallet.balance) {
-            //       console.log(`Amount : ${amount} exceeds the balance`);
-            //       return undefined;
-            // }
-
-            return Transaction.generateTransaction(senderWallet, to, amount, type);
+      ): Transaction<DataFormat> | undefined {
+            return this.generateTransaction<DataFormat>(senderWallet, to, amount, type);
       }
 
-      static generateTransaction(
-            senderWallet: any, // Replace with the actual type of senderWallet
+      private generateTransaction<DataFormat extends any>(
+            senderWallet: any,
             to: string,
-            amount: number,
+            amount: DataFormat,
             type: string
-      ): Transaction {
-            const transaction = new this();
-            transaction.type = type;
-            transaction.output = {
-                  to: to,
-                  amount: amount - TRANSACTION_FEE,
-                  fee: TRANSACTION_FEE,
-            };
-            Transaction.signTransaction(transaction, senderWallet);
-            return transaction;
+      ): Transaction<DataFormat> | undefined {
+            try {
+                  const transaction = new Transaction<DataFormat>();
+                  if (!transaction) {
+                        throw new ErrorWithCode(
+                              `Errored interbnally: Failed to generate transaction`,
+                              ProtocolError.INTERNAL_ERROR
+                        );
+                  }
+                  transaction.type = type;
+                  transaction.output = {
+                        to: to,
+                        amount: (amount as number) - TRANSACTION_FEE,
+                        fee: TRANSACTION_FEE,
+                  } as any;
+
+                  this.signTransaction(transaction, senderWallet);
+                  return transaction;
+            } catch (error) {
+                  console.error(error);
+                  return undefined;
+            }
       }
 
-      static signTransaction(transaction: Transaction, senderWallet: any): void {
+      public signTransaction(transaction: Transaction<any>, senderWallet: any): void {
             transaction.input = {
                   timestamp: Date.now(),
                   from: senderWallet.publicKey,
@@ -53,7 +69,7 @@ class Transaction {
             };
       }
 
-      static verifyTransaction(transaction: Transaction): boolean {
+      public verifyTransaction(transaction: Transaction<any>): boolean {
             return ChainUtil.verifySignature(
                   transaction.input.from,
                   transaction.input.signature,

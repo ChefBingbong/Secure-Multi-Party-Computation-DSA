@@ -17,10 +17,6 @@ export const getPublicKey = (req: Request, res: Response) => {
       res.json({ publicKey: app.p2pServer.validator.publicKey });
 };
 
-export const getBalance = (req: Request, res: Response) => {
-      res.json({ balance: app.p2pServer.chain.getBalance(app.p2pServer.wallet.publicKey) });
-};
-
 export const getTransactions = (req: Request, res: Response) => {
       res.json(app.p2pServer.transactionPool.transactions);
 };
@@ -31,7 +27,6 @@ export const createTransaction = (req: Request, res: Response) => {
             to,
             amount,
             type,
-            app.p2pServer.chain,
             app.p2pServer.transactionPool
       );
       app.p2pServer.sendTransaction(transaction);

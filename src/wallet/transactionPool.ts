@@ -1,40 +1,40 @@
 import Transaction from "./transaction";
 import { TRANSACTION_THRESHOLD } from "../config/config";
 
-class TransactionPool {
-      transactions: Transaction[];
+export interface BaseTransactionPoolInterface {
+      transactions: Transaction<any>[];
+      addTransaction<T extends any>(transaction: Transaction<T>): boolean;
+      validTransactions<T extends any>(): Transaction<T>[];
+}
 
-      constructor() {
-            this.transactions = [];
-      }
+class TransactionPool implements BaseTransactionPoolInterface {
+      public transactions: Transaction<any>[] = [];
 
-      thresholdReached(): boolean {
+      public thresholdReached(): boolean {
             console.log(this.transactions.length);
             return this.transactions.length >= TRANSACTION_THRESHOLD;
       }
 
-      addTransaction(transaction: Transaction): boolean {
+      public addTransaction<T extends {}>(transaction: Transaction<T>): boolean {
             this.transactions.push(transaction);
             return this.thresholdReached();
       }
 
-      validTransactions(): Transaction[] {
+      public validTransactions<T extends any>(): Transaction<T>[] {
             return this.transactions.filter((transaction) => {
-                  if (!Transaction.verifyTransaction(transaction)) {
+                  if (!transaction.verifyTransaction(transaction)) {
                         console.log(`Invalid signature from ${transaction.input.from}`);
                         return false;
                   }
-
                   return true;
             });
       }
 
-      transactionExists(transaction: Transaction): Transaction | undefined {
-            // console.log(this.transactions.find((t) => t?.id === transaction?.id));
+      public transactionExists<T extends any>(transaction: Transaction<T>): Transaction<T> | undefined {
             return this.transactions.find((t) => t?.id === transaction?.id);
       }
 
-      clear(): void {
+      public clear(): void {
             this.transactions = [];
       }
 }
