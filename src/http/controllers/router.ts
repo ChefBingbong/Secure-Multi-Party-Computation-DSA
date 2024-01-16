@@ -18,6 +18,24 @@ export const getValidators = (req: Request, res: Response, next: NextFunction) =
       }
 };
 
+export const getLeader = async (req: Request, res: Response, next: NextFunction) => {
+      try {
+            const leader = await P2pServer.getLeader();
+            res.status(200).json({ leader });
+      } catch (error) {
+            next(error);
+      }
+};
+
+export const getShare = async (req: Request, res: Response, next: NextFunction) => {
+      try {
+            const leader = app.p2pServer.validator.getShare();
+            res.status(200).json({ leader });
+      } catch (error) {
+            next(error);
+      }
+};
+
 export const getDirectMessages = (req: Request, res: Response, next: NextFunction) => {
       try {
             const roundId = Number(req.query.roundId?.toString());
@@ -66,6 +84,16 @@ export const postBroadcast = (req: Request, res: Response, next: NextFunction) =
 export const postStart = async (req: Request, res: Response, next: NextFunction) => {
       try {
             await app.p2pServer.startKeygen();
+            res.status(200).json();
+      } catch (error) {
+            console.log(error);
+            next(error);
+      }
+};
+
+export const postElectLeader = async (req: Request, res: Response, next: NextFunction) => {
+      try {
+            await app.p2pServer.electNewLeader();
             res.status(200).json();
       } catch (error) {
             console.log(error);

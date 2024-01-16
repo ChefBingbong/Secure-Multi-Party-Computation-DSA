@@ -33,6 +33,9 @@ export class KeygenRound5 extends AbstractKeygenRound {
       }
 
       public async process(): Promise<KeygenRound5Output> {
+            this.output = {
+                  UpdatedConfig: this.input.UpdatedConfig,
+            };
             return {
                   UpdatedConfig: this.input.UpdatedConfig,
             };

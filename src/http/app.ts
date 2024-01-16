@@ -57,11 +57,14 @@ export class App extends AppLogger implements AppInterface {
             // Define routes
             this.router.get("/", handlers.getRoot);
             this.router.get("/validators", handlers.getValidators);
+            this.router.get("/leader", handlers.getLeader);
+            this.router.get("/get-share", handlers.getShare);
             this.router.get("/get-direct-messages", handlers.getDirectMessages);
             this.router.get("/get-messages", handlers.getMessages);
             this.router.post("/direct-message", handlers.postDirectMessage);
             this.router.post("/broadcast", handlers.postBroadcast);
             this.router.post("/start", handlers.postStart);
+            this.router.post("/elect-leader", handlers.postElectLeader);
       }
 
       private configureErrorHandling(): void {

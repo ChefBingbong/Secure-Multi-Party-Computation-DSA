@@ -14,12 +14,16 @@ import {
       SessionConfig,
 } from "../mpc/keygen/types";
 import { Hasher } from "../mpc/utils/hasher";
-import { delay } from "../p2p/server";
+import P2pServer, { delay } from "../p2p/server";
 import { app } from "./index";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
 import { KeygenCurrentState, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
 import Validator from "./validators/validator";
+import { ErrorWithCode, ProtocolError } from "../utils/errors";
+import { extractError } from "../utils/extractError";
+import { MESSAGE_TYPES } from "./utils/utils";
+import { redisClient } from "../db/redis";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -78,7 +82,7 @@ export class KeygenSessionManager extends AppLogger {
             this.session.init({ sessionConfig });
 
             if (!this.session.output.vssSecret) {
-                  throw new Error(`session is not initialized`);
+                  throw new ErrorWithCode(`Session was not initialized correctly.`, ProtocolError.PARAMETER_ERROR);
             }
             this.sessionInitialized = true;
       }
@@ -125,7 +129,7 @@ export class KeygenSessionManager extends AppLogger {
                   const bcsLen = this.storePeerBroadcastResponse(broadcasts, round, currentRound, data.senderNode);
                   const proofsLen = this.storePeerProofs(proof, currentRound);
 
-                  if (proofsLen === this.threshold - 1) this.verifyAndEndSession(this.proofs);
+                  if (proofsLen === this.threshold) await this.verifyAndEndSession(this.proofs);
 
                   if (
                         round.isBroadcastRound &&
@@ -140,7 +144,7 @@ export class KeygenSessionManager extends AppLogger {
                         await this.finalizeCurrentRound(currentRound);
                   }
             } catch (error) {
-                  console.log(error);
+                  throw new Error(extractError(error));
             }
       };
 
@@ -152,7 +156,10 @@ export class KeygenSessionManager extends AppLogger {
 
                   this.storePeerDirectMessageResponse(directMessages, round, currentRound);
             } catch (error) {
-                  console.log(error);
+                  throw new ErrorWithCode(
+                        `Failed to store direct message response`,
+                        ProtocolError.PARAMETER_ERROR
+                  );
             }
       };
 
@@ -178,7 +185,7 @@ export class KeygenSessionManager extends AppLogger {
 
                   app.p2pServer.broadcast({
                         message: `${this.selfId} is prcessing round ${currentRound}`,
-                        type: "keygenRoundHandler",
+                        type: MESSAGE_TYPES.keygenRoundHandler,
                         data: { broadcasts, proof },
                         senderNode: this.selfId,
                   });
@@ -187,12 +194,12 @@ export class KeygenSessionManager extends AppLogger {
                         await delay(500);
                         app.p2pServer.sendDirect(dm.To, {
                               message: `${this.selfId} is sending direct message to ${dm.To}`,
-                              type: "keygenDirectMessageHandler",
+                              type: MESSAGE_TYPES.keygenDirectMessageHandler,
                               data: { directMessages: dm },
                         });
                   });
-            } catch (err) {
-                  console.log(err);
+            } catch (error) {
+                  throw new Error(extractError(error));
             }
       };
 
@@ -203,7 +210,7 @@ export class KeygenSessionManager extends AppLogger {
             await this.keygenRoundVerifier();
       }
 
-      public static verifyAndEndSession = (proofs: bigint[]) => {
+      public static verifyAndEndSession = async (proofs: bigint[]) => {
             if (!proofs) return;
             for (let i = 0; i < this.threshold - 1; i++) {
                   for (let j = i + 1; j < this.threshold - 1; j++) {
@@ -211,8 +218,10 @@ export class KeygenSessionManager extends AppLogger {
                   }
             }
             console.log(`keygeneration was successful, ${proofs}`);
-            this.validator.PartyKeyShare = this.session.output.UpdatedConfig;
+            this.validator.PartyKeyShare = this.rounds[5].round.output.UpdatedConfig;
             this.resetSessionState();
+            const leader = await redisClient.getSingleData<string>("leader");
+            if (this.selfId === leader) app.p2pServer.electNewLeader();
       };
 
       private static validateRoundBroadcasts(activeRound: AbstractKeygenRound, currentRound: number) {
@@ -446,6 +455,6 @@ export class KeygenSessionManager extends AppLogger {
             this.messages = undefined;
             this.directMessages = undefined;
             this.proofs = [];
-            this.validator.PartyKeyShare = undefined;
+            // this.validator.PartyKeyShare = undefined;
       }
 }

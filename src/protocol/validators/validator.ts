@@ -44,6 +44,10 @@ class Validator {
             return !round ? this.messages.getAll() : this.messages.getRoundValues(round);
       }
 
+      public getShare(): PartySecretKeyConfig | undefined {
+            return this.PartyKeyShare;
+      }
+
       public static parseWalletInfo(templateString: string): WalletInfo | null {
             const matches = templateString.match(/publicKey: (.+?) -\s+validatorId: (.+?) -\s+port: (.+?)$/);
 

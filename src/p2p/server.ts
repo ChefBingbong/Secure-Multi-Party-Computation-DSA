@@ -9,6 +9,7 @@ import { ServerDirectMessage, ServerMessage } from "../protocol/types";
 import Validator from "../protocol/validators/validator";
 import { P2PNetworkEventEmitter } from "./eventEmitter";
 import { P2PNetwork } from "./types";
+import { MESSAGE_TYPES } from "../protocol/utils/utils";
 // const root = protobuf.loadSync("../../types_pb");
 
 // // Obtain the message type
@@ -24,6 +25,9 @@ class P2pServer extends AppLogger implements P2PNetwork {
       public validators: string[];
 
       public static validators: Map<string, string>;
+      public static leader: string;
+      public votes: { voter: string; vote: string }[];
+
       public threshold: number;
       private readonly emitter: P2PNetworkEventEmitter;
       private log: Logger;
@@ -39,7 +43,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.emitter = new P2PNetworkEventEmitter(false);
             this.emitter.on.bind(this.emitter);
             this.emitter.off.bind(this.emitter);
-
+            this.votes = [];
             this.log = this.getLogger("p2p-log");
             this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
             this.updateReplica(Number(this.NODE_ID), "CONNECT");
@@ -138,7 +142,14 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
             this.server.listen(port, "0.0.0.0", () => {
                   this.handlePeerConnection(async (p: number) => await this.updateReplica(p, "CONNECT"));
-                  this.handlePeerDisconnect(async (p: number) => await this.updateReplica(p, "DISCONNECT"));
+
+                  this.handlePeerDisconnect(async (p: number) => {
+                        await this.updateReplica(p, "DISCONNECT");
+
+                        if (P2pServer.leader === p.toString()) {
+                              await this.electNewLeader();
+                        }
+                  });
 
                   this.handleBroadcastMessage(async () => {});
                   this.handleDirectMessage(async () => {});
@@ -157,7 +168,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
             socket.on("error", (err) => {
                   console.error(`Socket connection error: ${err.message}`);
-                  // You can perform error handling logic here
             });
             socket.connect(port, ip, () => {
                   this.handleNewSocket(socket);
@@ -270,10 +280,53 @@ class P2pServer extends AppLogger implements P2PNetwork {
             throw new Error(error);
       };
 
+      public static getLeader = async () => {
+            const leader = this.leader ?? (await redisClient.getSingleData<string>("leader"));
+            if (leader) {
+                  this.leader = leader;
+                  await redisClient.setSignleData("leader", leader);
+            }
+            return leader;
+      };
+
+      public electNewLeader = async () => {
+            let leader = P2pServer.leader ?? (await redisClient.getSingleData<string>("leader"));
+            try {
+                  if (!leader) {
+                        leader = this.NODE_ID;
+                        await redisClient.setSignleData("leader", leader);
+                  } else {
+                        await redisClient.setSignleData("leader", leader);
+                  }
+                  if (KeygenSessionManager.sessionInitialized) {
+                        throw new Error(`cannot elect a new leader while a session is active`);
+                  }
+                  if (this.NODE_ID !== leader) {
+                        throw new Error(`election can only be started by previous rounds leader`);
+                  }
+
+                  this.broadcast({
+                        message: `${this.NODE_ID} is starting a new leader election`,
+                        type: MESSAGE_TYPES.LeaderElection,
+                        senderNode: leader,
+                  });
+            } catch (error) {
+                  this.broadcast({
+                        message: `${this.NODE_ID} is updating leader`,
+                        type: MESSAGE_TYPES.SetNewLeader,
+                        data: { newLeader: leader },
+                  });
+            }
+      };
+
       public startKeygen = async () => {
+            let leader = P2pServer.leader ?? (await redisClient.getSingleData<string>("leader"));
+            if (!leader || this.NODE_ID !== leader) {
+                  throw new Error(`leader has not been initialized or you are not the leader`);
+            }
             this.broadcast({
                   message: `${this.NODE_ID} is starting a new keygen session`,
-                  type: "keygenInit",
+                  type: MESSAGE_TYPES.keygenInit,
             });
       };
 
@@ -305,17 +358,56 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   this.log.info(`${message.message}`);
                   this.validator.messages.set(0, message);
 
-                  if (message.type === `keygenRoundHandler`) {
+                  if (message.type === MESSAGE_TYPES.keygenRoundHandler) {
                         await KeygenSessionManager.keygenRoundProcessor(message);
                   }
-                  if (message.type === `keygenInit`) {
+                  if (message.type === MESSAGE_TYPES.keygenInit) {
                         KeygenSessionManager.startNewSession({
                               selfId: this.NODE_ID,
                               partyIds: this.validators,
                               threshold: this.threshold,
                         });
-                        // await delay(1000);
+
                         await KeygenSessionManager.finalizeCurrentRound(0);
+                  }
+                  if (message.type === MESSAGE_TYPES.LeaderElection) {
+                        let currentLeader = message.senderNode;
+                        try {
+                              const eligibleLalidators = this.validators.filter((v) => v !== currentLeader);
+                              const voteIndex = Math.abs(
+                                    Math.floor(Math.random() * eligibleLalidators.length - 1)
+                              );
+
+                              console.log(voteIndex, eligibleLalidators, currentLeader);
+                              if (voteIndex < 0 || voteIndex > eligibleLalidators.length) {
+                                    throw new Error(`bad vote index. error in leader election`);
+                              }
+                              const thisNodesVoteResult = eligibleLalidators[voteIndex];
+
+                              if (!eligibleLalidators.includes(thisNodesVoteResult)) {
+                                    throw new Error(`bad vote result. error in leader election`);
+                              }
+
+                              this.sendDirect(currentLeader, {
+                                    message: `${this.NODE_ID} voted for ${thisNodesVoteResult}`,
+                                    type: MESSAGE_TYPES.LeaderVote,
+                                    data: { vote: thisNodesVoteResult, validators: eligibleLalidators },
+                                    senderNode: this.NODE_ID,
+                              });
+                        } catch (error) {
+                              this.broadcast({
+                                    message: `${this.NODE_ID} is updating leader`,
+                                    type: MESSAGE_TYPES.SetNewLeader,
+                                    data: { newLeader: currentLeader },
+                              });
+                        }
+                  }
+                  if (message.type === MESSAGE_TYPES.SetNewLeader) {
+                        //@ts-ignore
+                        const newLeader = message.data.newLeader;
+                        P2pServer.leader = newLeader;
+                        await redisClient.setSignleData("leader", newLeader);
+                        console.log(`the new leader is ${newLeader}`);
                   }
                   await callback();
             });
@@ -324,7 +416,8 @@ class P2pServer extends AppLogger implements P2PNetwork {
       private handleDirectMessage = (callback?: () => Promise<void>) => {
             this.on("direct", async ({ message }: { message: ServerDirectMessage }) => {
                   this.log.info(`${message.message}`);
-                  if (message.type === `keygenDirectMessageHandler`) {
+
+                  if (message.type === MESSAGE_TYPES.keygenDirectMessageHandler) {
                         const dm = message.data.directMessages.Data;
                         this.validator.directMessagesMap.set(
                               KeygenSessionManager.currentRound,
@@ -332,6 +425,52 @@ class P2pServer extends AppLogger implements P2PNetwork {
                               dm
                         );
                         await KeygenSessionManager.keygenRoundDirectMessageProcessor(message);
+                  }
+                  if (message.type === MESSAGE_TYPES.LeaderVote) {
+                        let maxVotes = 0;
+                        let winner = P2pServer.leader;
+
+                        try {
+                              // @ts-ignore
+                              const { vote: recievedVote, validators } = message.data;
+                              if (!recievedVote || !validators) {
+                                    throw new Error(`bad vote result. error in leader election`);
+                              }
+
+                              this.votes.push({ voter: message.senderNode, vote: recievedVote });
+                              const voters = this.votes.map((vote) => vote.voter);
+
+                              if (validators.every((itemA) => voters.includes(itemA))) {
+                                    const voteCount: Record<string, number> = {};
+                                    const votes = this.votes.map((vote) => vote.vote);
+
+                                    votes.forEach((v) => (voteCount[v] = voteCount[v] ? voteCount[v] + 1 : 1));
+                                    for (const candidate in voteCount) {
+                                          if (voteCount[candidate] > maxVotes) {
+                                                maxVotes = voteCount[candidate];
+                                                winner = candidate;
+                                          }
+                                    }
+
+                                    this.votes = [];
+                                    P2pServer.leader = winner;
+                                    await redisClient.setSignleData("leader", winner);
+                                    await delay(500);
+
+                                    this.broadcast({
+                                          message: `${this.NODE_ID} is updating leader`,
+                                          type: MESSAGE_TYPES.SetNewLeader,
+                                          data: { newLeader: winner },
+                                    });
+                              }
+                        } catch (error) {
+                              P2pServer.leader = winner;
+                              this.broadcast({
+                                    message: `${this.NODE_ID} is updating leader`,
+                                    type: MESSAGE_TYPES.SetNewLeader,
+                                    data: { newLeader: winner },
+                              });
+                        }
                   }
                   await callback();
             });
