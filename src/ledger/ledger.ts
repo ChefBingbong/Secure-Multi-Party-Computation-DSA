@@ -1,7 +1,7 @@
 import Block from "./block";
 import Stake from "./stake";
 import Account from "./account";
-import Validators from "./validators";
+import { ValidatorsGroup } from "../protocol/validators/validators";
 import Wallet from "../wallet/wallet";
 
 let secret = "i am the first leader";
@@ -16,13 +16,12 @@ class Blockchain {
       public chain: Block[];
       private stakes: Stake;
       private accounts: Account;
-      private validators: Validators;
+      public leader: string;
 
-      constructor() {
+      constructor(initialAccount?: string) {
             this.chain = [Block.genesis()];
             this.stakes = new Stake();
-            this.accounts = new Account();
-            this.validators = new Validators();
+            this.accounts = new Account(initialAccount);
       }
 
       addBlock(data: any): Block {
@@ -75,10 +74,6 @@ class Blockchain {
             return this.accounts.getBalance(publicKey);
       }
 
-      getLeader(): any {
-            return this.stakes.getMax(this.validators.list);
-      }
-
       initialize(address: string): void {
             this.accounts.initialize(address);
             this.stakes.initialize(address);
@@ -89,8 +84,8 @@ class Blockchain {
             if (
                   block.lastHash === lastBlock.hash &&
                   block.hash === Block.blockHash(block) &&
-                  Block.verifyBlock(block)
-                  // Block.verifyLeader(block, this.getLeader())
+                  Block.verifyBlock(block) &&
+                  Block.verifyLeader(block, this.leader)
             ) {
                   console.log("block valid");
                   this.addBlock(block);
@@ -115,10 +110,10 @@ class Blockchain {
                               break;
                         case TRANSACTION_TYPE.validator_fee:
                               console.log("VALIDATOR_FEE");
-                              if (this.validators.update(transaction)) {
-                                    this.accounts.decrement(transaction.input.from, transaction.output.amount);
-                                    this.accounts.transferFee(block, transaction);
-                              }
+                              // if (this.validators.update(transaction)) {
+                              //       this.accounts.decrement(transaction.input.from, transaction.output.amount);
+                              //       this.accounts.transferFee(block, transaction);
+                              // }
                               break;
                   }
             });
@@ -134,7 +129,6 @@ class Blockchain {
             this.chain = [Block.genesis()];
             this.stakes = new Stake();
             this.accounts = new Account();
-            this.validators = new Validators();
       }
 }
 

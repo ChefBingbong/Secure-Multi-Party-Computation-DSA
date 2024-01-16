@@ -9,6 +9,7 @@ class TransactionPool {
       }
 
       thresholdReached(): boolean {
+            console.log(this.transactions.length);
             return this.transactions.length >= TRANSACTION_THRESHOLD;
       }
 
@@ -29,6 +30,7 @@ class TransactionPool {
       }
 
       transactionExists(transaction: Transaction): Transaction | undefined {
+            // console.log(this.transactions.find((t) => t?.id === transaction?.id));
             return this.transactions.find((t) => t?.id === transaction?.id);
       }
 

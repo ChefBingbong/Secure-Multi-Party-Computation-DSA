@@ -1,3 +1,4 @@
+import { eddsa } from "elliptic";
 import ChainUtil from "../utils/chainUtil";
 import Transaction from "./transaction";
 
@@ -12,17 +13,11 @@ class Wallet {
             this.publicKey = this.keyPair.getPublic("hex");
       }
 
-      toString(): string {
-            return `Wallet - 
-        publicKey: ${this.publicKey.toString()}
-        balance  : ${this.balance}`;
-      }
-
-      sign(dataHash: string): string {
+      public sign(dataHash: string): string {
             return this.keyPair.sign(dataHash).toHex();
       }
 
-      createTransaction(
+      public createTransaction(
             to: string,
             amount: number,
             type: string,
@@ -39,11 +34,11 @@ class Wallet {
             return transaction;
       }
 
-      getBalance(blockchain: any): number {
+      public getBalance(blockchain: any): number {
             return blockchain.getBalance(this.publicKey);
       }
 
-      getPublicKey(): string {
+      public getPublicKey(): string {
             return this.publicKey;
       }
 }

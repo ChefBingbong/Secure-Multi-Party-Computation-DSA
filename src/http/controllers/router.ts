@@ -3,6 +3,7 @@ import config from "../../config/config";
 import P2pServer from "../../p2p/server";
 import { app } from "../../protocol";
 import Validator from "../../protocol/validators/validator";
+import { ValidatorsGroup } from "../../protocol/validators/validators";
 
 export const getRoot = (req: Request, res: Response) => {
       res.status(200).send({ result: "ok" });
@@ -13,7 +14,7 @@ export const getBlocks = (req: Request, res: Response) => {
 };
 
 export const getPublicKey = (req: Request, res: Response) => {
-      res.json({ publicKey: app.p2pServer.wallet.publicKey });
+      res.json({ publicKey: app.p2pServer.validator.publicKey });
 };
 
 export const getBalance = (req: Request, res: Response) => {
@@ -26,7 +27,7 @@ export const getTransactions = (req: Request, res: Response) => {
 
 export const createTransaction = (req: Request, res: Response) => {
       const { to, amount, type } = req.body;
-      const transaction = app.p2pServer.wallet.createTransaction(
+      const transaction = app.p2pServer.validator.createTransaction(
             to,
             amount,
             type,
@@ -39,7 +40,7 @@ export const createTransaction = (req: Request, res: Response) => {
 
 export const getValidators = (req: Request, res: Response, next: NextFunction) => {
       try {
-            const partyIds = P2pServer.getAllValidators();
+            const partyIds = ValidatorsGroup.getAllValidators();
             const validatorInfo = partyIds.map((info) => Validator.parseWalletInfo(info));
             res.status(200).json({ partyIds: validatorInfo });
       } catch (error) {

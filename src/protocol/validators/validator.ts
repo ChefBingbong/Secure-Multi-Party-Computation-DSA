@@ -9,6 +9,7 @@ import { MessageQueue } from "../types";
 import ChainUtil from "./chainUtil";
 import { Message as Msg } from "../types";
 import { PartySecretKeyConfig } from "../../mpc/keygen/partyKey";
+import Wallet from "../../wallet/wallet";
 
 export interface WalletInfo {
       publicKey: string;
@@ -16,9 +17,9 @@ export interface WalletInfo {
       port: string;
 }
 
-class Validator {
-      private keyPair: any;
-      private publicKey: string;
+class Validator extends Wallet {
+      public keyPair: any;
+      public publicKey: string;
       public ID: string;
       public nodeId: string;
       public messages: MessageQueueArray<any>;
@@ -26,8 +27,10 @@ class Validator {
       public PartyKeyShare: PartySecretKeyConfig;
 
       constructor() {
+            const secret = Date.now().toString();
+            super(secret);
             this.ID = ChainUtil.id();
-            this.keyPair = ChainUtil.genKeyPair(this.ID);
+            this.keyPair = ChainUtil.genKeyPair(secret);
             this.publicKey = this.keyPair.getPublic("hex");
             this.nodeId = config.p2pPort;
             this.directMessagesMap = new MessageQueueMap([this.nodeId], KeygenSessionManager.finalRound + 1);
@@ -50,9 +53,6 @@ class Validator {
 
       public static parseWalletInfo(templateString: string): WalletInfo | null {
             const matches = templateString.match(/publicKey: (.+?) -\s+validatorId: (.+?) -\s+port: (.+?)$/);
-
-            console.log(matches);
-            console.log(templateString);
 
             if (matches) {
                   const [_, publicKey, validatorId, port] = matches;
@@ -101,14 +101,6 @@ class Validator {
             return `publicKey: ${this.publicKey.toString()} -
                   validatorId: ${this.ID} -
                   port: ${config.p2pPort}`;
-      }
-
-      public sign(dataHash: string): string {
-            return this.keyPair.sign(dataHash).toHex();
-      }
-
-      public sgetPublicKey(): string {
-            return this.publicKey;
       }
 }
 

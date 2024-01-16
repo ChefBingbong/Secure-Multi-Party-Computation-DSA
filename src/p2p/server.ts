@@ -14,6 +14,7 @@ import Blockchain from "../ledger/ledger";
 import Wallet from "../wallet/wallet";
 import TransactionPool from "../wallet/transactionPool";
 import { TRANSACTION_THRESHOLD } from "../config/config";
+import { ValidatorsGroup } from "../protocol/validators/validators";
 
 const MESSAGE_TYPE = {
       chain: "CHAIN",
@@ -38,7 +39,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
       public wallet: Wallet;
       public transactionPool: TransactionPool;
 
-      public static validators: Map<string, string>;
       public static leader: string;
       public votes: { voter: string; vote: string }[];
 
@@ -61,10 +61,9 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.log = this.getLogger("p2p-log");
             this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
             this.updateReplica(Number(this.NODE_ID), "CONNECT");
-            P2pServer.validators = new Map([[config.p2pPort, this.validator.toString()]]);
+            new ValidatorsGroup(this.validator.toString());
 
             this.chain = new Blockchain();
-            this.wallet = new Wallet(Date.now().toString());
             this.transactionPool = new TransactionPool();
 
             new KeygenSessionManager(this.validator);
@@ -87,6 +86,10 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         return self.indexOf(value) === index;
                   });
 
+            const { ports, publickKeys } = ValidatorsGroup.getAllKeys();
+            const leader = publickKeys[ports.indexOf("6001")];
+            this.chain.leader = leader;
+            console.log(this.chain.leader);
             this.validators = peers.map((p) => p.toString());
             this.threshold = this.validators.length;
       }
@@ -106,7 +109,8 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         const validatorId = this.extractValidatorHost(nodeId);
 
                         this.neighbors.set(validatorId, connectionId);
-                        P2pServer.validators.set(validatorId, nodeId);
+                        ValidatorsGroup.update(validatorId, nodeId);
+                        // console.log(this.chain.chain);
                         this.emitter.emitConnect(validatorId, true);
                   }
 
@@ -121,7 +125,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   if (!nodeId) return;
 
                   this.neighbors.delete(nodeId);
-                  P2pServer.validators.delete(nodeId);
+                  ValidatorsGroup.delete(nodeId);
                   this.emitter.emitDisconnect(nodeId, true);
             });
 
@@ -304,18 +308,17 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   data: JSON.stringify({
                         chain: this.chain.chain,
                   }),
-                  senderNode: this.NODE_ID,
             });
       };
 
       public sendTransaction = (transaction: any) => {
+            // console.log(this.chain.getLeader());
             this.broadcast({
                   message: `${this.NODE_ID} sending transaction`,
                   type: MESSAGE_TYPE.transaction,
                   data: JSON.stringify({
                         transaction: transaction,
                   }),
-                  senderNode: this.NODE_ID,
             });
       };
 
@@ -326,7 +329,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   data: JSON.stringify({
                         block: block,
                   }),
-                  senderNode: this.NODE_ID,
             });
       };
 
@@ -381,13 +383,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.broadcast({
                   message: `${this.NODE_ID} is starting a new keygen session`,
                   type: MESSAGE_TYPES.keygenInit,
-            });
-      };
-
-      // static methods
-      public static getAllValidators = () => {
-            return [...P2pServer.validators.values()].filter((value, index, self) => {
-                  return self.indexOf(value) === index;
             });
       };
 
@@ -468,46 +463,40 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         await redisClient.setSignleData("leader", newLeader);
                         console.log(`the new leader is ${newLeader}`);
                   }
-                  console.log(message.type, MESSAGE_TYPE.chain);
-
                   if (message.type === MESSAGE_TYPE.chain) {
                         //@ts-ignore
                         const data = message.data.chain;
-                        console.log(data);
                         this.chain.replaceChain(data);
                   }
-                  // console.log(message.type, MESSAGE_TYPE.chain)
                   if (message.type === MESSAGE_TYPE.transaction) {
                         //@ts-ignore
                         const data = JSON.parse(message.data);
-                        console.log(data);
+
+                        console.log(this.chain.leader, this.validator.getPublicKey());
                         let thresholdReached = null;
                         if (!this.transactionPool.transactionExists(data)) {
                               thresholdReached = this.transactionPool.addTransaction(data);
                               this.sendTransaction(data);
-                              // console.log(thresholdReached);
                         }
                         if (this.transactionPool.thresholdReached()) {
-                              console.log(this.chain.getLeader(), this.wallet.getPublicKey());
-                              // if (this.chain.getLeader() == this.wallet.getPublicKey()) {
-                              console.log("Creating block");
-                              let block = this.chain.createBlock(this.transactionPool.transactions, this.wallet);
-                              this.sendBlock(block);
-                              // }
+                              if (this.chain.leader == this.validator.getPublicKey()) {
+                                    console.log("Creating block");
+                                    let block = this.chain.createBlock(
+                                          this.transactionPool.transactions,
+                                          this.validator
+                                    );
+                                    this.sendBlock(block);
+                              }
                         }
                   }
                   if (message.type === MESSAGE_TYPE.block) {
                         //@ts-ignore
                         const data = JSON.parse(message.data).block;
-                        // console.log(data);
+                        console.log("heyy");
                         if (this.chain.isValidBlock(data)) {
-                              console.log(data);
-
+                              // this.chain.addBlock(data);
+                              // this.chain.executeTransactions(data);
                               this.sendBlock(data);
-                              this.validators.forEach(async (v) => {
-                                    await delay(1000);
-                                    this.sendChain(v);
-                              });
                               this.transactionPool.clear();
                         }
                   }

@@ -2,7 +2,7 @@ import SHA256 from "crypto-js/sha256";
 import ChainUtil from "../utils/chainUtil";
 
 class Block {
-      timestamp: number;
+      timestamp: string | number;
       lastHash: string;
       hash: string;
       data: any[];
@@ -10,7 +10,7 @@ class Block {
       signature: string;
 
       constructor(
-            timestamp: number,
+            timestamp: string | number,
             lastHash: string,
             hash: string,
             data: any[],
@@ -36,7 +36,7 @@ class Block {
       }
 
       static genesis(): Block {
-            return new this(Date.now(), "----", "genesis-hash", []);
+            return new this("genesis time", "----", "genesis-hash", []);
       }
 
       static createBlock(lastBlock: Block, _data: any, wallet: any): Block {
@@ -50,7 +50,7 @@ class Block {
             return new this(timestamp, lastHash, hash, data, validator, signature);
       }
 
-      static hash(timestamp: number, lastHash: string, data: any[]): string {
+      static hash(timestamp: string | number, lastHash: string, data: any[]): string {
             return SHA256(JSON.stringify(`${timestamp}${lastHash}${data}`)).toString();
       }
 
