@@ -8,6 +8,7 @@ import { MessageQueueArray, MessageQueueMap } from "../message/messageQueue";
 import { MessageQueue } from "../types";
 import ChainUtil from "./chainUtil";
 import { Message as Msg } from "../types";
+import { PartySecretKeyConfig } from "../../mpc/keygen/partyKey";
 
 export interface WalletInfo {
       publicKey: string;
@@ -22,6 +23,7 @@ class Validator {
       public nodeId: string;
       public messages: MessageQueueArray<any>;
       public directMessagesMap: MessageQueueMap<KeygenDirectMessageForRound4JSON>;
+      public PartyKeyShare: PartySecretKeyConfig;
 
       constructor() {
             this.ID = ChainUtil.id();
