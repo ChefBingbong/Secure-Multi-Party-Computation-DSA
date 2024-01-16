@@ -4,7 +4,7 @@ import { Logger } from "winston";
 import config from "../config/config";
 import { redisClient } from "../db/redis";
 import { AppLogger } from "../http/middleware/logger";
-import Blockchain from "../ledger/ledger";
+import Blockchain from "../consensus/ledger";
 import { KeygenSessionManager } from "../protocol/keygenProtocol";
 import { ServerDirectMessage, ServerMessage } from "../protocol/types";
 import { MESSAGE_TYPES } from "../protocol/utils/utils";
@@ -14,6 +14,7 @@ import TransactionPool from "../wallet/transactionPool";
 import Wallet from "../wallet/wallet";
 import { P2PNetworkEventEmitter } from "./eventEmitter";
 import { P2PNetwork } from "./types";
+import { ErrorWithCode, ProtocolError } from "../utils/errors";
 
 const MESSAGE_TYPE = {
       chain: "CHAIN",
@@ -25,6 +26,16 @@ const MESSAGE_TYPE = {
 
 // // Obtain the message type
 // const YourMessageType = root.lookupType("YourMessageType");
+export interface NetworkMessageDirect<T> {
+      message: T;
+      id?: string;
+      origin?: string;
+      ttl?: number;
+}
+
+export interface NetworkMessageBroadcast<T> extends NetworkMessageDirect<T> {
+      destination: string;
+}
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -53,20 +64,21 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.connections = new Map();
             this.neighbors = new Map();
             this.NODE_ID = config.p2pPort;
+
             this.emitter = new P2PNetworkEventEmitter(false);
             this.emitter.on.bind(this.emitter);
             this.emitter.off.bind(this.emitter);
+
             this.votes = [];
             this.log = this.getLogger("p2p-log");
-            this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
-            this.updateReplica(Number(this.NODE_ID), "CONNECT");
-            new ValidatorsGroup(this.validator.toString());
 
+            this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
             this.chain = new Blockchain(this.log);
             this.transactionPool = new TransactionPool();
+            this.updateReplica(Number(this.NODE_ID), "CONNECT");
 
+            new ValidatorsGroup(this.validator.toString());
             new KeygenSessionManager(this.validator);
-
             this.initState();
       }
 
@@ -96,7 +108,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.threshold = this.validators.length;
       }
 
-      private initState() {
+      private initState(): void {
             this.emitter.on("_connect", (connectionId) => {
                   this._send(connectionId.connectionId, {
                         type: "handshake",
@@ -112,7 +124,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
                         this.neighbors.set(validatorId, connectionId);
                         ValidatorsGroup.update(validatorId, nodeId);
-                        // console.log(this.chain.chain);
                         this.emitter.emitConnect(validatorId, true);
                   }
 
@@ -167,7 +178,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.server.listen(port, "0.0.0.0", () => {
                   this.handlePeerConnection(async (p: number) => {
                         await this.updateReplica(p, "CONNECT");
-                        // this.sendChain();
                   });
 
                   this.handlePeerDisconnect(async (p: number) => {
@@ -202,19 +212,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
             });
 
             return (cb: Error) => socket.destroy(cb);
-      };
-
-      public close = (cb: () => void) => {
-            for (let [, socket] of this.connections) socket.destroy();
-            this.server.close(cb);
-      };
-
-      public on = (event: string, listener: (...args: any[]) => void) => {
-            this.emitter.on(event, listener);
-      };
-
-      public off = (event: string, listener: (...args: any[]) => void) => {
-            this.emitter.on(event, listener);
       };
 
       public broadcast = (
@@ -303,6 +300,53 @@ class P2pServer extends AppLogger implements P2PNetwork {
             }
       };
 
+      public close = (cb: () => void) => {
+            for (let [, socket] of this.connections) socket.destroy();
+            this.server.close(cb);
+      };
+
+      public on = (event: string, listener: (...args: any[]) => void) => {
+            this.emitter.on(event, listener);
+      };
+
+      public off = (event: string, listener: (...args: any[]) => void) => {
+            this.emitter.on(event, listener);
+      };
+
+      public buildAndSendNetworkMessage = async <
+            Q,
+            T extends NetworkMessageDirect<Q> & NetworkMessageBroadcast<Q>
+      >(
+            type: "BROADCAST" | "DIRECT",
+            data: T
+      ) => {
+            try {
+                  switch (type) {
+                        case "BROADCAST":
+                              await this.broadcast(data.message, data.id, data.origin, data.ttl);
+                              break;
+                        case "DIRECT":
+                              await this.sendDirect(
+                                    data.destination,
+                                    data.message,
+                                    data.id,
+                                    data.origin,
+                                    data.ttl
+                              );
+                              break;
+                        default:
+                              // Handle unexpected type
+                              throw new ErrorWithCode(
+                                    `Invalid message type: ${type}`,
+                                    ProtocolError.INTERNAL_ERROR
+                              );
+                  }
+            } catch (error) {
+                  console.log(error);
+                  throw new ErrorWithCode(`Failed to send message across network`, ProtocolError.INTERNAL_ERROR);
+            }
+      };
+
       public sendChain = (nodeId) => {
             this.sendDirect(nodeId, {
                   message: `${nodeId} sending chain`,
@@ -324,7 +368,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
       };
 
       public sendTransaction = (transaction: any) => {
-            // console.log(this.chain.getLeader());
             this.broadcast({
                   message: `${this.NODE_ID} sending transaction`,
                   type: MESSAGE_TYPE.transaction,
@@ -472,8 +515,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         }
                   }
                   if (message.type === MESSAGE_TYPES.SetNewLeader) {
-                        //@ts-ignore
-                        const newLeader = message.data.newLeader;
+                        const newLeader = (message.data as any).newLeader;
                         const { ports, publickKeys } = ValidatorsGroup.getAllKeys();
                         const newLeaderPublicKey = publickKeys[ports.indexOf(newLeader)];
 
@@ -486,13 +528,11 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         console.log(`the new leader is ${newLeader} ${newLeaderPublicKey}`);
                   }
                   if (message.type === MESSAGE_TYPE.chain) {
-                        //@ts-ignore
-                        const data = message.data.chain;
+                        const data = (message.data as any).chain;
                         this.chain.replaceChain(data);
                   }
                   if (message.type === MESSAGE_TYPE.transaction) {
-                        //@ts-ignore
-                        const data = JSON.parse(message.data);
+                        const data = JSON.parse(message.data as any);
 
                         if (!this.transactionPool.transactionExists(data)) {
                               this.transactionPool.addTransaction(data);
@@ -500,7 +540,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         }
                         if (this.transactionPool.thresholdReached()) {
                               if (this.chain.leader == this.validator.getPublicKey()) {
-                                    console.log("Creating block");
                                     let block = this.chain.createBlock(
                                           this.transactionPool.transactions,
                                           this.validator
@@ -510,8 +549,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         }
                   }
                   if (message.type === MESSAGE_TYPE.block) {
-                        //@ts-ignore
-                        const data = JSON.parse(message.data).block;
+                        const data = (JSON.parse(message.data as string) as any).block;
                         if (this.chain.isValidBlock(data)) {
                               this.sendBlock(data);
                               this.transactionPool.clear();
@@ -524,20 +562,15 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.on("direct", async ({ message }: { message: ServerDirectMessage }) => {
                   this.log.info(`${message.message}`);
 
-                  console.log(message.type, MESSAGE_TYPE.chain);
-
                   if (message.type === MESSAGE_TYPE.chain) {
-                        //@ts-ignore
-                        const data = JSON.parse(message.data).chain;
-                        console.log(data);
+                        const data = (JSON.parse(message.data as string) as any).chain;
                         this.chain.replaceChain(data);
                   }
                   if (message.type === MESSAGE_TYPES.keygenDirectMessageHandler) {
-                        const dm = message.data.directMessages.Data;
                         this.validator.directMessagesMap.set(
                               KeygenSessionManager.currentRound,
                               this.validator.nodeId,
-                              dm
+                              message.data.directMessages.Data
                         );
                         await KeygenSessionManager.keygenRoundDirectMessageProcessor(message);
                   }
@@ -546,8 +579,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         let winner = P2pServer.leader;
 
                         try {
-                              // @ts-ignore
-                              const { vote: recievedVote, validators } = message.data;
+                              const { vote: recievedVote, validators } = (message as any).data;
                               if (!recievedVote || !validators) {
                                     throw new Error(`bad vote result. error in leader election`);
                               }
@@ -566,7 +598,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
                                                 winner = candidate;
                                           }
                                     }
-
                                     this.votes = [];
                                     P2pServer.leader = winner;
                                     await redisClient.setSignleData("leader", winner);
