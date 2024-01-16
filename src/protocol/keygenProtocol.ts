@@ -17,8 +17,17 @@ import { delay } from "../p2p/server";
 import { app } from "./index";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
-import { KeygenCurrentState, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
+import {
+      KeygenCurrentState,
+      MessageData,
+      Messages,
+      Round,
+      Rounds,
+      ServerDirectMessage,
+      ServerMessage,
+} from "./types";
 import Validator from "./validators/validator";
+import { createHash } from "crypto";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -38,6 +47,8 @@ export class KeygenSessionManager extends AppLogger {
 
       private static directMessages: MessageQueueArray<KeygenDirectMessageForRound4JSON>;
       private static messages: MessageQueueMap<GenericKeygenRoundBroadcast>;
+      private static broadcastRoundHashes: Record<number, string> = {};
+      private static directMessageRoundHashes: Record<number, string> = {};
 
       constructor(validator: Validator) {
             super();
@@ -57,6 +68,8 @@ export class KeygenSessionManager extends AppLogger {
             this.init(sessionConfig.threshold, sessionConfig.partyIds);
             this.directMessages = new MessageQueueArray(this.finalRound + 1);
             this.messages = new MessageQueueMap(this.validators, KeygenSessionManager.finalRound + 1);
+            this.broadcastRoundHashes[0] = this.hashMessageData("0x0");
+            // this.directMessageRoundHashes[0] = this.hashMessageData("0x0");
 
             this.rounds = KeygenRounds.reduce((accumulator, round, i) => {
                   accumulator[i] = {
@@ -107,6 +120,12 @@ export class KeygenSessionManager extends AppLogger {
                   if (round.isDirectMessageRound && dmsLen < this.threshold - 1) {
                         await delay(200);
                         await this.keygenRoundProcessor(data);
+
+                        this.generateBroadcastHashes(
+                              this.directMessages.getRoundValues(currentRound),
+                              currentRound,
+                              this.directMessageRoundHashes
+                        );
                         return;
                   }
 
@@ -115,7 +134,16 @@ export class KeygenSessionManager extends AppLogger {
 
                   if (proofsLen === this.threshold - 1) this.verifyAndEndSession(this.proofs);
 
-                  if (round.isBroadcastRound && bcsLen === this.threshold) {
+                  if (
+                        round.isBroadcastRound &&
+                        bcsLen === this.threshold &&
+                        this.receivedAll(round, currentRound)
+                  ) {
+                        this.generateBroadcastHashes(
+                              this.messages.getRoundValues(currentRound),
+                              currentRound,
+                              this.broadcastRoundHashes
+                        );
                         await this.finalizeCurrentRound(currentRound);
                   }
             } catch (error) {
@@ -199,6 +227,10 @@ export class KeygenSessionManager extends AppLogger {
             const previousRound = this.rounds[currentRound - 1]?.round;
             if (!previousRound?.isBroadcastRound) return;
 
+            for (let round = 1; round <= currentRound - 1; round++) {
+                  this.verifyLastRoundHash(round, this.broadcastRoundHashes, this.messages.getRoundValues(round));
+            }
+
             this.messages
                   .getRoundValues(currentRound - 1)
                   .map((broadcast) => AbstractKeygenBroadcast.fromJSON(broadcast as any))
@@ -209,6 +241,11 @@ export class KeygenSessionManager extends AppLogger {
             const previousRound = this.rounds[currentRound - 1]?.round;
             if (!previousRound?.isDirectMessageRound) return;
 
+            this.verifyLastRoundHash(
+                  currentRound - 1,
+                  this.directMessageRoundHashes,
+                  this.directMessages.getRoundValues(currentRound - 1)
+            );
             this.directMessages
                   .getRoundValues(currentRound - 1)
                   .map((directMsg) => KeygenDirectMessageForRound4.fromJSON(directMsg))
@@ -231,14 +268,6 @@ export class KeygenSessionManager extends AppLogger {
       public static isFinalRound(currentRound?: number): boolean {
             if (currentRound) return currentRound === this.finalRound;
             return this.currentRound === this.finalRound;
-      }
-
-      private static messageQueueArray<T>(rounds: number): { [round: number]: T[] } {
-            const q: { [round: number]: any[] } = {};
-            for (let i = 0; i <= rounds; i++) {
-                  q[i] = [];
-            }
-            return q;
       }
 
       private static storePeerBroadcastResponse(
@@ -280,24 +309,84 @@ export class KeygenSessionManager extends AppLogger {
             return this.proofs.length;
       }
 
-      private static receivedAll(round: Round, currentRound: number): boolean {
-            const isBroadcastRound = round.round.isBroadcastRound;
-            const isDirectMessageRound = round.round.isDirectMessageRound;
+      private static receivedAll(round: AbstractKeygenRound, currentRound: number): boolean {
+            const isBroadcastRound = round.isBroadcastRound;
+            const isDirectMessageRound = round.isDirectMessageRound;
 
-            const roundBroadcasts = this.messages[currentRound].length;
-            const roundMessages = this.directMessages[currentRound].length;
+            const roundBroadcasts = this.messages.getRoundMessagesLen(currentRound);
+            const roundMessages = this.directMessages.getNonNullValuesLength(currentRound);
             const partyId = this.validators.length;
 
             if (isBroadcastRound && isDirectMessageRound) {
-                  return roundBroadcasts === partyId && roundMessages === partyId;
+                  return roundBroadcasts === partyId && roundMessages === partyId - 1;
             }
             if (isBroadcastRound && !isDirectMessageRound) {
                   return roundBroadcasts === partyId;
             }
             if (!isBroadcastRound && isDirectMessageRound) {
-                  return roundMessages === partyId;
+                  return roundMessages === partyId - 1;
+            }
+            for (let round = 1; round <= currentRound - 1; round++) {
+                  this.verifyLastRoundHash(round, this.broadcastRoundHashes, this.messages.getRoundValues(round));
             }
             return true;
+      }
+
+      private static hashMessageData(data: any): string {
+            const hash = createHash("sha256");
+            hash.update(JSON.stringify(data));
+            return hash.digest("hex");
+      }
+
+      private static generateBroadcastHashes(
+            messages: GenericKeygenRoundBroadcast[],
+            roundNumber: number,
+            roundHashes: Record<number, string>
+      ): any {
+            if (!messages) {
+                  throw new Error(`round messages do not exists something went wrong.`);
+            }
+            const dataForRound: string[] = messages.map((messageData) => {
+                  if (messageData) {
+                        const hashedData = this.hashMessageData(messageData);
+                        return hashedData;
+                  }
+                  return "";
+            });
+
+            const currentRoundData = dataForRound.join("");
+            const currentRoundHash = this.hashMessageData(currentRoundData);
+            roundHashes[roundNumber] = currentRoundHash;
+            return dataForRound;
+      }
+
+      private static verifyLastRoundHash(
+            roundNumber: number,
+            roundHashes: Record<number, string>,
+            messages: GenericKeygenRoundBroadcast[]
+      ): void {
+            const lastRound = roundNumber;
+            const lastRoundHash = roundHashes[lastRound];
+
+            // Compute the hash of the last round's messages
+            const lastRoundData =
+                  lastRound === 0
+                        ? "0x0"
+                        : messages
+                                .map((messageData) => {
+                                      if (messageData) {
+                                            return this.hashMessageData(messageData);
+                                      }
+                                      return "";
+                                })
+                                .join("");
+
+            const computedLastRoundHash = this.hashMessageData(lastRoundData);
+
+            // Verify that the computed hash matches the stored hash
+            if (lastRoundHash !== computedLastRoundHash) {
+                  throw new Error(`Inconsistent hash detected for the last round: ${lastRound}`);
+            }
       }
 
       private static createDirectMessage = (

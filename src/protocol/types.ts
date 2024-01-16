@@ -47,3 +47,11 @@ export interface Queue<T> {
 export interface MessageQueue<T> {
       [roundNumber: number]: Queue<T>;
 }
+
+export type MessageData = any;
+
+export type KeygenRoundHandlerMessage = any;
+
+export interface Messages {
+      [round: string]: KeygenRoundHandlerMessage[];
+}
