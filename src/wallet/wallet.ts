@@ -16,7 +16,7 @@ class Wallet {
 
       public createTransaction<T extends any>(
             to: string,
-            amount: number,
+            amount: any,
             type: string,
             transactionPool: any
       ): Transaction<T> | undefined {

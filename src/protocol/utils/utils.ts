@@ -11,4 +11,5 @@ export enum MESSAGE_TYPES {
       LeaderElection = "LeaderElection",
       LeaderVote = "LeaderVote",
       SetNewLeader = "SetNewLeader",
+      KeygenTransaction = "KeygenTransaction",
 }

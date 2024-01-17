@@ -92,6 +92,7 @@ class Blockchain implements BlockchainInterface {
             )
                   return false;
             this.addBlock(block);
+            console.log("block added");
             return true;
       }
 

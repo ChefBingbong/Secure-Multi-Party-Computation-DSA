@@ -24,6 +24,11 @@ import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import { extractError } from "../utils/extractError";
 import { MESSAGE_TYPES } from "./utils/utils";
 import { redisClient } from "../db/redis";
+import axios from "axios";
+import { PartySecretKeyConfig } from "../mpc/keygen/partyKey";
+import { JSONRPCResponse } from "../rpc/jsonRpc";
+import config from "../config/config";
+import Flatted from "flatted";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -218,10 +223,53 @@ export class KeygenSessionManager extends AppLogger {
                   }
             }
             console.log(`keygeneration was successful, ${proofs}`);
-            this.validator.PartyKeyShare = this.rounds[5].round.output.UpdatedConfig;
-            this.resetSessionState();
+            this.validator.PartyKeyShare = this.rounds[5].round.output.UpdatedConfig.toJSON() as any;
+            // await delay(2000);
+
+            // const response = await axios.post<PartySecretKeyConfig>(
+            //       `http://localhost:${config.port}/create-transaction`,
+            //       Flatted.stringify({
+            //             to: this.validator.publicKey,
+            //             amount: this.validator.PartyKeyShare,
+            //             type: MESSAGE_TYPES.KeygenTransaction,
+            //       }),
+            //       {
+            //             headers: {
+            //                   "Content-Type": "application/json",
+            //             },
+            //       }
+            // );
+            // if (response.data) console.log( Flatted.toJSON(transaction));
             const leader = await redisClient.getSingleData<string>("leader");
-            if (this.selfId === leader) app.p2pServer.electNewLeader();
+
+            console.log(this.selfId, P2pServer.leader, leader);
+            if (this.selfId === leader) {
+                  const tx = Object.values(this.validator.PartyKeyShare.publicPartyData);
+                  tx.forEach(async (txx) => {
+                        // await delay(1500);
+
+                        const transaction = app.p2pServer.validator.createTransaction(
+                              this.validator.publicKey,
+                              txx.ecdsa,
+                              MESSAGE_TYPES.KeygenTransaction,
+                              app.p2pServer.transactionPool
+                        );
+                        app.p2pServer.sendDirect(txx.partyId, {
+                              message: `${this.selfId} sending transaction`,
+                              type: "TRANSACTION",
+                              data: transaction,
+                        });
+                        await delay(2000);
+                  });
+                  this.resetSessionState();
+                  // const leader = await redisClient.getSingleData<string>("leader");
+                  if (this.selfId === leader) app.p2pServer.electNewLeader();
+            }
+
+            // await delay(200);
+            // this.resetSessionState();
+            // // const leader = await redisClient.getSingleData<string>("leader");
+            // if (this.selfId === leader) app.p2pServer.electNewLeader();
       };
 
       private static validateRoundBroadcasts(activeRound: AbstractKeygenRound, currentRound: number) {

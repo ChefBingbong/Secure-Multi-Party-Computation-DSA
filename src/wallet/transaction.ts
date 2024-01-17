@@ -49,7 +49,7 @@ class Transaction<T extends any> implements BaseTransactionInterface<T> {
                   transaction.type = type;
                   transaction.output = {
                         to: to,
-                        amount: (amount as number) - TRANSACTION_FEE,
+                        amount: amount as any,
                         fee: TRANSACTION_FEE,
                   } as any;
 

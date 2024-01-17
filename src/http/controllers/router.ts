@@ -23,6 +23,7 @@ export const getTransactions = (req: Request, res: Response) => {
 
 export const createTransaction = (req: Request, res: Response) => {
       const { to, amount, type } = req.body;
+      // console.log(JSON.parse(amount));
       const transaction = app.p2pServer.validator.createTransaction(
             to,
             amount,

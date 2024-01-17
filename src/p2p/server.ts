@@ -15,6 +15,7 @@ import Wallet from "../wallet/wallet";
 import { P2PNetworkEventEmitter } from "./eventEmitter";
 import { P2PNetwork } from "./types";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
+import Flatted from "flatted";
 
 const MESSAGE_TYPE = {
       chain: "CHAIN",
@@ -562,6 +563,24 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.on("direct", async ({ message }: { message: ServerDirectMessage }) => {
                   this.log.info(`${message.message}`);
 
+                  if (message.type === "TRANSACTION") {
+                        const data = message.data as any;
+
+                        if (!this.transactionPool.transactionExists(data)) {
+                              this.transactionPool.addTransaction(data);
+                              this.sendTransaction(data);
+                        }
+                        if (this.transactionPool.thresholdReached()) {
+                              if (this.chain.leader == this.validator.getPublicKey()) {
+                                    console.log("block created");
+                                    let block = this.chain.createBlock(
+                                          this.transactionPool.transactions,
+                                          this.validator
+                                    );
+                                    this.sendBlock(block);
+                              }
+                        }
+                  }
                   if (message.type === MESSAGE_TYPE.chain) {
                         const data = (JSON.parse(message.data as string) as any).chain;
                         this.chain.replaceChain(data);
