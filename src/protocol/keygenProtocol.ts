@@ -29,6 +29,7 @@ import { PartySecretKeyConfig } from "../mpc/keygen/partyKey";
 import { JSONRPCResponse } from "../rpc/jsonRpc";
 import config from "../config/config";
 import Flatted from "flatted";
+import { tryNTimes } from "../rpc/utils/helpers";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -134,7 +135,7 @@ export class KeygenSessionManager extends AppLogger {
                   const bcsLen = this.storePeerBroadcastResponse(broadcasts, round, currentRound, data.senderNode);
                   const proofsLen = this.storePeerProofs(proof, currentRound);
 
-                  if (proofsLen === this.threshold) await this.verifyAndEndSession(this.proofs);
+                  if (proofsLen === this.threshold) await this.verifyAndEndSession(this.proofs, proof);
 
                   if (
                         round.isBroadcastRound &&
@@ -215,7 +216,7 @@ export class KeygenSessionManager extends AppLogger {
             await this.keygenRoundVerifier();
       }
 
-      public static verifyAndEndSession = async (proofs: bigint[]) => {
+      public static verifyAndEndSession = async (proofs: bigint[], proof: string) => {
             if (!proofs) return;
             for (let i = 0; i < this.threshold - 1; i++) {
                   for (let j = i + 1; j < this.threshold - 1; j++) {
@@ -224,52 +225,28 @@ export class KeygenSessionManager extends AppLogger {
             }
             console.log(`keygeneration was successful, ${proofs}`);
             this.validator.PartyKeyShare = this.rounds[5].round.output.UpdatedConfig.toJSON() as any;
-            // await delay(2000);
-
-            // const response = await axios.post<PartySecretKeyConfig>(
-            //       `http://localhost:${config.port}/create-transaction`,
-            //       Flatted.stringify({
-            //             to: this.validator.publicKey,
-            //             amount: this.validator.PartyKeyShare,
-            //             type: MESSAGE_TYPES.KeygenTransaction,
-            //       }),
-            //       {
-            //             headers: {
-            //                   "Content-Type": "application/json",
-            //             },
-            //       }
-            // );
-            // if (response.data) console.log( Flatted.toJSON(transaction));
             const leader = await redisClient.getSingleData<string>("leader");
 
-            console.log(this.selfId, P2pServer.leader, leader);
-            if (this.selfId === leader) {
-                  const tx = Object.values(this.validator.PartyKeyShare.publicPartyData);
-                  tx.forEach(async (txx) => {
-                        // await delay(1500);
-
-                        const transaction = app.p2pServer.validator.createTransaction(
-                              this.validator.publicKey,
-                              txx.ecdsa,
-                              MESSAGE_TYPES.KeygenTransaction,
-                              app.p2pServer.transactionPool
-                        );
-                        app.p2pServer.sendDirect(txx.partyId, {
-                              message: `${this.selfId} sending transaction`,
-                              type: "TRANSACTION",
-                              data: transaction,
-                        });
-                        await delay(2000);
-                  });
-                  this.resetSessionState();
-                  // const leader = await redisClient.getSingleData<string>("leader");
-                  if (this.selfId === leader) app.p2pServer.electNewLeader();
+            if (leader === this.selfId) {
+                  await tryNTimes(
+                        async () =>
+                              await axios.post<PartySecretKeyConfig>(
+                                    `http://localhost:${config.port}/create-transaction`,
+                                    Flatted.stringify({
+                                          to: this.validator.publicKey,
+                                          amount: proof,
+                                          type: MESSAGE_TYPES.KeygenTransaction,
+                                    })
+                              ),
+                        5,
+                        1 * 1000
+                  );
             }
 
-            // await delay(200);
-            // this.resetSessionState();
-            // // const leader = await redisClient.getSingleData<string>("leader");
-            // if (this.selfId === leader) app.p2pServer.electNewLeader();
+            await delay(200);
+            this.resetSessionState();
+            // const leader = await redisClient.getSingleData<string>("leader");
+            if (this.selfId === leader) app.p2pServer.electNewLeader();
       };
 
       private static validateRoundBroadcasts(activeRound: AbstractKeygenRound, currentRound: number) {
