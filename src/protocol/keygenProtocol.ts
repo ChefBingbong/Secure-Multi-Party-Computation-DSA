@@ -1,4 +1,5 @@
 import assert from "assert";
+import { createHash } from "crypto";
 import { AppLogger } from "../http/middleware/logger";
 import { AllKeyGenRounds } from "../mpc/keygen";
 import { AbstractKeygenRound, GenericKeygenRoundBroadcast } from "../mpc/keygen/abstractRound";
@@ -13,21 +14,22 @@ import {
       SessionConfig,
 } from "../mpc/keygen/types";
 import { Hasher } from "../mpc/utils/hasher";
-import { delay } from "../p2p/server";
+import P2pServer, { delay } from "../p2p/server";
 import { app } from "./index";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
-import {
-      KeygenCurrentState,
-      MessageData,
-      Messages,
-      Round,
-      Rounds,
-      ServerDirectMessage,
-      ServerMessage,
-} from "./types";
+import { KeygenCurrentState, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
 import Validator from "./validators/validator";
-import { createHash } from "crypto";
+import { ErrorWithCode, ProtocolError } from "../utils/errors";
+import { extractError } from "../utils/extractError";
+import { MESSAGE_TYPES } from "./utils/utils";
+import { redisClient } from "../db/redis";
+import axios from "axios";
+import { PartySecretKeyConfig } from "../mpc/keygen/partyKey";
+import { JSONRPCResponse } from "../rpc/jsonRpc";
+import config from "../config/config";
+import Flatted from "flatted";
+import { tryNTimes } from "../rpc/utils/helpers";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -66,10 +68,11 @@ export class KeygenSessionManager extends AppLogger {
                   throw new Error(`there is already a keygen session n progress`);
             }
             this.init(sessionConfig.threshold, sessionConfig.partyIds);
+
             this.directMessages = new MessageQueueArray(this.finalRound + 1);
             this.messages = new MessageQueueMap(this.validators, KeygenSessionManager.finalRound + 1);
             this.broadcastRoundHashes[0] = this.hashMessageData("0x0");
-            // this.directMessageRoundHashes[0] = this.hashMessageData("0x0");
+            this.directMessageRoundHashes[2] = this.hashMessageData("0x0");
 
             this.rounds = KeygenRounds.reduce((accumulator, round, i) => {
                   accumulator[i] = {
@@ -85,7 +88,7 @@ export class KeygenSessionManager extends AppLogger {
             this.session.init({ sessionConfig });
 
             if (!this.session.output.vssSecret) {
-                  throw new Error(`session is not initialized`);
+                  throw new ErrorWithCode(`Session was not initialized correctly.`, ProtocolError.PARAMETER_ERROR);
             }
             this.sessionInitialized = true;
       }
@@ -121,8 +124,8 @@ export class KeygenSessionManager extends AppLogger {
                         await delay(200);
                         await this.keygenRoundProcessor(data);
 
-                        this.generateBroadcastHashes(
-                              this.directMessages.getRoundValues(currentRound),
+                        this.generateBroadcastHashes<MessageQueueArray<KeygenDirectMessageForRound4JSON>>(
+                              this.directMessages,
                               currentRound,
                               this.directMessageRoundHashes
                         );
@@ -132,22 +135,22 @@ export class KeygenSessionManager extends AppLogger {
                   const bcsLen = this.storePeerBroadcastResponse(broadcasts, round, currentRound, data.senderNode);
                   const proofsLen = this.storePeerProofs(proof, currentRound);
 
-                  if (proofsLen === this.threshold - 1) this.verifyAndEndSession(this.proofs);
+                  if (proofsLen === this.threshold) await this.verifyAndEndSession(this.proofs, proof);
 
                   if (
                         round.isBroadcastRound &&
                         bcsLen === this.threshold &&
                         this.receivedAll(round, currentRound)
                   ) {
-                        this.generateBroadcastHashes(
-                              this.messages.getRoundValues(currentRound),
+                        this.generateBroadcastHashes<MessageQueueMap<GenericKeygenRoundBroadcast>>(
+                              this.messages,
                               currentRound,
                               this.broadcastRoundHashes
                         );
                         await this.finalizeCurrentRound(currentRound);
                   }
             } catch (error) {
-                  console.log(error);
+                  throw new Error(extractError(error));
             }
       };
 
@@ -159,7 +162,10 @@ export class KeygenSessionManager extends AppLogger {
 
                   this.storePeerDirectMessageResponse(directMessages, round, currentRound);
             } catch (error) {
-                  console.log(error);
+                  throw new ErrorWithCode(
+                        `Failed to store direct message response`,
+                        ProtocolError.PARAMETER_ERROR
+                  );
             }
       };
 
@@ -185,23 +191,21 @@ export class KeygenSessionManager extends AppLogger {
 
                   app.p2pServer.broadcast({
                         message: `${this.selfId} is prcessing round ${currentRound}`,
-                        type: "keygenRoundHandler",
+                        type: MESSAGE_TYPES.keygenRoundHandler,
                         data: { broadcasts, proof },
                         senderNode: this.selfId,
                   });
 
-                  if (round.isDirectMessageRound) {
-                        directMessages.forEach(async (dm) => {
-                              await delay(500);
-                              app.p2pServer.sendDirect(dm.To, {
-                                    message: `${this.selfId} is sending direct message to ${dm.To}`,
-                                    type: "keygenDirectMessageHandler",
-                                    data: { directMessages: dm },
-                              });
+                  directMessages.forEach(async (dm: Msg<KeygenDirectMessageForRound4JSON>) => {
+                        await delay(500);
+                        app.p2pServer.sendDirect(dm.To, {
+                              message: `${this.selfId} is sending direct message to ${dm.To}`,
+                              type: MESSAGE_TYPES.keygenDirectMessageHandler,
+                              data: { directMessages: dm },
                         });
-                  }
-            } catch (err) {
-                  console.log(err);
+                  });
+            } catch (error) {
+                  throw new Error(extractError(error));
             }
       };
 
@@ -212,7 +216,7 @@ export class KeygenSessionManager extends AppLogger {
             await this.keygenRoundVerifier();
       }
 
-      public static verifyAndEndSession = (proofs: bigint[]) => {
+      public static verifyAndEndSession = async (proofs: bigint[], proof: string) => {
             if (!proofs) return;
             for (let i = 0; i < this.threshold - 1; i++) {
                   for (let j = i + 1; j < this.threshold - 1; j++) {
@@ -220,16 +224,34 @@ export class KeygenSessionManager extends AppLogger {
                   }
             }
             console.log(`keygeneration was successful, ${proofs}`);
+            this.validator.PartyKeyShare = this.rounds[5].round.output.UpdatedConfig.toJSON() as any;
+            const leader = await redisClient.getSingleData<string>("leader");
+
+            if (leader === this.selfId) {
+                  await tryNTimes(
+                        async () =>
+                              await axios.post<PartySecretKeyConfig>(
+                                    `http://localhost:${config.port}/create-transaction`,
+                                    Flatted.stringify({
+                                          to: this.validator.publicKey,
+                                          amount: proof,
+                                          type: MESSAGE_TYPES.KeygenTransaction,
+                                    })
+                              ),
+                        5,
+                        1 * 1000
+                  );
+            }
+
+            await delay(200);
             this.resetSessionState();
+            // const leader = await redisClient.getSingleData<string>("leader");
+            if (this.selfId === leader) app.p2pServer.electNewLeader();
       };
 
       private static validateRoundBroadcasts(activeRound: AbstractKeygenRound, currentRound: number) {
             const previousRound = this.rounds[currentRound - 1]?.round;
             if (!previousRound?.isBroadcastRound) return;
-
-            for (let round = 1; round <= currentRound - 1; round++) {
-                  this.verifyLastRoundHash(round, this.broadcastRoundHashes, this.messages.getRoundValues(round));
-            }
 
             this.messages
                   .getRoundValues(currentRound - 1)
@@ -241,11 +263,6 @@ export class KeygenSessionManager extends AppLogger {
             const previousRound = this.rounds[currentRound - 1]?.round;
             if (!previousRound?.isDirectMessageRound) return;
 
-            this.verifyLastRoundHash(
-                  currentRound - 1,
-                  this.directMessageRoundHashes,
-                  this.directMessages.getRoundValues(currentRound - 1)
-            );
             this.directMessages
                   .getRoundValues(currentRound - 1)
                   .map((directMsg) => KeygenDirectMessageForRound4.fromJSON(directMsg))
@@ -326,9 +343,6 @@ export class KeygenSessionManager extends AppLogger {
             if (!isBroadcastRound && isDirectMessageRound) {
                   return roundMessages === partyId - 1;
             }
-            for (let round = 1; round <= currentRound - 1; round++) {
-                  this.verifyLastRoundHash(round, this.broadcastRoundHashes, this.messages.getRoundValues(round));
-            }
             return true;
       }
 
@@ -338,21 +352,32 @@ export class KeygenSessionManager extends AppLogger {
             return hash.digest("hex");
       }
 
-      private static generateBroadcastHashes(
-            messages: GenericKeygenRoundBroadcast[],
-            roundNumber: number,
-            roundHashes: Record<number, string>
-      ): any {
+      private static generateBroadcastHashes<
+            T extends
+                  | MessageQueueArray<KeygenDirectMessageForRound4JSON>
+                  | MessageQueueMap<GenericKeygenRoundBroadcast>
+      >(messages: T, roundNumber: number, roundHashes: Record<number, string>): string[] {
             if (!messages) {
                   throw new Error(`round messages do not exists something went wrong.`);
             }
-            const dataForRound: string[] = messages.map((messageData) => {
-                  if (messageData) {
-                        const hashedData = this.hashMessageData(messageData);
-                        return hashedData;
+            const dataForRound: string[] = ["0x0"];
+            for (let round = 1; round <= roundNumber; round++) {
+                  if (!this.rounds[round].round.isDirectMessageRound && round !== 3) continue;
+
+                  const currentRoundData = dataForRound.join("");
+                  const currentRoundHash = this.hashMessageData(currentRoundData);
+
+                  if (currentRoundHash !== roundHashes[round - 1]) {
+                        throw new Error(`Inconsistent hash detected for the last round: ${round - 1}`);
                   }
-                  return "";
-            });
+
+                  messages.getRoundValues(round).forEach((messageData) => {
+                        if (messageData) {
+                              const hashedData = this.hashMessageData(messageData);
+                              dataForRound.push(hashedData);
+                        }
+                  });
+            }
 
             const currentRoundData = dataForRound.join("");
             const currentRoundHash = this.hashMessageData(currentRoundData);
@@ -360,41 +385,12 @@ export class KeygenSessionManager extends AppLogger {
             return dataForRound;
       }
 
-      private static verifyLastRoundHash(
-            roundNumber: number,
-            roundHashes: Record<number, string>,
-            messages: GenericKeygenRoundBroadcast[]
-      ): void {
-            const lastRound = roundNumber;
-            const lastRoundHash = roundHashes[lastRound];
-
-            // Compute the hash of the last round's messages
-            const lastRoundData =
-                  lastRound === 0
-                        ? "0x0"
-                        : messages
-                                .map((messageData) => {
-                                      if (messageData) {
-                                            return this.hashMessageData(messageData);
-                                      }
-                                      return "";
-                                })
-                                .join("");
-
-            const computedLastRoundHash = this.hashMessageData(lastRoundData);
-
-            // Verify that the computed hash matches the stored hash
-            if (lastRoundHash !== computedLastRoundHash) {
-                  throw new Error(`Inconsistent hash detected for the last round: ${lastRound}`);
-            }
-      }
-
       private static createDirectMessage = (
             round: AbstractKeygenRound,
             messageType: KeygenDirectMessageForRound4JSON[],
             currentRound: number
-      ): Msg<KeygenDirectMessageForRound4JSON>[] | undefined => {
-            if (!round.isDirectMessageRound) return undefined;
+      ): Msg<KeygenDirectMessageForRound4JSON>[] => {
+            if (!round.isDirectMessageRound) return [];
 
             return messageType.map((msg) => {
                   return Msg.create<KeygenDirectMessageForRound4JSON>(
@@ -484,5 +480,6 @@ export class KeygenSessionManager extends AppLogger {
             this.messages = undefined;
             this.directMessages = undefined;
             this.proofs = [];
+            // this.validator.PartyKeyShare = undefined;
       }
 }

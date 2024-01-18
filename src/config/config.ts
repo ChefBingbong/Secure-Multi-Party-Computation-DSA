@@ -22,6 +22,14 @@ try {
       console.error("Error validating environment variables:", error);
 }
 
+export const TOTAL_COINS = 1000;
+
+export const TRANSACTION_THRESHOLD = 4;
+
+export const FIRST_LEADER = "";
+
+export const TRANSACTION_FEE = 1;
+
 // map env vars and make it visible outside module
 export default {
       env: envVars.NODE_ENV,

@@ -3,3 +3,13 @@ export function ceilDivideByTwoThirds(number: number) {
       const ceilResult = Math.ceil(result);
       return ceilResult;
 }
+
+export enum MESSAGE_TYPES {
+      keygenDirectMessageHandler = "keygenDirectMessageHandler",
+      keygenInit = "keygenInit",
+      keygenRoundHandler = "keygenRoundHandler",
+      LeaderElection = "LeaderElection",
+      LeaderVote = "LeaderVote",
+      SetNewLeader = "SetNewLeader",
+      KeygenTransaction = "KeygenTransaction",
+}
