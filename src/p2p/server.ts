@@ -333,10 +333,14 @@ class P2pServer extends AppLogger {
             if (!leader || this.NODE_ID !== leader) {
                   throw new Error(`leader has not been initialized or you are not the leader`);
             }
-            this.broadcast({
-                  message: `${this.NODE_ID} is starting a new keygen session`,
-                  type: MESSAGE_TYPE.keygenInit,
-            });
+            try {
+                  this.broadcast({
+                        message: `${this.NODE_ID} is starting a new keygen session`,
+                        type: MESSAGE_TYPE.keygenInit,
+                  });
+            } catch (err) {
+                  console.log(err);
+            }
       };
 
       // helpers for building messages

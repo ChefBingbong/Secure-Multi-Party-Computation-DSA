@@ -29,6 +29,7 @@ import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
 import { KeygenCurrentState, KeygenMessageData, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
 import Validator from "./validators/validator";
+import TransactionPool from "../wallet/transactionPool";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -149,6 +150,7 @@ export class KeygenSessionManager extends AppLogger {
                         await this.finalizeCurrentRound(currentRound);
                   }
             } catch (error) {
+                  console.log(error);
                   throw new Error(extractError(error));
             }
       };
@@ -223,9 +225,9 @@ export class KeygenSessionManager extends AppLogger {
                         break;
                   case MESSAGE_TYPE.keygenInit:
                         this.startNewSession({
-                              selfId: this.selfId,
-                              partyIds: this.validators,
-                              threshold: this.threshold,
+                              selfId: app.p2pServer.NODE_ID,
+                              partyIds: app.p2pServer.validators,
+                              threshold: app.p2pServer.threshold,
                         });
                         await this.finalizeCurrentRound(0);
                         break;
@@ -252,25 +254,24 @@ export class KeygenSessionManager extends AppLogger {
             this.validator.PartyKeyShare = this.rounds[5].round.output.UpdatedConfig.toJSON() as any;
             const leader = await redisClient.getSingleData<string>("leader");
 
-            if (leader === this.selfId) {
-                  await tryNTimes(
-                        async () =>
-                              await axios.post<PartySecretKeyConfig>(
-                                    `http://localhost:${config.port}/create-transaction`,
-                                    Flatted.stringify({
-                                          to: this.validator.publicKey,
-                                          amount: proof,
-                                          type: MESSAGE_TYPE.KeygenTransaction,
-                                    })
-                              ),
-                        5,
-                        1 * 1000
-                  );
+            const response = await tryNTimes(
+                  async () =>
+                        await axios.post<PartySecretKeyConfig>(
+                              `http://localhost:${config.port}/create-transaction`,
+                              { from: this.selfId, proof, type: "KEYGEN_PROOF" }
+                        ),
+                  3,
+                  1 * 1000
+            );
+            if (response) {
+                  console.log(`${this.selfId} publishing proof to chain`);
+                  if (app.p2pServer.chain.transactionPool.thresholdReached()) {
+                        console.log(`KEYGEN ROUND FINISHED CREATING NEW BLOCK FROM PROOF`);
+                  }
             }
 
             await delay(200);
             this.resetSessionState();
-            // const leader = await redisClient.getSingleData<string>("leader");
             if (this.selfId === leader) app.p2pServer.chain.electNewLeader();
       };
 
