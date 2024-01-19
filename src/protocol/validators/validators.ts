@@ -25,6 +25,11 @@ export class ValidatorsGroup {
             });
       };
 
+      public static getPublickKeyFromNodeId = (nodeId: string) => {
+            const validators = this.getAllKeys();
+            return validators.publickKeys[validators.ports.indexOf(nodeId)];
+      };
+
       public static getAllKeys = () => {
             const partyIds = this.getAllValidators();
             return {

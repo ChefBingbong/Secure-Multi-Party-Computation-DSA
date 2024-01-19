@@ -1,11 +1,16 @@
 import assert from "assert";
+import axios from "axios";
 import { createHash } from "crypto";
+import Flatted from "flatted";
+import config from "../config/config";
+import { redisClient } from "../db/redis";
 import { AppLogger } from "../http/middleware/logger";
 import { AllKeyGenRounds } from "../mpc/keygen";
 import { AbstractKeygenRound, GenericKeygenRoundBroadcast } from "../mpc/keygen/abstractRound";
 import { AbstractKeygenBroadcast } from "../mpc/keygen/keygenMessages/abstractKeygenBroadcast";
 import { KeygenDirectMessageForRound4 } from "../mpc/keygen/keygenMessages/directMessages";
 import { KeygenSession } from "../mpc/keygen/keygenSession";
+import { PartySecretKeyConfig } from "../mpc/keygen/partyKey";
 import {
       GenericKeygenRoundInput,
       GenericRoundOutput,
@@ -14,22 +19,16 @@ import {
       SessionConfig,
 } from "../mpc/keygen/types";
 import { Hasher } from "../mpc/utils/hasher";
-import P2pServer, { delay } from "../p2p/server";
+import { delay } from "../p2p/server";
+import { MESSAGE_TYPE } from "../p2p/types";
+import { tryNTimes } from "../rpc/utils/helpers";
+import { ErrorWithCode, ProtocolError } from "../utils/errors";
+import { extractError } from "../utils/extractError";
 import { app } from "./index";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
-import { KeygenCurrentState, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
+import { KeygenCurrentState, KeygenMessageData, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
 import Validator from "./validators/validator";
-import { ErrorWithCode, ProtocolError } from "../utils/errors";
-import { extractError } from "../utils/extractError";
-import { MESSAGE_TYPES } from "./utils/utils";
-import { redisClient } from "../db/redis";
-import axios from "axios";
-import { PartySecretKeyConfig } from "../mpc/keygen/partyKey";
-import { JSONRPCResponse } from "../rpc/jsonRpc";
-import config from "../config/config";
-import Flatted from "flatted";
-import { tryNTimes } from "../rpc/utils/helpers";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -112,7 +111,7 @@ export class KeygenSessionManager extends AppLogger {
             round.init({ session: this.session, input: roundInput as GenericKeygenRoundInput });
       }
 
-      public static keygenRoundProcessor = async (data: ServerMessage) => {
+      public static keygenRoundProcessor = async (data: ServerMessage<KeygenMessageData>) => {
             if (!this.sessionInitialized) return;
             try {
                   const { broadcasts, proof } = data.data;
@@ -160,6 +159,11 @@ export class KeygenSessionManager extends AppLogger {
                   const { directMessages } = data.data;
                   const { round, currentRound } = this.getCurrentState();
 
+                  this.validator.directMessagesMap.set(
+                        this.currentRound,
+                        this.validator.nodeId,
+                        data.data.directMessages.Data
+                  );
                   this.storePeerDirectMessageResponse(directMessages, round, currentRound);
             } catch (error) {
                   throw new ErrorWithCode(
@@ -191,7 +195,7 @@ export class KeygenSessionManager extends AppLogger {
 
                   app.p2pServer.broadcast({
                         message: `${this.selfId} is prcessing round ${currentRound}`,
-                        type: MESSAGE_TYPES.keygenRoundHandler,
+                        type: MESSAGE_TYPE.keygenRoundHandler,
                         data: { broadcasts, proof },
                         senderNode: this.selfId,
                   });
@@ -200,12 +204,33 @@ export class KeygenSessionManager extends AppLogger {
                         await delay(500);
                         app.p2pServer.sendDirect(dm.To, {
                               message: `${this.selfId} is sending direct message to ${dm.To}`,
-                              type: MESSAGE_TYPES.keygenDirectMessageHandler,
+                              type: MESSAGE_TYPE.keygenDirectMessageHandler,
                               data: { directMessages: dm },
                         });
                   });
             } catch (error) {
                   throw new Error(extractError(error));
+            }
+      };
+
+      public static handleKeygenConsensusMessage = async <Type extends ServerMessage<any>>(message: Type) => {
+            switch (message.type) {
+                  case MESSAGE_TYPE.keygenDirectMessageHandler:
+                        await this.keygenRoundDirectMessageProcessor(message);
+                        break;
+                  case MESSAGE_TYPE.keygenRoundHandler:
+                        await this.keygenRoundProcessor(message);
+                        break;
+                  case MESSAGE_TYPE.keygenInit:
+                        this.startNewSession({
+                              selfId: this.selfId,
+                              partyIds: this.validators,
+                              threshold: this.threshold,
+                        });
+                        await this.finalizeCurrentRound(0);
+                        break;
+                  default:
+                        break;
             }
       };
 
@@ -235,7 +260,7 @@ export class KeygenSessionManager extends AppLogger {
                                     Flatted.stringify({
                                           to: this.validator.publicKey,
                                           amount: proof,
-                                          type: MESSAGE_TYPES.KeygenTransaction,
+                                          type: MESSAGE_TYPE.KeygenTransaction,
                                     })
                               ),
                         5,
@@ -246,7 +271,7 @@ export class KeygenSessionManager extends AppLogger {
             await delay(200);
             this.resetSessionState();
             // const leader = await redisClient.getSingleData<string>("leader");
-            if (this.selfId === leader) app.p2pServer.electNewLeader();
+            if (this.selfId === leader) app.p2pServer.chain.electNewLeader();
       };
 
       private static validateRoundBroadcasts(activeRound: AbstractKeygenRound, currentRound: number) {

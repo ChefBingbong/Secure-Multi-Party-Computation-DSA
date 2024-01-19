@@ -1,15 +1,7 @@
 import SHA256 from "crypto-js/sha256";
 import ChainUtil from "../utils/chainUtil";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
-
-export interface BaseBlockParams<T> {
-      timestamp: string | number;
-      lastHash: string;
-      hash: string;
-      data: T[];
-      validator: string;
-      signature: string;
-}
+import { BaseBlockParams } from "./types";
 
 class Block implements BaseBlockParams<any> {
       public timestamp: string | number;
@@ -18,6 +10,7 @@ class Block implements BaseBlockParams<any> {
       public data: any[];
       public validator: string;
       public signature: string;
+      public sequenceNumber: number;
       public prepareMessages: any[];
       public commitMessages: any[];
 
@@ -27,7 +20,8 @@ class Block implements BaseBlockParams<any> {
             hash: string,
             data: any[],
             validator?: string,
-            signature?: string
+            signature?: string,
+            sequenceNumber?: number
       ) {
             this.timestamp = timestamp;
             this.lastHash = lastHash;
@@ -35,6 +29,7 @@ class Block implements BaseBlockParams<any> {
             this.data = data;
             this.validator = validator;
             this.signature = signature;
+            this.sequenceNumber = sequenceNumber;
       }
 
       public toString(): string {
@@ -44,11 +39,12 @@ class Block implements BaseBlockParams<any> {
         Hash      : ${this.hash}
         Data      : ${this.data}
         Validator : ${this.validator}
-        Signature : ${this.signature}`;
+        Signature : ${this.signature};
+        Sequence No : ${this.sequenceNumber}`;
       }
 
       public static genesis(): Block {
-            return new this("genesis time", "----", "genesis-hash", [], "", "");
+            return new this("genesis time", "----", "genesis-hash", [], "P4@P@53R", "SIGN", 0);
       }
 
       public static createBlock(lastBlock: Block, _data: any, wallet: any): Block {
@@ -65,7 +61,7 @@ class Block implements BaseBlockParams<any> {
                         ProtocolError.INTERNAL_ERROR
                   );
             }
-            return new this(timestamp, lastHash, hash, data, validator, signature);
+            return new this(timestamp, lastHash, hash, data, validator, signature, 1 + lastBlock.sequenceNumber);
       }
 
       public static hash(timestamp: string | number, lastHash: string, data: any[]): string {
@@ -90,7 +86,7 @@ class Block implements BaseBlockParams<any> {
       }
 
       public static verifyLeader(block: Block, leader: string): boolean {
-            return block.validator == leader;
+            return Boolean(block.validator === leader);
       }
 }
 
