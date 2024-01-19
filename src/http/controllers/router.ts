@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import config from "../../config/config";
-import P2pServer, { MESSAGE_TYPE } from "../../p2p/server";
+import { MESSAGE_TYPE } from "../../p2p/types";
 import { app } from "../../protocol";
 import Validator from "../../protocol/validators/validator";
 import { ValidatorsGroup } from "../../protocol/validators/validators";

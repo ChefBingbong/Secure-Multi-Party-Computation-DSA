@@ -1,13 +1,7 @@
 import ChainUtil from "../../../protocol/validators/chainUtil";
 import Wallet from "../../../wallet/wallet";
+import { RoundChangeMessage } from "../../types";
 import AbstractPBFTMessagePool from "../abstractPBFTPool";
-
-export interface RoundChangeMessage {
-      publicKey: string;
-      message: string;
-      signature: string;
-      blockHash: string;
-}
 
 class MessagePool implements AbstractPBFTMessagePool<RoundChangeMessage> {
       public list: { [blockHash: string]: RoundChangeMessage[] };

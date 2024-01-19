@@ -1,6 +1,7 @@
 import { Logger } from "winston";
 import { redisClient } from "../db/redis";
-import { MESSAGE_TYPE, delay } from "../p2p/server";
+import { delay } from "../p2p/server";
+import { MESSAGE_TYPE } from "../p2p/types";
 import { app } from "../protocol";
 import { KeygenSessionManager } from "../protocol/keygenProtocol";
 import { ServerMessage } from "../protocol/types";
@@ -12,20 +13,18 @@ import TransactionPool from "../wallet/transactionPool";
 import Wallet from "../wallet/wallet";
 import Block from "./block";
 import BlockPool from "./pBft/blockPool";
-import CommitPool, { CommitMessage } from "./pBft/messagePools/commitPool";
-import MessagePool, { RoundChangeMessage } from "./pBft/messagePools/messagePool";
-import PreparePool, { PrepareMessage } from "./pBft/messagePools/preparePool";
+import CommitPool from "./pBft/messagePools/commitPool";
+import MessagePool from "./pBft/messagePools/messagePool";
+import PreparePool from "./pBft/messagePools/preparePool";
+import {
+      BlockchainInterface,
+      GenericPBFTMessage,
+      CommitMessage,
+      PrepareMessage,
+      RoundChangeMessage,
+      LeaderElectionArgs,
+} from "./types";
 
-export type GenericPBFTMessage = PrepareMessage & CommitMessage & RoundChangeMessage & Block & Transaction<any>;
-
-export interface BlockchainInterface {
-      addBlock(data: any): Promise<Block>;
-      createBlock(transactions: any, wallet: Wallet): Block;
-      isValidChain(chain: Block[]): boolean;
-      replaceChain(newChain: Block[]): Promise<void>;
-      isValidBlock(block: Block): boolean;
-}
-export type LeaderElectionArgs = { vote: string; validators: string[]; senderNode: string };
 const MIN_APPROVALS = 2 * (3 / 3) + 0;
 class Blockchain implements BlockchainInterface {
       public chain: Block[];

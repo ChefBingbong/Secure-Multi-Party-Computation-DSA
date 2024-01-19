@@ -1,12 +1,7 @@
 import ChainUtil from "../../../protocol/validators/chainUtil";
 import Wallet from "../../../wallet/wallet";
+import { PrepareMessage } from "../../types";
 import AbstractPBFTMessagePool from "../abstractPBFTPool";
-
-export interface PrepareMessage {
-      blockHash: string;
-      publicKey: string;
-      signature: string;
-}
 
 class PreparePool implements AbstractPBFTMessagePool<PrepareMessage> {
       public list: { [blockHash: string]: PrepareMessage[] };

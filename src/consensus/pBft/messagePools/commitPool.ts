@@ -1,12 +1,7 @@
 import ChainUtil from "../../../protocol/validators/chainUtil";
 import Wallet from "../../../wallet/wallet";
+import { CommitMessage } from "../../types";
 import AbstractPBFTMessagePool from "../abstractPBFTPool";
-
-export interface CommitMessage {
-      blockHash: string;
-      publicKey: string;
-      signature: string;
-}
 
 class CommitPool implements AbstractPBFTMessagePool<CommitMessage> {
       public list: { [blockHash: string]: CommitMessage[] };

@@ -1,19 +1,5 @@
 import Wallet from "../../wallet/wallet";
-
-interface BasePBFTMessagePoolInterface<PBFTMessageType> {
-      message(
-            prepare: {
-                  blockHash: string;
-            },
-            wallet: Wallet
-      ): PBFTMessageType;
-
-      existingMessage(commit: PBFTMessageType): PBFTMessageType | undefined | false;
-
-      isValidMessage(commit: PBFTMessageType): boolean;
-
-      addMessage(commit: PBFTMessageType): void;
-}
+import { BasePBFTMessagePoolInterface } from "../types";
 
 export abstract class AbstractPBFTMessagePool<PBFTMessageType>
       implements BasePBFTMessagePoolInterface<PBFTMessageType>

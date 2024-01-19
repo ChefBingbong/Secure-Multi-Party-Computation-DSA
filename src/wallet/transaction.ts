@@ -1,15 +1,12 @@
-import ChainUtil from "../utils/chainUtil";
-import { TRANSACTION_FEE } from "../config/config";
-import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import Validator from "../protocol/validators/validator";
+import ChainUtil from "../utils/chainUtil";
+import { ErrorWithCode, ProtocolError } from "../utils/errors";
 
 export type TransactonInput = { timestamp: number; from: string; signature: string };
 export type TransactonOutput<T extends any> = { to: string; amount: T; fee: number };
 
 export interface BaseTransactionInterface<T> {
-      // newTransaction(senderWallet: any, to: string, amount: T, type: string): Transaction<T> | undefined;
       signTransaction(transaction: Transaction<any>, senderWallet: any): void;
-      // verifyTransaction(transaction: Transaction<any>): boolean;
 }
 class Transaction<T extends any> implements BaseTransactionInterface<T> {
       public id: string;

@@ -1,15 +1,7 @@
 import SHA256 from "crypto-js/sha256";
 import ChainUtil from "../utils/chainUtil";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
-
-export interface BaseBlockParams<T> {
-      timestamp: string | number;
-      lastHash: string;
-      hash: string;
-      data: T[];
-      validator: string;
-      signature: string;
-}
+import { BaseBlockParams } from "./types";
 
 class Block implements BaseBlockParams<any> {
       public timestamp: string | number;
