@@ -1,4 +1,5 @@
 import { app } from "../protocol";
+import { ValidatorsGroup } from "../protocol/validators/validators";
 import Transaction from "./transaction";
 
 export interface BaseTransactionPoolInterface {
@@ -11,13 +12,16 @@ class TransactionPool implements BaseTransactionPoolInterface {
       public transactions: Transaction<any>[] = [];
 
       public thresholdReached(): boolean {
-            return this.transactions.length >= app.p2pServer.threshold;
+            console.log(Math.ceil(ValidatorsGroup.getAllValidators().length * 0.67));
+            return Boolean(
+                  this.transactions.length >= Math.ceil(ValidatorsGroup.getAllValidators().length * 0.67)
+            );
       }
 
       public addTransaction<T extends {}>(transaction: Transaction<T>): boolean {
             this.transactions.push(transaction);
             app.p2pServer.getLogger("info").info(`TRANSACTION ADDED`);
-            return this.thresholdReached();
+            return transaction?.override ? true : this.thresholdReached();
       }
 
       public verifyTransaction<T extends any>(transaction: Transaction<T>) {

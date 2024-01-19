@@ -255,18 +255,23 @@ export class KeygenSessionManager extends AppLogger {
             this.validator.PartyKeyShare = this.rounds[5].round.output.UpdatedConfig.toJSON() as any;
             const leader = await redisClient.getSingleData<string>("leader");
 
-            const response = await tryNTimes(
-                  async () =>
-                        await axios.post<PartySecretKeyConfig>(
-                              `http://localhost:${config.port}/create-transaction`,
-                              { from: this.selfId, proof, type: "KEYGEN_PROOF" }
-                        ),
-                  3,
-                  1 * 1000
-            );
-            if (response) {
-                  console.log(`${this.selfId} PUBLISHING PROOF TO CHAIN\n`);
-                  if (app.p2pServer.chain.transactionPool.thresholdReached()) {
+            if (this.selfId === this.validators[0]) {
+                  const proofsToString = proofs.map((p) => p.toString());
+                  const response = await tryNTimes(
+                        async () =>
+                              await axios.post<PartySecretKeyConfig>(
+                                    `http://localhost:${config.port}/create-transaction`,
+                                    {
+                                          from: this.selfId,
+                                          proof: proofsToString,
+                                          type: "KEYGEN_PROOF",
+                                          override: true,
+                                    }
+                              ),
+                        3,
+                        1 * 1000
+                  );
+                  if (response) {
                         console.log(`KEYGEN ROUND FINISHED CREATING NEW BLOCK FROM PROOF\n`);
                   }
             }

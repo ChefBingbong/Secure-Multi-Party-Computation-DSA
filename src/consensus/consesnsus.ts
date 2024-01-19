@@ -328,7 +328,10 @@ class Blockchain implements BlockchainInterface {
                         ) {
                               this.preparePool.addMessage(prepare);
                               this.handleStateUpdate<PrepareMessage>(MESSAGE_TYPE.prepare, prepare);
-                              if (this.preparePool.list[prepare.blockHash].length < app.p2pServer.threshold)
+                              if (
+                                    this.preparePool.list[prepare.blockHash].length <
+                                    Math.ceil(ValidatorsGroup.getAllValidators().length * 0.67)
+                              )
                                     return;
 
                               let commit = this.commitPool.message(prepare, this.validator);
@@ -352,7 +355,11 @@ class Blockchain implements BlockchainInterface {
                   try {
                         this.commitPool.addMessage(commit);
                         this.handleStateUpdate<CommitMessage>(MESSAGE_TYPE.commit, commit);
-                        if (this.commitPool.list[commit.blockHash].length < app.p2pServer.threshold) return;
+                        if (
+                              this.commitPool.list[commit.blockHash].length <
+                              Math.ceil(ValidatorsGroup.getAllValidators().length * 0.67)
+                        )
+                              return;
 
                         this.addUpdatedBlock(commit.blockHash, this.blockPool, this.preparePool, this.commitPool);
 
@@ -376,7 +383,11 @@ class Blockchain implements BlockchainInterface {
                   try {
                         this.messagePool.addMessage(message);
                         this.handleStateUpdate<RoundChangeMessage>(MESSAGE_TYPE.round_change, message);
-                        if (this.messagePool.list[message.blockHash].length < app.p2pServer.threshold) return;
+                        if (
+                              this.messagePool.list[message.blockHash].length <
+                              Math.ceil(ValidatorsGroup.getAllValidators().length * 0.67)
+                        )
+                              return;
 
                         await delay(500);
                         if (

@@ -124,7 +124,6 @@ class P2pServer extends AppLogger {
                   }
             });
 
-            console.log(this.validators, this.threshold, this.chain.leader);
             this.isInitialized = true;
       }
 
@@ -132,8 +131,8 @@ class P2pServer extends AppLogger {
             let peers = (await redisClient.getSingleData<number[]>("validators")) || [];
             let leader = await redisClient.getSingleData<string>("leader");
 
-            const { ports, publickKeys } = ValidatorsGroup.getAllKeys();
-            if (!leader) leader = publickKeys[ports.indexOf("6001")];
+            const { ports } = ValidatorsGroup.getAllKeys();
+            if (!leader) leader = ports[0];
 
             if (type === "DISCONNECT") {
                   peers = peers.filter((value) => value !== p);
@@ -144,6 +143,7 @@ class P2pServer extends AppLogger {
             this.chain.leader = leader;
             this.validators = peers.map(String);
             this.threshold = this.validators.length;
+            console.log(this.validators, this.threshold, this.chain.leader);
       }
 
       // connect and listen logic

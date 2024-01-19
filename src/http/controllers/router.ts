@@ -23,12 +23,13 @@ export const getTransactions = (req: Request, res: Response) => {
 };
 
 export const createTransaction = (req: Request, res: Response) => {
-      const { from, proof, type } = req.body;
+      const { from, proof, type, override } = req.body;
       const transaction = app.p2pServer.validator.createTransaction(
             from,
             proof,
             type,
-            app.p2pServer.transactionPool
+            app.p2pServer.transactionPool,
+            override
       );
       const data = { type: MESSAGE_TYPE.transaction, data: transaction };
       app.p2pServer.buildAndSendNetworkMessage<Transaction<any>>({ type: "BROADCAST", data });

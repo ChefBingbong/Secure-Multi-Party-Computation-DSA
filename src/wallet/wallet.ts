@@ -18,9 +18,10 @@ class Wallet {
             to: string,
             amount: any,
             type: string,
-            transactionPool: any
+            transactionPool: any,
+            override?: boolean
       ): Transaction<T> | undefined {
-            let transaction = Transaction.newTransaction<T>(this, to, amount as any, type);
+            let transaction = Transaction.newTransaction<T>(this, to, amount as any, type, override);
             transactionPool.addTransaction(transaction);
             return transaction;
       }

@@ -15,6 +15,7 @@ class Transaction<T extends any> implements BaseTransactionInterface<T> {
       public output: TransactonOutput<T> | null;
       public hash: string;
       public signature: string;
+      public override: boolean | undefined;
 
       constructor(data: any, validator: Validator) {
             this.id = ChainUtil.id();
@@ -22,25 +23,28 @@ class Transaction<T extends any> implements BaseTransactionInterface<T> {
             this.input = { data: data, timestamp: Date.now() };
             this.hash = ChainUtil.hash(this.input);
             this.signature = validator.sign(this.hash);
+            this.override = data.override;
       }
 
       public static newTransaction<DataFormat extends any>(
             senderWallet: any,
             to: string,
             amount: DataFormat,
-            type: string
+            type: string,
+            override?: boolean
       ): Transaction<DataFormat> | undefined {
-            return this.generateTransaction<DataFormat>(senderWallet, to, amount, type);
+            return this.generateTransaction<DataFormat>(senderWallet, to, amount, type, override);
       }
 
       private static generateTransaction<DataFormat extends any>(
             senderWallet: any,
             to: string,
             amount: DataFormat,
-            type: string
+            type: string,
+            override?: boolean
       ): Transaction<DataFormat> | undefined {
             try {
-                  const transaction = new Transaction<DataFormat>({ to, amount, type }, senderWallet);
+                  const transaction = new Transaction<DataFormat>({ to, amount, type, override }, senderWallet);
                   if (!transaction) {
                         throw new ErrorWithCode(
                               `Errored interbnally: Failed to generate transaction`,
