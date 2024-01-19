@@ -1,5 +1,6 @@
 import Transaction from "./transaction";
 import { TRANSACTION_THRESHOLD } from "../config/config";
+import { app } from "../protocol";
 
 export interface BaseTransactionPoolInterface {
       transactions: Transaction<any>[];
@@ -11,18 +12,26 @@ class TransactionPool implements BaseTransactionPoolInterface {
       public transactions: Transaction<any>[] = [];
 
       public thresholdReached(): boolean {
-            console.log(this.transactions.length);
             return this.transactions.length >= TRANSACTION_THRESHOLD;
       }
 
       public addTransaction<T extends {}>(transaction: Transaction<T>): boolean {
             this.transactions.push(transaction);
+            app.p2pServer.getLogger("info").info(`TRANSACTION ADDED`);
             return this.thresholdReached();
+      }
+
+      public verifyTransaction<T extends any>(transaction: Transaction<T>) {
+            try {
+                  return Transaction.verifyTransaction(transaction);
+            } catch (err) {
+                  return false;
+            }
       }
 
       public validTransactions<T extends any>(): Transaction<T>[] {
             return this.transactions.filter((transaction) => {
-                  if (!transaction.verifyTransaction(transaction)) {
+                  if (!Transaction.verifyTransaction(transaction)) {
                         console.log(`Invalid signature from ${transaction.input.from}`);
                         return false;
                   }

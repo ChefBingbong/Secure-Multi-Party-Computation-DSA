@@ -42,17 +42,14 @@ export const startProtocol = async (): Promise<void> => {
             .on("SIGTERM", async (reason) => {
                   log.error(`SIGTERM. ${reason}`);
                   await updatePeerReplica(port, "DISCONNECT");
-                  process.exit();
             })
             .on("unhandledRejection", async (reason) => {
                   log.error(`Unhandled Rejection at Promise. Reason: ${reason}`);
                   await updatePeerReplica(port, "DISCONNECT");
-                  process.exit(-1);
             })
             .on("uncaughtException", async (reason) => {
                   log.error(`Uncaught Exception Rejection at Promise. Reason: ${reason}`);
                   await updatePeerReplica(port, "DISCONNECT");
-                  process.exit(-2);
             });
 };
 

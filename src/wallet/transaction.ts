@@ -1,29 +1,30 @@
+import Validator from "../protocol/validators/validator";
 import ChainUtil from "../utils/chainUtil";
-import { TRANSACTION_FEE } from "../config/config";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 
 export type TransactonInput = { timestamp: number; from: string; signature: string };
 export type TransactonOutput<T extends any> = { to: string; amount: T; fee: number };
 
 export interface BaseTransactionInterface<T> {
-      newTransaction(senderWallet: any, to: string, amount: T, type: string): Transaction<T> | undefined;
       signTransaction(transaction: Transaction<any>, senderWallet: any): void;
-      verifyTransaction(transaction: Transaction<any>): boolean;
 }
 class Transaction<T extends any> implements BaseTransactionInterface<T> {
       public id: string;
-      public type: string | null;
-      public input: TransactonInput | null;
+      public from: string;
+      public input: any;
       public output: TransactonOutput<T> | null;
+      public hash: string;
+      public signature: string;
 
-      constructor() {
+      constructor(data: any, validator: Validator) {
             this.id = ChainUtil.id();
-            this.type = null;
-            this.input = null;
-            this.output = null;
+            this.from = validator.publicKey;
+            this.input = { data: data, timestamp: Date.now() };
+            this.hash = ChainUtil.hash(this.input);
+            this.signature = validator.sign(this.hash);
       }
 
-      public newTransaction<DataFormat extends any>(
+      public static newTransaction<DataFormat extends any>(
             senderWallet: any,
             to: string,
             amount: DataFormat,
@@ -32,28 +33,22 @@ class Transaction<T extends any> implements BaseTransactionInterface<T> {
             return this.generateTransaction<DataFormat>(senderWallet, to, amount, type);
       }
 
-      private generateTransaction<DataFormat extends any>(
+      private static generateTransaction<DataFormat extends any>(
             senderWallet: any,
             to: string,
             amount: DataFormat,
             type: string
       ): Transaction<DataFormat> | undefined {
             try {
-                  const transaction = new Transaction<DataFormat>();
+                  const transaction = new Transaction<DataFormat>({ to, amount, type }, senderWallet);
                   if (!transaction) {
                         throw new ErrorWithCode(
                               `Errored interbnally: Failed to generate transaction`,
                               ProtocolError.INTERNAL_ERROR
                         );
                   }
-                  transaction.type = type;
-                  transaction.output = {
-                        to: to,
-                        amount: amount as any,
-                        fee: TRANSACTION_FEE,
-                  } as any;
 
-                  this.signTransaction(transaction, senderWallet);
+                  // this.signTransaction(transaction, senderWallet);
                   return transaction;
             } catch (error) {
                   console.error(error);
@@ -69,11 +64,11 @@ class Transaction<T extends any> implements BaseTransactionInterface<T> {
             };
       }
 
-      public verifyTransaction(transaction: Transaction<any>): boolean {
+      public static verifyTransaction(transaction: Transaction<any>): boolean {
             return ChainUtil.verifySignature(
-                  transaction.input.from,
-                  transaction.input.signature,
-                  ChainUtil.hash(transaction.output)
+                  transaction.from,
+                  transaction.signature,
+                  ChainUtil.hash(transaction.input)
             );
       }
 }

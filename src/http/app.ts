@@ -65,6 +65,7 @@ export class App extends AppLogger implements AppInterface {
             this.router.post("/broadcast", handlers.postBroadcast);
             this.router.post("/start", handlers.postStart);
             this.router.post("/elect-leader", handlers.postElectLeader);
+            this.router.post("/reset-state", handlers.resetState);
 
             this.router.get("/blocks", handlers.getBlocks);
             this.router.get("/transactions", handlers.getTransactions);
@@ -80,7 +81,7 @@ export class App extends AppLogger implements AppInterface {
             this.app.listen(Number(config.port), async () => {
                   App.log.info(`Server listening on port ${Number(config.port)}.`);
                   this.p2pServer = new P2pServer();
-                  this.p2pServer.listen(Number(config.p2pPort), peers);
+                  this.p2pServer.listen(peers);
             });
       }
 }
