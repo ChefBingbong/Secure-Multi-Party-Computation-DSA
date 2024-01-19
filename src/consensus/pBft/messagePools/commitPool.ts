@@ -1,5 +1,6 @@
-import Wallet from "../../wallet/wallet";
-import ChainUtil from "../../protocol/validators/chainUtil";
+import ChainUtil from "../../../protocol/validators/chainUtil";
+import Wallet from "../../../wallet/wallet";
+import AbstractPBFTMessagePool from "../abstractPBFTPool";
 
 export interface CommitMessage {
       blockHash: string;
@@ -7,7 +8,7 @@ export interface CommitMessage {
       signature: string;
 }
 
-class CommitPool {
+class CommitPool implements AbstractPBFTMessagePool<CommitMessage> {
       public list: { [blockHash: string]: CommitMessage[] };
 
       constructor() {
@@ -16,7 +17,7 @@ class CommitPool {
 
       // Commit function initializes a list of commit messages for a prepare message
       // and adds the commit message for the current node and returns it
-      commit(prepare: { blockHash: string }, wallet: Wallet): CommitMessage {
+      message(prepare: { blockHash: string }, wallet: Wallet): CommitMessage {
             const commit = this.createCommit(prepare, wallet);
             this.list[prepare.blockHash] = [];
             this.list[prepare.blockHash].push(commit);
@@ -32,16 +33,16 @@ class CommitPool {
             return commit;
       }
 
-      existingCommit(commit: CommitMessage): CommitMessage | undefined {
+      existingMessage(commit: CommitMessage): CommitMessage | undefined {
             if (!this.list[commit.blockHash]) return undefined;
             return this.list[commit.blockHash].find((p) => p.publicKey === commit.publicKey);
       }
 
-      isValidCommit(commit: CommitMessage): boolean {
+      isValidMessage(commit: CommitMessage): boolean {
             return ChainUtil.verifySignature(commit.publicKey, commit.signature, commit.blockHash);
       }
 
-      addCommit(commit: CommitMessage): void {
+      addMessage(commit: CommitMessage): void {
             this.list[commit.blockHash].push(commit);
       }
 }

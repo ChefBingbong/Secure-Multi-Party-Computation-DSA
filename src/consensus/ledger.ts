@@ -1,21 +1,20 @@
 import { Logger } from "winston";
 import { redisClient } from "../db/redis";
+import { MESSAGE_TYPE, delay } from "../p2p/server";
+import { app } from "../protocol";
+import { KeygenSessionManager } from "../protocol/keygenProtocol";
+import { ServerMessage } from "../protocol/types";
+import Validator from "../protocol/validators/validator";
+import { ValidatorsGroup } from "../protocol/validators/validators";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
+import Transaction from "../wallet/transaction";
+import TransactionPool from "../wallet/transactionPool";
 import Wallet from "../wallet/wallet";
 import Block from "./block";
 import BlockPool from "./pBft/blockPool";
-import PreparePool, { PrepareMessage } from "./pBft/preparePool";
-import CommitPool, { CommitMessage } from "./pBft/commitPool";
-import { MESSAGE_TYPE, delay } from "../p2p/server";
-import MessagePool, { RoundChangeMessage } from "./pBft/messagePool";
-import TransactionPool from "../wallet/transactionPool";
-import { ValidatorsGroup } from "../protocol/validators/validators";
-import { app } from "../protocol";
-import Validator from "../protocol/validators/validator";
-import config from "../config/config";
-import Transaction from "../wallet/transaction";
-import { KeygenSessionManager } from "../protocol/keygenProtocol";
-import { ServerMessage } from "../protocol/types";
+import CommitPool, { CommitMessage } from "./pBft/messagePools/commitPool";
+import MessagePool, { RoundChangeMessage } from "./pBft/messagePools/messagePool";
+import PreparePool, { PrepareMessage } from "./pBft/messagePools/preparePool";
 
 export type GenericPBFTMessage = PrepareMessage & CommitMessage & RoundChangeMessage & Block & Transaction<any>;
 
@@ -215,7 +214,7 @@ class Blockchain implements BlockchainInterface {
                         this.blockPool.addBlock(block);
                         this.handleStateUpdate<Block>(MESSAGE_TYPE.pre_prepare, block);
 
-                        let prepare = this.preparePool.prepare(block, this.validator);
+                        let prepare = this.preparePool.message(block, this.validator);
                         this.handleStateUpdate<PrepareMessage>(MESSAGE_TYPE.prepare, prepare);
                   } catch (error) {
                         throw new ErrorWithCode(
@@ -228,21 +227,21 @@ class Blockchain implements BlockchainInterface {
 
       private handleNewBlockPrepare = (prepare: PrepareMessage) => {
             if (
-                  !this.preparePool.existingPrepare(prepare) &&
-                  this.preparePool.isValidPrepare(prepare) &&
+                  !this.preparePool.existingMessage(prepare) &&
+                  this.preparePool.isValidMessage(prepare) &&
                   ValidatorsGroup.isValidValidator(prepare.publicKey)
             ) {
                   try {
                         if (
-                              !this.preparePool.existingPrepare(prepare) &&
-                              this.preparePool.isValidPrepare(prepare) &&
+                              !this.preparePool.existingMessage(prepare) &&
+                              this.preparePool.isValidMessage(prepare) &&
                               ValidatorsGroup.isValidValidator(prepare.publicKey)
                         ) {
-                              this.preparePool.addPrepare(prepare);
+                              this.preparePool.addMessage(prepare);
                               this.handleStateUpdate<PrepareMessage>(MESSAGE_TYPE.prepare, prepare);
                               if (this.preparePool.list[prepare.blockHash].length < MIN_APPROVALS) return;
 
-                              let commit = this.commitPool.commit(prepare, this.validator);
+                              let commit = this.commitPool.message(prepare, this.validator);
                               this.handleStateUpdate<CommitMessage>(MESSAGE_TYPE.commit, commit);
                         }
                   } catch (error) {
@@ -256,12 +255,12 @@ class Blockchain implements BlockchainInterface {
 
       private handleNewBlockCommit = (commit: CommitMessage) => {
             if (
-                  !this.commitPool.existingCommit(commit) &&
-                  this.commitPool.isValidCommit(commit) &&
+                  !this.commitPool.existingMessage(commit) &&
+                  this.commitPool.isValidMessage(commit) &&
                   ValidatorsGroup.isValidValidator(commit.publicKey)
             ) {
                   try {
-                        this.commitPool.addCommit(commit);
+                        this.commitPool.addMessage(commit);
                         this.handleStateUpdate<CommitMessage>(MESSAGE_TYPE.commit, commit);
                         if (this.commitPool.list[commit.blockHash].length < MIN_APPROVALS) return;
 

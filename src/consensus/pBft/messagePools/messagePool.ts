@@ -1,5 +1,6 @@
-import ChainUtil from "../../protocol/validators/chainUtil";
-import Wallet from "../../wallet/wallet";
+import ChainUtil from "../../../protocol/validators/chainUtil";
+import Wallet from "../../../wallet/wallet";
+import AbstractPBFTMessagePool from "../abstractPBFTPool";
 
 export interface RoundChangeMessage {
       publicKey: string;
@@ -8,21 +9,22 @@ export interface RoundChangeMessage {
       blockHash: string;
 }
 
-class MessagePool {
+class MessagePool implements AbstractPBFTMessagePool<RoundChangeMessage> {
       public list: { [blockHash: string]: RoundChangeMessage[] };
-      public message: string;
+      public msg: string;
 
       constructor() {
             this.list = {};
-            this.message = "INITIATE NEW ROUND";
+            this.msg = "INITIATE NEW ROUND";
       }
 
+      message(): any {}
       // Creates a round change message for the given block hash
-      createMessage(blockHash: string, wallet: Wallet): RoundChangeMessage {
+      public createMessage(blockHash: string, wallet: Wallet): RoundChangeMessage {
             const roundChange: RoundChangeMessage = {
                   publicKey: wallet.getPublicKey(),
-                  message: this.message,
-                  signature: wallet.sign(ChainUtil.hash(this.message + blockHash)),
+                  message: this.msg,
+                  signature: wallet.sign(ChainUtil.hash(this.msg + blockHash)),
                   blockHash: blockHash,
             };
 
@@ -30,7 +32,7 @@ class MessagePool {
             return roundChange;
       }
 
-      existingMessage(message: RoundChangeMessage): RoundChangeMessage | false {
+      public existingMessage(message: RoundChangeMessage): RoundChangeMessage | false {
             if (this.list[message.blockHash]) {
                   return this.list[message.blockHash].find((p) => p.publicKey === message.publicKey);
             } else {
@@ -38,7 +40,7 @@ class MessagePool {
             }
       }
 
-      isValidMessage(message: RoundChangeMessage): boolean {
+      public isValidMessage(message: RoundChangeMessage): boolean {
             console.log("in valid here");
             return ChainUtil.verifySignature(
                   message.publicKey,
@@ -47,7 +49,7 @@ class MessagePool {
             );
       }
 
-      addMessage(message: RoundChangeMessage): void {
+      public addMessage(message: RoundChangeMessage): void {
             this.list[message.blockHash]?.push(message);
       }
 }
