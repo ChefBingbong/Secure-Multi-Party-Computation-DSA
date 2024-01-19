@@ -1,9 +1,10 @@
 import { NextFunction, Request, Response } from "express";
 import config from "../../config/config";
-import P2pServer from "../../p2p/server";
+import P2pServer, { MESSAGE_TYPE } from "../../p2p/server";
 import { app } from "../../protocol";
 import Validator from "../../protocol/validators/validator";
 import { ValidatorsGroup } from "../../protocol/validators/validators";
+import Transaction from "../../wallet/transaction";
 
 export const getRoot = (req: Request, res: Response) => {
       res.status(200).send({ result: "ok" });
@@ -30,7 +31,8 @@ export const createTransaction = (req: Request, res: Response) => {
             type,
             app.p2pServer.transactionPool
       );
-      app.p2pServer.chain.sendTransaction(transaction, config.p2pPort);
+      const data = { type: MESSAGE_TYPE.transaction, data: transaction };
+      app.p2pServer.buildAndSendNetworkMessage<Transaction<any>>({ type: "BROADCAST", data });
       res.redirect("/transactions");
 };
 

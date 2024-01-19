@@ -18,11 +18,12 @@ import P2pServer, { delay } from "../p2p/server";
 import { app } from "./index";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
-import { KeygenCurrentState, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
+import { KeygenCurrentState, KeygenMessageData, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
 import Validator from "./validators/validator";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import { extractError } from "../utils/extractError";
-import { MESSAGE_TYPES } from "./utils/utils";
+// import { MESSAGE_TYPE } from "./utils/utils";
+import { MESSAGE_TYPE } from "../p2p/server";
 import { redisClient } from "../db/redis";
 import axios from "axios";
 import { PartySecretKeyConfig } from "../mpc/keygen/partyKey";
@@ -112,7 +113,7 @@ export class KeygenSessionManager extends AppLogger {
             round.init({ session: this.session, input: roundInput as GenericKeygenRoundInput });
       }
 
-      public static keygenRoundProcessor = async (data: ServerMessage) => {
+      public static keygenRoundProcessor = async (data: ServerMessage<KeygenMessageData>) => {
             if (!this.sessionInitialized) return;
             try {
                   const { broadcasts, proof } = data.data;
@@ -191,7 +192,7 @@ export class KeygenSessionManager extends AppLogger {
 
                   app.p2pServer.broadcast({
                         message: `${this.selfId} is prcessing round ${currentRound}`,
-                        type: MESSAGE_TYPES.keygenRoundHandler,
+                        type: MESSAGE_TYPE.keygenRoundHandler,
                         data: { broadcasts, proof },
                         senderNode: this.selfId,
                   });
@@ -200,7 +201,7 @@ export class KeygenSessionManager extends AppLogger {
                         await delay(500);
                         app.p2pServer.sendDirect(dm.To, {
                               message: `${this.selfId} is sending direct message to ${dm.To}`,
-                              type: MESSAGE_TYPES.keygenDirectMessageHandler,
+                              type: MESSAGE_TYPE.keygenDirectMessageHandler,
                               data: { directMessages: dm },
                         });
                   });
@@ -235,7 +236,7 @@ export class KeygenSessionManager extends AppLogger {
                                     Flatted.stringify({
                                           to: this.validator.publicKey,
                                           amount: proof,
-                                          type: MESSAGE_TYPES.KeygenTransaction,
+                                          type: MESSAGE_TYPE.KeygenTransaction,
                                     })
                               ),
                         5,

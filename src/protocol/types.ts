@@ -20,17 +20,30 @@ export type KeygenCurrentState = {
       session: KeygenSession;
 };
 
-export type ServerMessage = {
+export type ServerMessage<T extends any = {}> = {
       message: string;
       type: string;
-      data: {
-            broadcasts?: Msg<GenericKeygenRoundBroadcast>;
-            directMessages?: Msg<KeygenDirectMessageForRound4JSON>[];
-            proof?: string;
-      };
+      data: T;
       senderNode: string;
 };
 
+export type TransactionData<T extends any = {}> = {
+      type: string;
+      data: T;
+};
+
+export type KeygenMessageData = {
+      broadcasts?: Msg<GenericKeygenRoundBroadcast>;
+      directMessages?: Msg<KeygenDirectMessageForRound4JSON>[];
+      proof?: string;
+};
+
+export type GenericMessageParams<T> = {
+      type: "BROADCAST" | "DIRECT";
+      data: T;
+      destination?: string;
+      ttl?: number;
+};
 export type ServerDirectMessage = {
       message: string;
       type: string;

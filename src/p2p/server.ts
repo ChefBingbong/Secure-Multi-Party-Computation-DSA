@@ -6,8 +6,8 @@ import { redisClient } from "../db/redis";
 import { AppLogger } from "../http/middleware/logger";
 import Blockchain from "../consensus/ledger";
 import { KeygenSessionManager } from "../protocol/keygenProtocol";
-import { ServerDirectMessage, ServerMessage } from "../protocol/types";
-import { MESSAGE_TYPES } from "../protocol/utils/utils";
+import { GenericMessageParams, ServerDirectMessage, ServerMessage, TransactionData } from "../protocol/types";
+// import { MESSAGE_TYPE } from "../protocol/utils/utils";
 import Validator from "../protocol/validators/validator";
 import { ValidatorsGroup } from "../protocol/validators/validators";
 import TransactionPool from "../wallet/transactionPool";
@@ -18,26 +18,43 @@ import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import Flatted from "flatted";
 import { Server, WebSocket } from "ws";
 import { IncomingMessage } from "http";
+import Block from "../consensus/block";
 
-export const MESSAGE_TYPE = {
-      chain: "CHAIN",
-      block: "BLOCK",
-      transaction: "TRANSACTION",
-      clear_transactions: "CLEAR_TRANSACTIONS",
-      prepare: "PREPARE",
-      pre_prepare: "PRE-PREPARE",
-      commit: "COMMIT",
-      round_change: "ROUND_CHANGE",
+export enum MESSAGE_TYPE {
+      chain = "CHAIN",
+      block = "BLOCK",
+      transaction = "TRANSACTION",
+      clear_transactions = "CLEAR_TRANSACTIONS",
+      prepare = "PREPARE",
+      pre_prepare = "PRE-PREPARE",
+      commit = "COMMIT",
+      round_change = "ROUND_CHANGE",
+      keygenDirectMessageHandler = "keygenDirectMessageHandler",
+      keygenInit = "keygenInit",
+      keygenRoundHandler = "keygenRoundHandler",
+      LeaderElection = "LeaderElection",
+      LeaderVote = "LeaderVote",
+      SetNewLeader = "SetNewLeader",
+      KeygenTransaction = "KeygenTransaction",
+}
+
+export const NetworkMessages: { [x: string]: string } = {
+      [MESSAGE_TYPE.chain]: `${config.p2pPort} sending chain`,
+      [MESSAGE_TYPE.SetNewLeader]: `${config.p2pPort} is updating leader`,
+      [MESSAGE_TYPE.LeaderVote]: `${config.p2pPort} voted`,
+      [MESSAGE_TYPE.LeaderElection]: `${config.p2pPort} is starting a new leader election`,
+      [MESSAGE_TYPE.transaction]: `${config.p2pPort} broadcasting transaction`,
+      [MESSAGE_TYPE.pre_prepare]: `${config.p2pPort} broadcasting pre-prepared block`,
+      [MESSAGE_TYPE.prepare]: `${config.p2pPort} broadcasting prepared block`,
+      [MESSAGE_TYPE.commit]: `${config.p2pPort} broadcasting block commit`,
+      [MESSAGE_TYPE.round_change]: `${config.p2pPort} broadcasting new leader election`,
 };
-// const root = protobuf.loadSync("../../types_pb");
 
-// // Obtain the message type
-// const YourMessageType = root.lookupType("YourMessageType");
 export interface NetworkMessageDirect<T> {
-      message: T;
-      id?: string;
-      origin?: string;
-      ttl?: number;
+      message: string;
+      type: string;
+      data?: T;
+      senderNode?: string;
 }
 
 export interface NetworkMessageBroadcast<T> extends NetworkMessageDirect<T> {
@@ -325,43 +342,6 @@ class P2pServer extends AppLogger {
             this.emitter.on(event, listener);
       };
 
-      public buildAndSendNetworkMessage = async <
-            Q,
-            T extends NetworkMessageDirect<Q> & NetworkMessageBroadcast<Q>
-      >(
-            type: "BROADCAST" | "DIRECT",
-            data: T
-      ) => {
-            try {
-                  switch (type) {
-                        case "BROADCAST":
-                              this.broadcast(data.message, data.id, data.origin, data.ttl);
-                              break;
-                        case "DIRECT":
-                              this.sendDirect(data.destination, data.message, data.id, data.origin, data.ttl);
-                              break;
-                        default:
-                              throw new ErrorWithCode(
-                                    `Invalid message type: ${type}`,
-                                    ProtocolError.INTERNAL_ERROR
-                              );
-                  }
-            } catch (error) {
-                  console.log(error);
-                  throw new ErrorWithCode(`Failed to send message across network`, ProtocolError.INTERNAL_ERROR);
-            }
-      };
-
-      public sendChain = (nodeId) => {
-            this.sendDirect(nodeId, {
-                  message: `${nodeId} sending chain`,
-                  type: MESSAGE_TYPE.chain,
-                  data: JSON.stringify({
-                        chain: this.chain.chain,
-                  }),
-            });
-      };
-
       private throwError = (error: string) => {
             throw new Error(error);
       };
@@ -373,7 +353,7 @@ class P2pServer extends AppLogger {
             }
             this.broadcast({
                   message: `${this.NODE_ID} is starting a new keygen session`,
-                  type: MESSAGE_TYPES.keygenInit,
+                  type: MESSAGE_TYPE.keygenInit,
             });
       };
 
@@ -385,7 +365,8 @@ class P2pServer extends AppLogger {
                   if (chain) this.chain.chain = chain;
 
                   if (nodeId !== this.NODE_ID) {
-                        this.sendChain(nodeId);
+                        const data = { type: MESSAGE_TYPE.chain, data: this.chain.chain };
+                        this.buildAndSendNetworkMessage<Block[]>({ type: "DIRECT", data, destination: nodeId });
                   }
                   await callback(Number(nodeId), "CONNECT");
                   console.log(this.threshold, this.validators);
@@ -401,14 +382,14 @@ class P2pServer extends AppLogger {
       };
 
       private handleBroadcastMessage = (callback?: () => Promise<void>) => {
-            this.on("broadcast", async ({ message }: { message: ServerMessage }) => {
+            this.on("broadcast", async ({ message }: { message: ServerMessage<any> }) => {
                   this.log.info(`${message.message}`);
                   this.validator.messages.set(0, message);
 
-                  if (message.type === MESSAGE_TYPES.keygenRoundHandler) {
+                  if (message.type === MESSAGE_TYPE.keygenRoundHandler) {
                         await KeygenSessionManager.keygenRoundProcessor(message);
                   }
-                  if (message.type === MESSAGE_TYPES.keygenInit) {
+                  if (message.type === MESSAGE_TYPE.keygenInit) {
                         KeygenSessionManager.startNewSession({
                               selfId: this.NODE_ID,
                               partyIds: this.validators,
@@ -417,8 +398,8 @@ class P2pServer extends AppLogger {
 
                         await KeygenSessionManager.finalizeCurrentRound(0);
                   }
-                  if (message.type === MESSAGE_TYPES.LeaderElection) {
-                        let currentLeader = message.senderNode;
+                  if (message.type === MESSAGE_TYPE.LeaderElection) {
+                        let currentLeader: string = message.data;
                         try {
                               const eligibleLalidators = this.validators.filter((v) => v !== currentLeader);
                               const voteIndex = Math.abs(
@@ -434,22 +415,20 @@ class P2pServer extends AppLogger {
                                     throw new Error(`bad vote result. error in leader election`);
                               }
 
-                              this.sendDirect(currentLeader, {
-                                    message: `${this.NODE_ID} voted for ${thisNodesVoteResult}`,
-                                    type: MESSAGE_TYPES.LeaderVote,
-                                    data: { vote: thisNodesVoteResult, validators: eligibleLalidators },
-                                    senderNode: this.NODE_ID,
+                              this.buildAndSendNetworkMessage<{ vote: string; validators: string[] }>({
+                                    type: "DIRECT",
+                                    data: {
+                                          type: MESSAGE_TYPE.LeaderVote,
+                                          data: { vote: thisNodesVoteResult, validators: eligibleLalidators },
+                                    },
+                                    destination: currentLeader,
                               });
                         } catch (error) {
-                              this.broadcast({
-                                    message: `${this.NODE_ID} is updating leader`,
-                                    type: MESSAGE_TYPES.SetNewLeader,
-                                    data: { newLeader: currentLeader },
-                              });
+                              this.chain.handleStateUpdate<string>(MESSAGE_TYPE.SetNewLeader, currentLeader);
                         }
                   }
-                  if (message.type === MESSAGE_TYPES.SetNewLeader) {
-                        const newLeader = (message.data as any).newLeader;
+                  if (message.type === MESSAGE_TYPE.SetNewLeader) {
+                        const newLeader: string = message.data;
                         const { ports, publickKeys } = ValidatorsGroup.getAllKeys();
                         const newLeaderPublicKey = publickKeys[ports.indexOf(newLeader)];
 
@@ -463,20 +442,20 @@ class P2pServer extends AppLogger {
                         this.chain.replaceChain(data);
                   }
 
-                  this.chain.handleMessage(message, this.NODE_ID);
+                  await this.chain.handleMessage(message);
                   await callback();
             });
       };
 
       private handleDirectMessage = (callback?: () => Promise<void>) => {
-            this.on("direct", async ({ message }: { message: ServerDirectMessage }) => {
+            this.on("direct", async ({ message }: { message: ServerMessage<any> }) => {
                   this.log.info(`${message.message}`);
 
                   if (message.type === MESSAGE_TYPE.chain) {
-                        const data = (JSON.parse(message.data as string) as any).chain;
+                        const data = message.data as Block[];
                         this.chain.replaceChain(data);
                   }
-                  if (message.type === MESSAGE_TYPES.keygenDirectMessageHandler) {
+                  if (message.type === MESSAGE_TYPE.keygenDirectMessageHandler) {
                         this.validator.directMessagesMap.set(
                               KeygenSessionManager.currentRound,
                               this.validator.nodeId,
@@ -484,7 +463,7 @@ class P2pServer extends AppLogger {
                         );
                         await KeygenSessionManager.keygenRoundDirectMessageProcessor(message);
                   }
-                  if (message.type === MESSAGE_TYPES.LeaderVote) {
+                  if (message.type === MESSAGE_TYPE.LeaderVote) {
                         let maxVotes = 0;
                         let winner = this.chain.leader;
 
@@ -513,23 +492,50 @@ class P2pServer extends AppLogger {
                                     await redisClient.setSignleData("leader", winner);
                                     await delay(500);
 
-                                    this.broadcast({
-                                          message: `${this.NODE_ID} is updating leader`,
-                                          type: MESSAGE_TYPES.SetNewLeader,
-                                          data: { newLeader: winner },
-                                    });
+                                    this.chain.handleStateUpdate<string>(MESSAGE_TYPE.SetNewLeader, winner);
                               }
                         } catch (error) {
-                              this.chain.leader = winner;
-                              this.broadcast({
-                                    message: `${this.NODE_ID} is updating leader`,
-                                    type: MESSAGE_TYPES.SetNewLeader,
-                                    data: { newLeader: winner },
-                              });
+                              this.chain.handleStateUpdate<string>(MESSAGE_TYPE.SetNewLeader, this.chain.leader);
                         }
                   }
                   await callback();
             });
+      };
+
+      public buildAndSendNetworkMessage = async <T extends any = {}>({
+            type,
+            data,
+            destination,
+            ttl = 255,
+      }: GenericMessageParams<TransactionData<T>>) => {
+            try {
+                  const messagePayload = this.buildPayloadFromParams<T>(data);
+                  switch (type) {
+                        case "BROADCAST":
+                              this.broadcast(messagePayload, v4(), this.validator.ID, ttl);
+                              break;
+                        case "DIRECT":
+                              this.sendDirect(destination, messagePayload, v4(), this.validator.ID, ttl);
+                              break;
+                        default:
+                              throw new ErrorWithCode(
+                                    `Invalid message type: ${type}`,
+                                    ProtocolError.INTERNAL_ERROR
+                              );
+                  }
+            } catch (error) {
+                  console.log(error);
+                  throw new ErrorWithCode(`Failed to send message across network`, ProtocolError.INTERNAL_ERROR);
+            }
+      };
+
+      private buildPayloadFromParams = <T extends any>(params: TransactionData<T>): ServerMessage<any> => {
+            return {
+                  message: NetworkMessages[params.type],
+                  type: params.type,
+                  data: params.data,
+                  senderNode: this.validator.nodeId,
+            };
       };
 }
 

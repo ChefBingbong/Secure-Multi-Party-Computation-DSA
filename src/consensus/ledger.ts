@@ -15,7 +15,9 @@ import Validator from "../protocol/validators/validator";
 import config from "../config/config";
 import Transaction from "../wallet/transaction";
 import { KeygenSessionManager } from "../protocol/keygenProtocol";
-import { MESSAGE_TYPES } from "../protocol/utils/utils";
+import { ServerMessage } from "../protocol/types";
+
+export type GenericPBFTMessage = PrepareMessage & CommitMessage & RoundChangeMessage & Block & Transaction<any>;
 
 export interface BlockchainInterface {
       addBlock(data: any): Promise<Block>;
@@ -49,6 +51,18 @@ class Blockchain implements BlockchainInterface {
             this.messagePool = new MessagePool();
       }
 
+      public addUpdatedBlock(
+            hash: string,
+            blockPool: BlockPool,
+            preparePool: PreparePool,
+            commitPool: CommitPool
+      ) {
+            let block = blockPool.getBlock(hash);
+            block.prepareMessages = preparePool.list[hash];
+            block.commitMessages = commitPool.list[hash];
+            this.addBlock(block);
+      }
+
       public async addBlock(block: any): Promise<Block> {
             try {
                   this.chain.push(block);
@@ -65,6 +79,8 @@ class Blockchain implements BlockchainInterface {
 
       public createBlock(transactions: any, wallet: Wallet): Block {
             const block = Block.createBlock(this.chain[this.chain.length - 1], transactions, wallet);
+            this.logger.info(`PROPOSING BLOCK`);
+            console.log(block);
             return block;
       }
 
@@ -83,18 +99,6 @@ class Blockchain implements BlockchainInterface {
                   }
             }
             return true;
-      }
-
-      public addUpdatedBlock(
-            hash: string,
-            blockPool: BlockPool,
-            preparePool: PreparePool,
-            commitPool: CommitPool
-      ) {
-            let block = blockPool.getBlock(hash);
-            block.prepareMessages = preparePool.list[hash];
-            block.commitMessages = commitPool.list[hash];
-            this.addBlock(block);
       }
 
       public async replaceChain(newChain: Block[]): Promise<void> {
@@ -137,7 +141,7 @@ class Blockchain implements BlockchainInterface {
       public electNewLeader = async () => {
             let leader = this.leader ?? (await redisClient.getSingleData<string>("leader"));
             try {
-                  if (!leader) {
+                  if (!leader || ValidatorsGroup.getAllKeys().publickKeys.includes(leader)) {
                         leader = this.validator.nodeId;
                         await redisClient.setSignleData("leader", leader);
                   } else {
@@ -149,18 +153,9 @@ class Blockchain implements BlockchainInterface {
                   if (this.validator.nodeId !== leader) {
                         throw new Error(`election can only be started by previous rounds leader`);
                   }
-
-                  app.p2pServer.broadcast({
-                        message: `${this.validator.nodeId} is starting a new leader election`,
-                        type: MESSAGE_TYPES.LeaderElection,
-                        senderNode: leader,
-                  });
+                  this.handleStateUpdate<string>(MESSAGE_TYPE.LeaderElection, leader);
             } catch (error) {
-                  app.p2pServer.broadcast({
-                        message: `${this.validator.nodeId} is updating leader`,
-                        type: MESSAGE_TYPES.SetNewLeader,
-                        data: { newLeader: leader },
-                  });
+                  this.handleStateUpdate<string>(MESSAGE_TYPE.SetNewLeader, leader);
             }
       };
 
@@ -169,201 +164,207 @@ class Blockchain implements BlockchainInterface {
             await redisClient.setSignleData<any>("chain", this.chain);
       };
 
-      public handleMessage = async (data: any, nodeId: string) => {
-            try {
-                  if (data.type === MESSAGE_TYPE.transaction) {
-                        const Data = JSON.parse(data.data);
-                        const transaction = Data.transaction;
+      public handleMessage = async <Type extends ServerMessage<GenericPBFTMessage>>(data: Type) => {
+            switch (data.type) {
+                  case MESSAGE_TYPE.transaction:
+                        this.handleNewTransaction(data.data as Transaction<any>);
+                        break;
+                  case MESSAGE_TYPE.pre_prepare:
+                        this.handleNewBlockPrePrepare(data.data as Block);
+                        break;
+                  case MESSAGE_TYPE.prepare:
+                        this.handleNewBlockPrepare(data.data as PrepareMessage);
+                        break;
+                  case MESSAGE_TYPE.commit:
+                        this.handleNewBlockCommit(data.data as CommitMessage);
+                        break;
+                  case MESSAGE_TYPE.round_change:
+                        this.handleNewRoundChange(data.data as RoundChangeMessage);
+                        break;
+                  default:
+                        break;
+            }
+      };
+
+      private handleNewTransaction = (transaction: Transaction<any>) => {
+            if (
+                  !this.transactionPool.transactionExists(transaction) &&
+                  this.transactionPool.verifyTransaction(transaction) &&
+                  ValidatorsGroup.isValidValidator(transaction.from)
+            ) {
+                  try {
+                        let thresholdReached = this.transactionPool.addTransaction(transaction);
+                        if (!thresholdReached) return;
+
+                        this.handleStateUpdate<Transaction<any>>(MESSAGE_TYPE.transaction, transaction);
                         if (
-                              !this.transactionPool.transactionExists(transaction) &&
-                              this.transactionPool.verifyTransaction(transaction) &&
-                              ValidatorsGroup.isValidValidator(transaction.from)
+                              ValidatorsGroup.getPublickKeyFromNodeId(this.leader) == this.validator.getPublicKey()
                         ) {
-                              let thresholdReached = this.transactionPool.addTransaction(transaction);
-                              this.sendTransaction(transaction, this.validator.nodeId);
-
-                              if (thresholdReached) {
-                                    console.log("THRESHOLD REACHED");
-                                    if (
-                                          ValidatorsGroup.getPublickKeyFromNodeId(this.leader) ==
-                                          this.validator.getPublicKey()
-                                    ) {
-                                          console.log("PROPOSING BLOCK");
-                                          let block = this.createBlock(
-                                                this.transactionPool.transactions,
-                                                this.validator
-                                          );
-                                          console.log("CREATED BLOCK", block);
-                                          await delay(500);
-                                          this.broadcastPrePrepare(block, this.validator.nodeId);
-                                    }
-                              } else {
-                                    console.log("Transaction Added");
-                              }
+                              let block = this.createBlock(this.transactionPool.transactions, this.validator);
+                              this.handleStateUpdate<Block>(MESSAGE_TYPE.pre_prepare, block);
                         }
-                  } else if (data.type === MESSAGE_TYPE.pre_prepare) {
-                        const block = data.data.block;
-                        if (!this.blockPool.existingBlock(block) && this.isValidBlock(block)) {
-                              this.blockPool.addBlock(block);
+                  } catch (error) {
+                        throw new ErrorWithCode(`error handling new transaction`, ProtocolError.INTERNAL_ERROR);
+                  }
+            }
+      };
 
-                              await delay(500);
-                              this.broadcastPrePrepare(block, this.validator.nodeId);
-                              let prepare = this.preparePool.prepare(block, this.validator);
-                              await delay(500);
+      private handleNewBlockPrePrepare = (block: Block) => {
+            if (!this.blockPool.existingBlock(block) && this.isValidBlock(block)) {
+                  try {
+                        this.blockPool.addBlock(block);
+                        this.handleStateUpdate<Block>(MESSAGE_TYPE.pre_prepare, block);
 
-                              this.broadcastPrepare(prepare, this.validator.nodeId);
-                        }
-                  } else if (data.type === MESSAGE_TYPE.prepare) {
-                        const prepare = data.data.prepare;
-                        console.log(
-                              !this.preparePool.existingPrepare(prepare),
-                              this.preparePool.isValidPrepare(prepare),
-                              ValidatorsGroup.isValidValidator(prepare.publicKey)
+                        let prepare = this.preparePool.prepare(block, this.validator);
+                        this.handleStateUpdate<PrepareMessage>(MESSAGE_TYPE.prepare, prepare);
+                  } catch (error) {
+                        throw new ErrorWithCode(
+                              `error handling new pre-prepareed block`,
+                              ProtocolError.INTERNAL_ERROR
                         );
+                  }
+            }
+      };
+
+      private handleNewBlockPrepare = (prepare: PrepareMessage) => {
+            if (
+                  !this.preparePool.existingPrepare(prepare) &&
+                  this.preparePool.isValidPrepare(prepare) &&
+                  ValidatorsGroup.isValidValidator(prepare.publicKey)
+            ) {
+                  try {
                         if (
                               !this.preparePool.existingPrepare(prepare) &&
                               this.preparePool.isValidPrepare(prepare) &&
                               ValidatorsGroup.isValidValidator(prepare.publicKey)
                         ) {
                               this.preparePool.addPrepare(prepare);
-                              this.broadcastPrepare(prepare, this.validator.nodeId);
+                              this.handleStateUpdate<PrepareMessage>(MESSAGE_TYPE.prepare, prepare);
+                              if (this.preparePool.list[prepare.blockHash].length < MIN_APPROVALS) return;
 
-                              console.log(this.preparePool.list[prepare.blockHash]?.length, MIN_APPROVALS);
-                              if (this.preparePool.list[prepare.blockHash].length >= MIN_APPROVALS) {
-                                    let commit = this.commitPool.commit(prepare, this.validator);
-                                    await delay(500);
-
-                                    this.broadcastCommit(commit, this.validator.nodeId);
-                              }
+                              let commit = this.commitPool.commit(prepare, this.validator);
+                              this.handleStateUpdate<CommitMessage>(MESSAGE_TYPE.commit, commit);
                         }
-                  } else if (data.type === MESSAGE_TYPE.commit) {
-                        const commit = data.data.commit;
-                        if (
-                              !this.commitPool.existingCommit(commit) &&
-                              this.commitPool.isValidCommit(commit) &&
-                              ValidatorsGroup.isValidValidator(commit.publicKey)
-                        ) {
-                              this.commitPool.addCommit(commit);
-                              this.broadcastCommit(commit, this.validator.nodeId);
-
-                              if (this.commitPool.list[commit.blockHash].length >= MIN_APPROVALS) {
-                                    this.addUpdatedBlock(
-                                          commit.blockHash,
-                                          this.blockPool,
-                                          this.preparePool,
-                                          this.commitPool
-                                    );
-                              }
-
-                              let message = this.messagePool.createMessage(
-                                    this.chain[this.chain.length - 1].hash,
-                                    this.validator
-                              );
-                              this.broadcastRoundChange(message, this.validator.nodeId);
-                        }
-                  } else if (data.type === MESSAGE_TYPE.round_change) {
-                        const message = data.data.message;
-                        if (
-                              !this.messagePool.existingMessage(message) &&
-                              this.messagePool.isValidMessage(message) &&
-                              ValidatorsGroup.isValidValidator(message.publicKey)
-                        ) {
-                              this.messagePool.addMessage(message);
-                              this.broadcastRoundChange(message, this.validator.nodeId);
-
-                              console.log(this.messagePool.list[message.blockHash].length);
-                              if (this.messagePool.list[message.blockHash].length >= MIN_APPROVALS) {
-                                    console.log("CLEARED POOL");
-                                    this.transactionPool.clear();
-                              }
-                        }
+                  } catch (error) {
+                        throw new ErrorWithCode(
+                              `error handling new prepareed block`,
+                              ProtocolError.INTERNAL_ERROR
+                        );
                   }
-            } catch (error) {
-                  console.log(error);
             }
       };
 
-      public sendChain = (nodeId: string) => {
-            app.p2pServer.sendDirect(nodeId, {
-                  message: `${nodeId} sending chain`,
-                  type: MESSAGE_TYPE.chain,
-                  data: JSON.stringify({
-                        chain: this.chain,
-                  }),
-            });
+      private handleNewBlockCommit = (commit: CommitMessage) => {
+            if (
+                  !this.commitPool.existingCommit(commit) &&
+                  this.commitPool.isValidCommit(commit) &&
+                  ValidatorsGroup.isValidValidator(commit.publicKey)
+            ) {
+                  try {
+                        this.commitPool.addCommit(commit);
+                        this.handleStateUpdate<CommitMessage>(MESSAGE_TYPE.commit, commit);
+                        if (this.commitPool.list[commit.blockHash].length < MIN_APPROVALS) return;
+
+                        this.addUpdatedBlock(commit.blockHash, this.blockPool, this.preparePool, this.commitPool);
+
+                        let message = this.messagePool.createMessage(
+                              this.chain[this.chain.length - 1].hash,
+                              this.validator
+                        );
+                        this.handleStateUpdate<RoundChangeMessage>(MESSAGE_TYPE.round_change, message);
+                  } catch (error) {
+                        throw new ErrorWithCode(`error handling new block commit`, ProtocolError.INTERNAL_ERROR);
+                  }
+            }
       };
 
-      public syncChain = (nodeId: string) => {
-            app.p2pServer.broadcast({
-                  message: `${nodeId} sending chain`,
-                  type: MESSAGE_TYPE.chain,
-                  data: JSON.stringify({
-                        chain: this.chain,
-                  }),
-            });
+      private handleNewRoundChange = async (message: RoundChangeMessage) => {
+            if (
+                  !this.messagePool.existingMessage(message) &&
+                  this.messagePool.isValidMessage(message) &&
+                  ValidatorsGroup.isValidValidator(message.publicKey)
+            ) {
+                  try {
+                        this.messagePool.addMessage(message);
+                        this.handleStateUpdate<RoundChangeMessage>(MESSAGE_TYPE.round_change, message);
+                        if (this.messagePool.list[message.blockHash].length < MIN_APPROVALS) return;
+
+                        await delay(500);
+                        if (
+                              this.validator.nodeId === this.leader &&
+                              this.transactionPool.transactions.length > 0
+                        ) {
+                              this.electNewLeader();
+                              this.logger.info(`CREATED BLOCK.. ELECTING NEW LEADER`);
+                        }
+                        this.transactionPool.clear();
+                  } catch (error) {
+                        throw new ErrorWithCode(`error handling new round change`, ProtocolError.INTERNAL_ERROR);
+                  }
+            }
       };
 
-      public sendTransaction = (transaction: Transaction<any>, nodeId: string) => {
-            app.p2pServer.broadcast({
-                  message: `${nodeId} sending transaction`,
-                  type: MESSAGE_TYPE.transaction,
-                  data: JSON.stringify({
-                        transaction: transaction,
-                  }),
-            });
+      public handleStateUpdate = <State>(stateType: MESSAGE_TYPE, newState: State) => {
+            switch (stateType) {
+                  case MESSAGE_TYPE.transaction:
+                        app.p2pServer.buildAndSendNetworkMessage<State>({
+                              type: "BROADCAST",
+                              data: { type: MESSAGE_TYPE.transaction, data: newState },
+                        });
+                        break;
+                  case MESSAGE_TYPE.round_change:
+                        app.p2pServer.buildAndSendNetworkMessage<State>({
+                              type: "BROADCAST",
+                              data: { type: MESSAGE_TYPE.round_change, data: newState },
+                        });
+                        break;
+
+                  case MESSAGE_TYPE.commit:
+                        app.p2pServer.buildAndSendNetworkMessage<State>({
+                              type: "BROADCAST",
+                              data: { type: MESSAGE_TYPE.commit, data: newState },
+                        });
+                        break;
+
+                  case MESSAGE_TYPE.prepare:
+                        app.p2pServer.buildAndSendNetworkMessage<State>({
+                              type: "BROADCAST",
+                              data: { type: MESSAGE_TYPE.prepare, data: newState },
+                        });
+                        break;
+
+                  case MESSAGE_TYPE.pre_prepare:
+                        app.p2pServer.buildAndSendNetworkMessage<State>({
+                              type: "BROADCAST",
+                              data: { type: MESSAGE_TYPE.pre_prepare, data: newState },
+                        });
+                        break;
+
+                  case MESSAGE_TYPE.LeaderElection:
+                        app.p2pServer.buildAndSendNetworkMessage<State>({
+                              type: "BROADCAST",
+                              data: {
+                                    type: MESSAGE_TYPE.LeaderElection,
+                                    data: newState,
+                              },
+                        });
+                        break;
+
+                  case MESSAGE_TYPE.SetNewLeader:
+                        app.p2pServer.buildAndSendNetworkMessage<State>({
+                              type: "BROADCAST",
+                              data: {
+                                    type: MESSAGE_TYPE.SetNewLeader,
+                                    data: newState,
+                              },
+                        });
+                        break;
+
+                  default:
+                        console.log(stateType);
+                        throw new ErrorWithCode(`unsupported state update type`, ProtocolError.PARAMETER_ERROR);
+            }
       };
-
-      public sendBlock = (block: Block, nodeId: string) => {
-            app.p2pServer.broadcast({
-                  message: `${nodeId} sending block`,
-                  type: MESSAGE_TYPE.block,
-                  data: JSON.stringify({
-                        block: block,
-                  }),
-            });
-      };
-
-      // broadcasts preprepare
-      broadcastPrePrepare(block: Block, nodeId: string) {
-            app.p2pServer.broadcast({
-                  message: `${nodeId} broadcasting pre-prepared block`,
-                  type: MESSAGE_TYPE.pre_prepare,
-                  data: { block: block },
-            });
-      }
-
-      // broadcast prepare
-      public broadcastPrepare(prepare: PrepareMessage, nodeId: string) {
-            console.log("hey");
-            app.p2pServer.broadcast({
-                  message: `${nodeId} broadcasting prepared block`,
-                  type: MESSAGE_TYPE.prepare,
-                  data: {
-                        prepare: prepare,
-                  },
-            });
-      }
-
-      // broadcasts commit
-      public broadcastCommit(commit: CommitMessage, nodeId: string) {
-            app.p2pServer.broadcast({
-                  message: `${nodeId} broadcasting commit block`,
-                  type: MESSAGE_TYPE.commit,
-                  data: {
-                        commit: commit,
-                  },
-            });
-      }
-
-      public broadcastRoundChange(message: RoundChangeMessage, nodeId: string) {
-            app.p2pServer.broadcast({
-                  message: `${nodeId} broadcasting round change block`,
-                  type: MESSAGE_TYPE.round_change,
-                  data: {
-                        message: message,
-                  },
-            });
-      }
 }
 
 export default Blockchain;
