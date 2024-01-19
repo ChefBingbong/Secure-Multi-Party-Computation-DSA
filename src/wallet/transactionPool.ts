@@ -22,7 +22,11 @@ class TransactionPool implements BaseTransactionPoolInterface {
       }
 
       public verifyTransaction<T extends any>(transaction: Transaction<T>) {
-            return Transaction.verifyTransaction(transaction);
+            try {
+                  return Transaction.verifyTransaction(transaction);
+            } catch (err) {
+                  return false;
+            }
       }
 
       public validTransactions<T extends any>(): Transaction<T>[] {

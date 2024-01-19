@@ -25,6 +25,7 @@ export interface BlockchainInterface {
       replaceChain(newChain: Block[]): Promise<void>;
       isValidBlock(block: Block): boolean;
 }
+export type LeaderElectionArgs = { vote: string; validators: string[]; senderNode: string };
 const MIN_APPROVALS = 2 * (3 / 3) + 0;
 class Blockchain implements BlockchainInterface {
       public chain: Block[];
@@ -36,6 +37,7 @@ class Blockchain implements BlockchainInterface {
       public preparePool: PreparePool;
       public commitPool: CommitPool;
       public messagePool: MessagePool;
+      public votes: { voter: string; vote: string }[] = [];
       private logger: Logger;
 
       constructor(logger: Logger, transactionPool: TransactionPool, validators: string[], validator: Validator) {
@@ -163,29 +165,118 @@ class Blockchain implements BlockchainInterface {
             await redisClient.setSignleData<any>("chain", this.chain);
       };
 
-      public handleMessage = async <Type extends ServerMessage<GenericPBFTMessage>>(data: Type) => {
+      public handleBlockchainConsensusMessage = async <Type extends ServerMessage<GenericPBFTMessage | any>>(
+            data: Type
+      ) => {
             switch (data.type) {
+                  case MESSAGE_TYPE.chain:
+                        const chain = data.data as Block[];
+                        this.replaceChain(chain);
                   case MESSAGE_TYPE.transaction:
-                        this.handleNewTransaction(data.data as Transaction<any>);
+                        this.handleNewTransaction<Transaction<any>>(data.data);
                         break;
                   case MESSAGE_TYPE.pre_prepare:
-                        this.handleNewBlockPrePrepare(data.data as Block);
+                        this.handleNewBlockPrePrepare<Block>(data.data);
                         break;
                   case MESSAGE_TYPE.prepare:
-                        this.handleNewBlockPrepare(data.data as PrepareMessage);
+                        this.handleNewBlockPrepare<PrepareMessage>(data.data);
                         break;
                   case MESSAGE_TYPE.commit:
-                        this.handleNewBlockCommit(data.data as CommitMessage);
+                        this.handleNewBlockCommit<CommitMessage>(data.data);
                         break;
                   case MESSAGE_TYPE.round_change:
-                        this.handleNewRoundChange(data.data as RoundChangeMessage);
+                        this.handleNewRoundChange<RoundChangeMessage>(data.data);
+                        break;
+                  case MESSAGE_TYPE.LeaderVote:
+                        const msg = { senderNode: data.senderNode, ...data.data };
+                        await this.handleNewElectionRoundVote<LeaderElectionArgs>(msg);
+                        break;
+                  case MESSAGE_TYPE.LeaderElection:
+                        this.handleNewElectionRound<string>(data.data);
+                        break;
+                  case MESSAGE_TYPE.SetNewLeader:
+                        await this.handleNewElectionRoundResult<string>(data.data);
                         break;
                   default:
                         break;
             }
       };
 
-      private handleNewTransaction = (transaction: Transaction<any>) => {
+      private handleNewElectionRoundResult = async <T extends string>(newLeader: T) => {
+            try {
+                  const { ports, publickKeys } = ValidatorsGroup.getAllKeys();
+                  const newLeaderPublicKey = publickKeys[ports.indexOf(newLeader)];
+
+                  this.leader = newLeader;
+                  this.logger.info(`the new leader is ${newLeader} ${newLeaderPublicKey}`);
+                  await redisClient.setSignleData("leader", newLeader);
+            } catch (error) {
+                  throw new ErrorWithCode(`error setting new leader`, ProtocolError.INTERNAL_ERROR);
+            }
+      };
+
+      private handleNewElectionRound = <T extends string>(currentLeader: T) => {
+            try {
+                  const eligibleLalidators = app.p2pServer.validators.filter((v) => v !== currentLeader);
+                  const voteIndex = Math.abs(Math.floor(Math.random() * eligibleLalidators.length - 1));
+
+                  if (voteIndex < 0 || voteIndex > eligibleLalidators.length) {
+                        throw new Error(`bad vote index. error in leader election`);
+                  }
+
+                  const VoteResult = eligibleLalidators[voteIndex];
+                  if (!eligibleLalidators.includes(VoteResult)) {
+                        throw new Error(`bad vote result. error in leader election`);
+                  }
+                  const data = { vote: VoteResult, validators: eligibleLalidators };
+
+                  app.p2pServer.buildAndSendNetworkMessage<{ vote: string; validators: string[] }>({
+                        type: "DIRECT",
+                        data: { type: MESSAGE_TYPE.LeaderVote, data },
+                        destination: currentLeader,
+                  });
+            } catch (error) {
+                  console.log(error);
+                  this.handleStateUpdate<string>(MESSAGE_TYPE.SetNewLeader, currentLeader);
+            }
+      };
+      private handleNewElectionRoundVote = async <T extends LeaderElectionArgs>({
+            vote,
+            validators,
+            senderNode,
+      }: T) => {
+            let maxVotes = 0;
+            try {
+                  if (!vote || !validators) {
+                        throw new Error(`bad vote result. error in leader election`);
+                  }
+                  this.votes.push({ voter: senderNode, vote: vote });
+                  const voters = this.votes.map((vote) => vote.voter);
+
+                  if (validators.every((itemA) => voters.includes(itemA))) {
+                        const voteCount: Record<string, number> = {};
+                        const votes = this.votes.map((vote) => vote.vote);
+
+                        votes.forEach((v) => (voteCount[v] = voteCount[v] ? voteCount[v] + 1 : 1));
+                        for (const candidate in voteCount) {
+                              if (voteCount[candidate] > maxVotes) {
+                                    maxVotes = voteCount[candidate];
+                                    this.leader = candidate;
+                              }
+                        }
+                        this.votes = [];
+                        await redisClient.setSignleData("leader", this.leader);
+
+                        await delay(500);
+                        this.handleStateUpdate<string>(MESSAGE_TYPE.SetNewLeader, this.leader);
+                  }
+            } catch (error) {
+                  console.log(error);
+                  this.handleStateUpdate<string>(MESSAGE_TYPE.SetNewLeader, this.leader);
+            }
+      };
+
+      private handleNewTransaction = <T extends Transaction<any>>(transaction: T) => {
             if (
                   !this.transactionPool.transactionExists(transaction) &&
                   this.transactionPool.verifyTransaction(transaction) &&
@@ -208,7 +299,7 @@ class Blockchain implements BlockchainInterface {
             }
       };
 
-      private handleNewBlockPrePrepare = (block: Block) => {
+      private handleNewBlockPrePrepare = <T extends Block>(block: T) => {
             if (!this.blockPool.existingBlock(block) && this.isValidBlock(block)) {
                   try {
                         this.blockPool.addBlock(block);
@@ -225,7 +316,7 @@ class Blockchain implements BlockchainInterface {
             }
       };
 
-      private handleNewBlockPrepare = (prepare: PrepareMessage) => {
+      private handleNewBlockPrepare = <T extends PrepareMessage>(prepare: T) => {
             if (
                   !this.preparePool.existingMessage(prepare) &&
                   this.preparePool.isValidMessage(prepare) &&
@@ -253,7 +344,7 @@ class Blockchain implements BlockchainInterface {
             }
       };
 
-      private handleNewBlockCommit = (commit: CommitMessage) => {
+      private handleNewBlockCommit = <T extends CommitMessage>(commit: T) => {
             if (
                   !this.commitPool.existingMessage(commit) &&
                   this.commitPool.isValidMessage(commit) &&
@@ -277,7 +368,7 @@ class Blockchain implements BlockchainInterface {
             }
       };
 
-      private handleNewRoundChange = async (message: RoundChangeMessage) => {
+      private handleNewRoundChange = async <T extends RoundChangeMessage>(message: T) => {
             if (
                   !this.messagePool.existingMessage(message) &&
                   this.messagePool.isValidMessage(message) &&
@@ -295,6 +386,7 @@ class Blockchain implements BlockchainInterface {
                         ) {
                               this.electNewLeader();
                               this.logger.info(`CREATED BLOCK.. ELECTING NEW LEADER`);
+                              this.transactionPool.clear();
                         }
                         this.transactionPool.clear();
                   } catch (error) {
@@ -346,6 +438,16 @@ class Blockchain implements BlockchainInterface {
                                     type: MESSAGE_TYPE.LeaderElection,
                                     data: newState,
                               },
+                        });
+                        break;
+                  case MESSAGE_TYPE.LeaderVote:
+                        app.p2pServer.buildAndSendNetworkMessage<State>({
+                              type: "DIRECT",
+                              data: {
+                                    type: MESSAGE_TYPE.LeaderVote,
+                                    data: newState,
+                              },
+                              destination: (newState as LeaderElectionArgs).senderNode,
                         });
                         break;
 

@@ -4,7 +4,7 @@ import { Logger } from "winston";
 import config from "../config/config";
 import { redisClient } from "../db/redis";
 import { AppLogger } from "../http/middleware/logger";
-import Blockchain from "../consensus/ledger";
+import Blockchain, { LeaderElectionArgs } from "../consensus/ledger";
 import { KeygenSessionManager } from "../protocol/keygenProtocol";
 import { GenericMessageParams, ServerDirectMessage, ServerMessage, TransactionData } from "../protocol/types";
 // import { MESSAGE_TYPE } from "../protocol/utils/utils";
@@ -19,6 +19,7 @@ import Flatted from "flatted";
 import { Server, WebSocket } from "ws";
 import { IncomingMessage } from "http";
 import Block from "../consensus/block";
+import { error } from "console";
 
 export enum MESSAGE_TYPE {
       chain = "CHAIN",
@@ -74,7 +75,6 @@ class P2pServer extends AppLogger {
       public chain: Blockchain;
       public wallet: Wallet;
       public transactionPool: TransactionPool;
-      public votes: { voter: string; vote: string }[];
       public threshold: number;
 
       private log: Logger;
@@ -91,8 +91,6 @@ class P2pServer extends AppLogger {
             this.emitter = new P2PNetworkEventEmitter(false);
             this.emitter.on.bind(this.emitter);
             this.emitter.off.bind(this.emitter);
-
-            this.votes = [];
             this.log = this.getLogger("p2p-log");
 
             this.server = new WebSocket.Server({ port: Number(config.p2pPort) });
@@ -107,28 +105,20 @@ class P2pServer extends AppLogger {
       }
 
       private async updateReplica(p: number, type: "DISCONNECT" | "CONNECT"): Promise<void> {
-            let peers = await redisClient.getSingleData<number[]>("validators");
+            let peers = (await redisClient.getSingleData<number[]>("validators")) || [];
             let leader = await redisClient.getSingleData<string>("leader");
 
-            if (!peers) {
-                  await redisClient.setSignleData("validators", [p]);
-                  peers = [p];
-            }
-            if (!leader) {
-                  const { ports, publickKeys } = ValidatorsGroup.getAllKeys();
-                  leader = publickKeys[ports.indexOf("6001")];
-            }
-            if (type === "DISCONNECT")
-                  peers = [...peers].filter((value, index, self) => {
-                        return self.indexOf(value) === index && value !== p;
-                  });
-            else
-                  peers = [...peers, p].filter((value, index, self) => {
-                        return self.indexOf(value) === index;
-                  });
+            const { ports, publickKeys } = ValidatorsGroup.getAllKeys();
+            if (!leader) leader = publickKeys[ports.indexOf("6001")];
 
+            if (type === "DISCONNECT") {
+                  peers = peers.filter((value) => value !== p);
+            } else {
+                  peers.push(p);
+                  peers = [...new Set(peers!)];
+            }
             this.chain.leader = leader;
-            this.validators = peers.map((p) => p.toString());
+            this.validators = peers.map(String);
             this.threshold = this.validators.length;
       }
 
@@ -398,51 +388,8 @@ class P2pServer extends AppLogger {
 
                         await KeygenSessionManager.finalizeCurrentRound(0);
                   }
-                  if (message.type === MESSAGE_TYPE.LeaderElection) {
-                        let currentLeader: string = message.data;
-                        try {
-                              const eligibleLalidators = this.validators.filter((v) => v !== currentLeader);
-                              const voteIndex = Math.abs(
-                                    Math.floor(Math.random() * eligibleLalidators.length - 1)
-                              );
 
-                              if (voteIndex < 0 || voteIndex > eligibleLalidators.length) {
-                                    throw new Error(`bad vote index. error in leader election`);
-                              }
-                              const thisNodesVoteResult = eligibleLalidators[voteIndex];
-
-                              if (!eligibleLalidators.includes(thisNodesVoteResult)) {
-                                    throw new Error(`bad vote result. error in leader election`);
-                              }
-
-                              this.buildAndSendNetworkMessage<{ vote: string; validators: string[] }>({
-                                    type: "DIRECT",
-                                    data: {
-                                          type: MESSAGE_TYPE.LeaderVote,
-                                          data: { vote: thisNodesVoteResult, validators: eligibleLalidators },
-                                    },
-                                    destination: currentLeader,
-                              });
-                        } catch (error) {
-                              this.chain.handleStateUpdate<string>(MESSAGE_TYPE.SetNewLeader, currentLeader);
-                        }
-                  }
-                  if (message.type === MESSAGE_TYPE.SetNewLeader) {
-                        const newLeader: string = message.data;
-                        const { ports, publickKeys } = ValidatorsGroup.getAllKeys();
-                        const newLeaderPublicKey = publickKeys[ports.indexOf(newLeader)];
-
-                        this.chain.leader = newLeader;
-
-                        await redisClient.setSignleData("leader", newLeader);
-                        console.log(`the new leader is ${newLeader} ${newLeaderPublicKey}`);
-                  }
-                  if (message.type === MESSAGE_TYPE.chain) {
-                        const data = (message.data as any).chain;
-                        this.chain.replaceChain(data);
-                  }
-
-                  await this.chain.handleMessage(message);
+                  await this.chain.handleBlockchainConsensusMessage(message);
                   await callback();
             });
       };
@@ -450,55 +397,23 @@ class P2pServer extends AppLogger {
       private handleDirectMessage = (callback?: () => Promise<void>) => {
             this.on("direct", async ({ message }: { message: ServerMessage<any> }) => {
                   this.log.info(`${message.message}`);
-
-                  if (message.type === MESSAGE_TYPE.chain) {
-                        const data = message.data as Block[];
-                        this.chain.replaceChain(data);
-                  }
-                  if (message.type === MESSAGE_TYPE.keygenDirectMessageHandler) {
-                        this.validator.directMessagesMap.set(
-                              KeygenSessionManager.currentRound,
-                              this.validator.nodeId,
-                              message.data.directMessages.Data
-                        );
-                        await KeygenSessionManager.keygenRoundDirectMessageProcessor(message);
-                  }
-                  if (message.type === MESSAGE_TYPE.LeaderVote) {
-                        let maxVotes = 0;
-                        let winner = this.chain.leader;
-
-                        try {
-                              const { vote: recievedVote, validators } = (message as any).data;
-                              if (!recievedVote || !validators) {
-                                    throw new Error(`bad vote result. error in leader election`);
-                              }
-
-                              this.votes.push({ voter: message.senderNode, vote: recievedVote });
-                              const voters = this.votes.map((vote) => vote.voter);
-
-                              if (validators.every((itemA) => voters.includes(itemA))) {
-                                    const voteCount: Record<string, number> = {};
-                                    const votes = this.votes.map((vote) => vote.vote);
-
-                                    votes.forEach((v) => (voteCount[v] = voteCount[v] ? voteCount[v] + 1 : 1));
-                                    for (const candidate in voteCount) {
-                                          if (voteCount[candidate] > maxVotes) {
-                                                maxVotes = voteCount[candidate];
-                                                winner = candidate;
-                                          }
-                                    }
-                                    this.votes = [];
-                                    this.chain.leader = winner;
-                                    await redisClient.setSignleData("leader", winner);
-                                    await delay(500);
-
-                                    this.chain.handleStateUpdate<string>(MESSAGE_TYPE.SetNewLeader, winner);
-                              }
-                        } catch (error) {
-                              this.chain.handleStateUpdate<string>(MESSAGE_TYPE.SetNewLeader, this.chain.leader);
+                  try {
+                        if (message.type === MESSAGE_TYPE.keygenDirectMessageHandler) {
+                              this.validator.directMessagesMap.set(
+                                    KeygenSessionManager.currentRound,
+                                    this.validator.nodeId,
+                                    message.data.directMessages.Data
+                              );
+                              await KeygenSessionManager.keygenRoundDirectMessageProcessor(message);
+                        } else {
+                              await this.chain.handleBlockchainConsensusMessage<ServerMessage<LeaderElectionArgs>>(
+                                    message
+                              );
                         }
+                        await callback();
+                  } catch (error) {
+                        console.log(error);
                   }
-                  await callback();
             });
       };
 
