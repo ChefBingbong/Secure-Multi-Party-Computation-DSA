@@ -34,6 +34,7 @@ class CommitPool {
       }
 
       existingCommit(commit: CommitMessage): CommitMessage | undefined {
+            if (!this.list[commit.blockHash]) return undefined;
             return this.list[commit.blockHash].find((p) => p.publicKey === commit.publicKey);
       }
 

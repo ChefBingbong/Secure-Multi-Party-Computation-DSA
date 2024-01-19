@@ -38,6 +38,7 @@ class PreparePool {
       }
 
       existingPrepare(prepare: PrepareMessage): PrepareMessage | undefined {
+            if (!this.list[prepare.blockHash]) return undefined;
             return this.list[prepare.blockHash].find((p) => p.publicKey === prepare.publicKey);
       }
 

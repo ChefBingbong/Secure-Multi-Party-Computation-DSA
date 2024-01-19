@@ -176,31 +176,30 @@ class Blockchain implements BlockchainInterface {
                         console.log("yoooo");
 
                         this.blockPool.addBlock(block);
-                        console.log("yoooo");
+                        await delay(1000);
+
                         this.broadcastPrePrepare(block, config.p2pPort);
                         let prepare = this.preparePool.prepare(block, this.validator);
-                        await delay(500);
-                        // this.broadcastPrepare(prepare, nodeId);
+                        await delay(1000);
+                        this.broadcastPrepare(prepare, nodeId);
                   }
             } else if (data.type === MESSAGE_TYPE.prepare) {
                   const prepare = data.data.prepare;
-                  console.log(prepare);
                   if (
                         !this.preparePool.existingPrepare(prepare) &&
                         this.preparePool.isValidPrepare(prepare) &&
                         ValidatorsGroup.isValidValidator(prepare.publicKey)
                   ) {
                         this.preparePool.addPrepare(prepare);
-                        // await delay(500);
-                        // this.broadcastPrepare(prepare, nodeId);
+                        await delay(1000);
+                        this.broadcastPrepare(prepare, nodeId);
 
-                        // if (
-                        //       this.preparePool.list[prepare.blockHash].length >=
-                        //       2 * (this.validators.length / 3) + 1
-                        // ) {
-                        //       let commit = this.commitPool.commit(prepare, this.validator);
-                        //       this.broadcastCommit(commit, nodeId);
-                        // }
+                        if (this.preparePool.list[prepare.blockHash].length >= 2 * (5 / 3) + 1) {
+                              let commit = this.commitPool.commit(prepare, this.validator);
+                              await delay(1000);
+
+                              this.broadcastCommit(commit, nodeId);
+                        }
                   }
             } else if (data.type === MESSAGE_TYPE.commit) {
                   const commit = data.data.commit;
@@ -210,12 +209,13 @@ class Blockchain implements BlockchainInterface {
                         ValidatorsGroup.isValidValidator(commit.publicKey)
                   ) {
                         this.commitPool.addCommit(commit);
+                        await delay(1000);
                         this.broadcastCommit(commit, config.p2pPort);
 
-                        if (
-                              this.commitPool.list[commit.blockHash].length >=
-                              2 * (this.validators.length / 3) + 1
-                        ) {
+                        if (this.commitPool.list[commit.blockHash].length >= 2 * (5 / 3) + 1) {
+                              await delay(1000);
+                              console.log(this.commitPool.list[commit.blockHash].length);
+
                               this.addUpdatedBlock(
                                     commit.blockHash,
                                     this.blockPool,
@@ -228,22 +228,24 @@ class Blockchain implements BlockchainInterface {
                               this.chain[this.chain.length - 1].hash,
                               this.validator
                         );
+                        await delay(1000);
                         this.broadcastRoundChange(message, config.p2pPort);
                   }
             } else if (data.type === MESSAGE_TYPE.round_change) {
                   const message = data.data.message;
+                  console.log(this.messagePool.list);
                   if (
                         !this.messagePool.existingMessage(message) &&
                         this.messagePool.isValidMessage(message) &&
                         ValidatorsGroup.isValidValidator(message.publicKey)
                   ) {
                         this.messagePool.addMessage(message);
+                        await delay(1000);
+
                         this.broadcastRoundChange(message, config.p2pPort);
 
-                        if (
-                              this.messagePool.list[message.blockHash].length >=
-                              2 * (this.validators.length / 3) + 1
-                        ) {
+                        if (this.messagePool.list[message.blockHash].length >= 2 * (5 / 3) + 1) {
+                              console.log("clearrrrrinnnnngggggggg");
                               this.transactionPool.clear();
                         }
                   }
@@ -324,7 +326,7 @@ class Blockchain implements BlockchainInterface {
 
       public broadcastRoundChange(message: RoundChangeMessage, nodeId: string) {
             app.p2pServer.broadcast({
-                  message: `${nodeId} broadcasting commit block`,
+                  message: `${nodeId} broadcasting round change block`,
                   type: MESSAGE_TYPE.round_change,
                   data: {
                         message: message,

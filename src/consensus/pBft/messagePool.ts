@@ -47,6 +47,7 @@ class MessagePool {
       }
 
       addMessage(message: RoundChangeMessage): void {
+            console.log(this.list[message.blockHash]);
             this.list[message.blockHash].push(message);
       }
 }

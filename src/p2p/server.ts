@@ -301,7 +301,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   this.seenMessages.add(packet.id);
             } else {
                   for (const $nodeId of this.neighbors.keys()) {
-                        // if ($nodeId === this.NODE_ID) continue;
                         this.send($nodeId, packet);
                         // this.seenMessages.add(packet.id);
                   }
