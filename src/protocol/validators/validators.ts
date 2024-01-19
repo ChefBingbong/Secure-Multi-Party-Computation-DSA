@@ -25,6 +25,11 @@ export class ValidatorsGroup {
             });
       };
 
+      public static getPublickKeyFromNodeId = (nodeId: string) => {
+            const validators = this.getAllKeys();
+            return validators.publickKeys[validators.ports.indexOf(nodeId)];
+      };
+
       public static getAllKeys = () => {
             const partyIds = this.getAllValidators();
             return {
@@ -32,6 +37,10 @@ export class ValidatorsGroup {
                   publickKeys: partyIds.map((info) => Validator.parseWalletInfo(info).publicKey),
             };
       };
+
+      public static isValidValidator(validator) {
+            return this.getAllKeys().publickKeys.includes(validator);
+      }
 }
 
 // export default Validators;

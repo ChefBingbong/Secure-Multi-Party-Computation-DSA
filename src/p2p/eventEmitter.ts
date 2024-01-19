@@ -11,6 +11,7 @@ export enum P2PNetworkEvents {
       DIRECT = "direct",
 }
 
+export type Listener = (...args: any[]) => void;
 export class P2PNetworkEventEmitter extends EventEmitter {
       constructor(readonly debug: boolean) {
             super();

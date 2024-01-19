@@ -1,62 +1,41 @@
-import * as net from "net";
 import { v4 } from "uuid";
 import { Logger } from "winston";
 import config from "../config/config";
+import Blockchain from "../consensus/ledger";
 import { redisClient } from "../db/redis";
 import { AppLogger } from "../http/middleware/logger";
-import Blockchain from "../consensus/ledger";
 import { KeygenSessionManager } from "../protocol/keygenProtocol";
-import { ServerDirectMessage, ServerMessage } from "../protocol/types";
-import { MESSAGE_TYPES } from "../protocol/utils/utils";
+import { GenericMessageParams, ServerMessage, TransactionData } from "../protocol/types";
+import { Server, WebSocket } from "ws";
+import Block from "../consensus/block";
 import Validator from "../protocol/validators/validator";
 import { ValidatorsGroup } from "../protocol/validators/validators";
+import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import TransactionPool from "../wallet/transactionPool";
 import Wallet from "../wallet/wallet";
-import { P2PNetworkEventEmitter } from "./eventEmitter";
-import { P2PNetwork } from "./types";
-import { ErrorWithCode, ProtocolError } from "../utils/errors";
-import Flatted from "flatted";
-
-const MESSAGE_TYPE = {
-      chain: "CHAIN",
-      block: "BLOCK",
-      transaction: "TRANSACTION",
-      clear_transactions: "CLEAR_TRANSACTIONS",
-};
-// const root = protobuf.loadSync("../../types_pb");
-
-// // Obtain the message type
-// const YourMessageType = root.lookupType("YourMessageType");
-export interface NetworkMessageDirect<T> {
-      message: T;
-      id?: string;
-      origin?: string;
-      ttl?: number;
-}
-
-export interface NetworkMessageBroadcast<T> extends NetworkMessageDirect<T> {
-      destination: string;
-}
+import { Listener, P2PNetworkEventEmitter } from "./eventEmitter";
+import { MESSAGE_TYPE, NetworkMessages } from "./types";
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-class P2pServer extends AppLogger implements P2PNetwork {
-      public readonly connections: Map<string, net.Socket>;
+class P2pServer extends AppLogger {
+      public readonly connections: Map<string, WebSocket>;
       public readonly NODE_ID: string;
       public readonly neighbors: Map<string, string>;
       public readonly validator: Validator = new Validator();
+      private readonly emitter: P2PNetworkEventEmitter;
+
+      on: (event: string, listener: (...args: any[]) => void) => void;
+      off: (event: string, listener: (...args: any[]) => void) => void;
+
       public validators: string[];
       public chain: Blockchain;
       public wallet: Wallet;
       public transactionPool: TransactionPool;
-
-      public static leader: string;
-      public votes: { voter: string; vote: string }[];
-
       public threshold: number;
-      private readonly emitter: P2PNetworkEventEmitter;
+
       private log: Logger;
-      private server: net.Server;
+      private server: Server;
       private seenMessages: Set<string> = new Set();
       private isInitialized: boolean = false;
 
@@ -69,46 +48,22 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.emitter = new P2PNetworkEventEmitter(false);
             this.emitter.on.bind(this.emitter);
             this.emitter.off.bind(this.emitter);
+            this.on = (e: string, l: Listener) => this.emitter.on(e, l);
+            this.off = (e: string, l: Listener) => this.emitter.on(e, l);
 
-            this.votes = [];
             this.log = this.getLogger("p2p-log");
-
-            this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
-            this.chain = new Blockchain(this.log);
+            this.server = new WebSocket.Server({ port: Number(config.p2pPort) });
             this.transactionPool = new TransactionPool();
-            this.updateReplica(Number(this.NODE_ID), "CONNECT");
+            this.chain = new Blockchain(this.log, this.transactionPool, this.validators, this.validator);
 
+            this.updateReplica(Number(this.NODE_ID), "CONNECT");
             new ValidatorsGroup(this.validator.toString());
             new KeygenSessionManager(this.validator);
+
             this.initState();
       }
 
-      private async updateReplica(p: number, type: "DISCONNECT" | "CONNECT"): Promise<void> {
-            let peers = await redisClient.getSingleData<number[]>("validators");
-            let leader = await redisClient.getSingleData<string>("leaderPublic");
-
-            if (!peers) {
-                  await redisClient.setSignleData("validators", [p]);
-                  peers = [p];
-            }
-            if (!leader) {
-                  const { ports, publickKeys } = ValidatorsGroup.getAllKeys();
-                  leader = publickKeys[ports.indexOf("6001")];
-            }
-            if (type === "DISCONNECT")
-                  peers = [...peers].filter((value, index, self) => {
-                        return self.indexOf(value) === index && value !== p;
-                  });
-            else
-                  peers = [...peers, p].filter((value, index, self) => {
-                        return self.indexOf(value) === index;
-                  });
-
-            this.chain.leader = leader;
-            this.validators = peers.map((p) => p.toString());
-            this.threshold = this.validators.length;
-      }
-
+      // server init
       private initState(): void {
             this.emitter.on("_connect", (connectionId) => {
                   this._send(connectionId.connectionId, {
@@ -172,49 +127,97 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.isInitialized = true;
       }
 
-      //public methods
-      public listen(port: number, ports: number[], cb?: () => void): (cb?: any) => net.Server {
-            if (!this.isInitialized) this.throwError(`Cannot listen before server is initialized`);
+      private async updateReplica(p: number, type: "DISCONNECT" | "CONNECT"): Promise<void> {
+            let peers = (await redisClient.getSingleData<number[]>("validators")) || [];
+            let leader = await redisClient.getSingleData<string>("leader");
 
-            this.server.listen(port, "0.0.0.0", () => {
-                  this.handlePeerConnection(async (p: number) => {
-                        await this.updateReplica(p, "CONNECT");
-                  });
+            const { ports, publickKeys } = ValidatorsGroup.getAllKeys();
+            if (!leader) leader = publickKeys[ports.indexOf("6001")];
 
-                  this.handlePeerDisconnect(async (p: number) => {
-                        await this.updateReplica(p, "DISCONNECT");
+            if (type === "DISCONNECT") {
+                  peers = peers.filter((value) => value !== p);
+            } else {
+                  peers.push(p);
+                  peers = [...new Set(peers!)];
+            }
+            this.chain.leader = leader;
+            this.validators = peers.map(String);
+            this.threshold = this.validators.length;
+      }
 
-                        if (P2pServer.leader === p.toString()) {
-                              await this.electNewLeader();
-                        }
-                  });
+      // connect and listen logic
+      public connect = (port: number, cb?: () => void) => {
+            const socket = new WebSocket(`ws://localhost:${port}`);
 
-                  this.handleBroadcastMessage(async () => {});
-                  this.handleDirectMessage(async () => {});
+            socket.on("error", (err) => {
+                  console.error(`Socket connection error: ${err.message}`);
+            });
 
-                  ports.forEach((pot) => {
-                        this.connect("127.0.0.1", Number(pot), () => {
-                              this.log.info(`Connection to ${pot} established.`);
-                        });
+            socket.on("open", async () => {
+                  this.handleNewSocket(socket);
+                  await this.updateReplica(Number(this.NODE_ID), "CONNECT");
+                  cb && cb();
+            });
+
+            return () => socket.terminate();
+      };
+
+      public listen(ports: number[], cb?: () => void): (cb?: any) => void {
+            if (!this.isInitialized)
+                  throw new ErrorWithCode(
+                        `Cannot listen before server is initialized`,
+                        ProtocolError.PARAMETER_ERROR
+                  );
+
+            this.server.on("connection", (socket) => {
+                  this.handleNewSocket(socket);
+            });
+
+            this.handlePeerConnection(async (p: number) => {
+                  await this.updateReplica(p, "CONNECT");
+            });
+
+            this.handlePeerDisconnect(async (p: number) => {
+                  await this.updateReplica(p, "DISCONNECT");
+
+                  if (this.chain.leader === p.toString()) {
+                        await this.chain.electNewLeader();
+                  }
+            });
+
+            this.handleBroadcastMessage(async () => {});
+            this.handleDirectMessage(async () => {});
+
+            ports.forEach((pot) => {
+                  this.connect(pot, () => {
+                        this.log.info(`Connection to ${pot} established.`);
                   });
             });
             return (cb) => this.server.close(cb);
       }
 
-      public connect = (ip: string, port: number, cb?: () => void) => {
-            const socket = new net.Socket();
+      private handleNewSocket = (socket: WebSocket, emitConnect = true) => {
+            const connectionId = v4();
+
+            this.connections.set(connectionId, socket);
+            if (emitConnect) this.emitter.emitConnect(connectionId, false);
+
+            socket.on("message", (message: any) => {
+                  const receivedData = JSON.parse(message);
+                  this.emitter.emitMessage(connectionId, receivedData, false);
+            });
+
+            socket.on("close", () => {
+                  this.connections.delete(connectionId);
+                  this.emitter.emitDisconnect(connectionId, false);
+            });
 
             socket.on("error", (err) => {
                   console.error(`Socket connection error: ${err.message}`);
             });
-            socket.connect(port, ip, () => {
-                  this.handleNewSocket(socket);
-                  cb && cb();
-            });
-
-            return (cb: Error) => socket.destroy(cb);
       };
 
+      // message sending logic
       public broadcast = (
             message: any,
             id: string = v4(),
@@ -241,31 +244,136 @@ class P2pServer extends AppLogger implements P2PNetwork {
             });
       };
 
-      private handleNewSocket = (socket: net.Socket, emitConnect = true) => {
-            const connectionId = v4();
-            this.connections.set(connectionId, socket);
-            if (emitConnect) this.emitter.emitConnect(connectionId, false);
+      private sendPacket = (packet: any) => {
+            if (packet.type === "direct") {
+                  this.send(packet.destination, packet);
+                  this.seenMessages.add(packet.id);
+            } else {
+                  for (const $nodeId of this.neighbors.keys()) {
+                        this.send($nodeId, packet);
+                        // this.seenMessages.add(packet.id);
+                  }
+            }
+      };
 
-            socket.on("error", (err) => {
-                  console.error(`Socket connection error: ${err.message}`);
-            });
-
-            socket.on("close", () => {
-                  this.connections.delete(connectionId);
-                  this.emitter.emitDisconnect(connectionId, false);
-            });
-
-            socket.on("data", (message) => {
-                  const receivedData = JSON.parse(message.toString());
-                  this.emitter.emitMessage(connectionId, receivedData, false);
-            });
+      private send = (nodeId: string, data: any) => {
+            const connectionId = this.neighbors.get(nodeId);
+            this._send(connectionId, { type: "message", data });
       };
 
       private _send = (connectionId: string, message: any) => {
             const socket = this.connections.get(connectionId);
 
-            if (!socket) this.throwError(`Attempt to send data to connection that does not exist ${connectionId}`);
-            socket.write(Buffer.from(JSON.stringify(message)));
+            if (!socket)
+                  throw new ErrorWithCode(
+                        `Attempt to send data to connection that does not exist ${connectionId}`,
+                        ProtocolError.INTERNAL_ERROR
+                  );
+            socket.send(JSON.stringify(message));
+      };
+
+      // event handler logic
+      private handlePeerConnection = (callback?: (p: number, type: string) => Promise<void>) => {
+            this.on("connect", async ({ nodeId }: { nodeId: string }) => {
+                  this.log.info(`New node connected: ${nodeId}`);
+
+                  const chain = await redisClient.getSingleData<any>("chain");
+                  if (chain) this.chain.chain = chain;
+
+                  if (nodeId !== this.NODE_ID) {
+                        const data = { type: MESSAGE_TYPE.chain, data: this.chain.chain };
+                        this.buildAndSendNetworkMessage<Block[]>({ type: "DIRECT", data, destination: nodeId });
+                  }
+                  await callback(Number(nodeId), "CONNECT");
+                  console.log(this.threshold, this.validators);
+            });
+      };
+
+      private handlePeerDisconnect = (callback?: (p: number, type: string) => Promise<void>) => {
+            this.on("disconnect", async ({ nodeId }: { nodeId: string }) => {
+                  this.log.info(`Node disconnected: ${nodeId}`);
+                  await callback(Number(nodeId), "DISCONNECT");
+                  console.log(this.threshold, this.validators);
+            });
+      };
+
+      private handleBroadcastMessage = (callback?: () => Promise<void>) => {
+            this.on("broadcast", async ({ message }: { message: ServerMessage<any> }) => {
+                  this.log.info(`${message.message}`);
+                  this.validator.messages.set(0, message);
+                  //handle keygen & pBFT consensus for broadcasts
+                  await KeygenSessionManager.handleKeygenConsensusMessage(message);
+                  await this.chain.handleBlockchainConsensusMessage(message);
+
+                  await callback();
+            });
+      };
+
+      private handleDirectMessage = (callback?: () => Promise<void>) => {
+            this.on("direct", async ({ message }: { message: ServerMessage<any> }) => {
+                  this.log.info(`${message.message}`);
+                  try {
+                        //handle keygen & pBFT consensus for direcct msgs
+                        await KeygenSessionManager.handleKeygenConsensusMessage(message);
+                        await this.chain.handleBlockchainConsensusMessage(message);
+                        await callback();
+                  } catch (error) {
+                        console.log(error);
+                        throw new ErrorWithCode(
+                              `Error prcessing direct message for ${this.NODE_ID}`,
+                              ProtocolError.INTERNAL_ERROR
+                        );
+                  }
+            });
+      };
+
+      //keygen protocol start
+      public startKeygen = async () => {
+            let leader = this.chain.leader ?? (await redisClient.getSingleData<string>("leader"));
+            if (!leader || this.NODE_ID !== leader) {
+                  throw new Error(`leader has not been initialized or you are not the leader`);
+            }
+            this.broadcast({
+                  message: `${this.NODE_ID} is starting a new keygen session`,
+                  type: MESSAGE_TYPE.keygenInit,
+            });
+      };
+
+      // helpers for building messages
+      public buildAndSendNetworkMessage = async <T extends any = {}>({
+            type,
+            data,
+            destination,
+            ttl = 255,
+      }: GenericMessageParams<TransactionData<T>>) => {
+            try {
+                  const messagePayload = this.buildPayloadFromParams<T>(data);
+                  switch (type) {
+                        case "BROADCAST":
+                              this.broadcast(messagePayload, v4(), this.validator.ID, ttl);
+                              break;
+                        case "DIRECT":
+                              this.sendDirect(destination, messagePayload, v4(), this.validator.ID, ttl);
+                              break;
+                        default:
+                              throw new ErrorWithCode(
+                                    `Invalid message type: ${type}`,
+                                    ProtocolError.INTERNAL_ERROR
+                              );
+                  }
+            } catch (error) {
+                  console.log(error);
+                  throw new ErrorWithCode(`Failed to send message across network`, ProtocolError.INTERNAL_ERROR);
+            }
+      };
+
+      private buildPayloadFromParams = <T extends any>(params: TransactionData<T>): ServerMessage<any> => {
+            return {
+                  message: NetworkMessages[params.type],
+                  type: params.type,
+                  data: params.data,
+                  senderNode: this.validator.nodeId,
+            };
       };
 
       private findNodeId = (connectionId: string): string | undefined => {
@@ -283,363 +391,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
             if (match) return match[1];
             return this.validator.ID;
       }
-
-      private send = (nodeId: string, data: any) => {
-            const connectionId = this.neighbors.get(nodeId);
-            this._send(connectionId, { type: "message", data });
-      };
-
-      private sendPacket = (packet: any) => {
-            if (packet.type === "direct") {
-                  this.send(packet.destination, packet);
-                  this.seenMessages.add(packet.id);
-            } else {
-                  for (const $nodeId of this.neighbors.keys()) {
-                        this.send($nodeId, packet);
-                        // this.seenMessages.add(packet.id);
-                  }
-            }
-      };
-
-      public close = (cb: () => void) => {
-            for (let [, socket] of this.connections) socket.destroy();
-            this.server.close(cb);
-      };
-
-      public on = (event: string, listener: (...args: any[]) => void) => {
-            this.emitter.on(event, listener);
-      };
-
-      public off = (event: string, listener: (...args: any[]) => void) => {
-            this.emitter.on(event, listener);
-      };
-
-      public buildAndSendNetworkMessage = async <
-            Q,
-            T extends NetworkMessageDirect<Q> & NetworkMessageBroadcast<Q>
-      >(
-            type: "BROADCAST" | "DIRECT",
-            data: T
-      ) => {
-            try {
-                  switch (type) {
-                        case "BROADCAST":
-                              await this.broadcast(data.message, data.id, data.origin, data.ttl);
-                              break;
-                        case "DIRECT":
-                              await this.sendDirect(
-                                    data.destination,
-                                    data.message,
-                                    data.id,
-                                    data.origin,
-                                    data.ttl
-                              );
-                              break;
-                        default:
-                              // Handle unexpected type
-                              throw new ErrorWithCode(
-                                    `Invalid message type: ${type}`,
-                                    ProtocolError.INTERNAL_ERROR
-                              );
-                  }
-            } catch (error) {
-                  console.log(error);
-                  throw new ErrorWithCode(`Failed to send message across network`, ProtocolError.INTERNAL_ERROR);
-            }
-      };
-
-      public sendChain = (nodeId) => {
-            this.sendDirect(nodeId, {
-                  message: `${nodeId} sending chain`,
-                  type: MESSAGE_TYPE.chain,
-                  data: JSON.stringify({
-                        chain: this.chain.chain,
-                  }),
-            });
-      };
-
-      public syncChain = () => {
-            this.broadcast({
-                  message: `${this.NODE_ID} sending chain`,
-                  type: MESSAGE_TYPE.chain,
-                  data: JSON.stringify({
-                        chain: this.chain.chain.toString(),
-                  }),
-            });
-      };
-
-      public sendTransaction = (transaction: any) => {
-            this.broadcast({
-                  message: `${this.NODE_ID} sending transaction`,
-                  type: MESSAGE_TYPE.transaction,
-                  data: JSON.stringify({
-                        transaction: transaction,
-                  }),
-            });
-      };
-
-      public sendBlock = (block: any) => {
-            this.broadcast({
-                  message: `${this.NODE_ID} sending block`,
-                  type: MESSAGE_TYPE.block,
-                  data: JSON.stringify({
-                        block: block,
-                  }),
-            });
-      };
-
-      private throwError = (error: string) => {
-            throw new Error(error);
-      };
-
-      public static getLeader = async () => {
-            const leader = this.leader ?? (await redisClient.getSingleData<string>("leader"));
-            if (leader) {
-                  this.leader = leader;
-                  await redisClient.setSignleData("leader", leader);
-            }
-            return leader;
-      };
-
-      public electNewLeader = async () => {
-            let leader = P2pServer.leader ?? (await redisClient.getSingleData<string>("leader"));
-            try {
-                  if (!leader) {
-                        leader = this.NODE_ID;
-                        await redisClient.setSignleData("leader", leader);
-                  } else {
-                        await redisClient.setSignleData("leader", leader);
-                  }
-                  if (KeygenSessionManager.sessionInitialized) {
-                        throw new Error(`cannot elect a new leader while a session is active`);
-                  }
-                  if (this.NODE_ID !== leader) {
-                        throw new Error(`election can only be started by previous rounds leader`);
-                  }
-
-                  this.broadcast({
-                        message: `${this.NODE_ID} is starting a new leader election`,
-                        type: MESSAGE_TYPES.LeaderElection,
-                        senderNode: leader,
-                  });
-            } catch (error) {
-                  this.broadcast({
-                        message: `${this.NODE_ID} is updating leader`,
-                        type: MESSAGE_TYPES.SetNewLeader,
-                        data: { newLeader: leader },
-                  });
-            }
-      };
-
-      public startKeygen = async () => {
-            let leader = P2pServer.leader ?? (await redisClient.getSingleData<string>("leader"));
-            if (!leader || this.NODE_ID !== leader) {
-                  throw new Error(`leader has not been initialized or you are not the leader`);
-            }
-            this.broadcast({
-                  message: `${this.NODE_ID} is starting a new keygen session`,
-                  type: MESSAGE_TYPES.keygenInit,
-            });
-      };
-
-      private handlePeerConnection = (callback?: (p: number, type: string) => Promise<void>) => {
-            this.on("connect", async ({ nodeId }: { nodeId: string }) => {
-                  this.log.info(`New node connected: ${nodeId}`);
-
-                  const chain = await redisClient.getSingleData<any>("chain");
-                  if (chain) this.chain.chain = chain;
-
-                  if (nodeId !== this.NODE_ID) {
-                        console.log("yayyy");
-                        await delay(2000);
-                        this.sendChain(nodeId);
-                  }
-                  await callback(Number(nodeId), "CONNECT");
-                  console.log(this.threshold, this.validators);
-            });
-      };
-
-      private handlePeerDisconnect = (callback?: (p: number, type: string) => Promise<void>) => {
-            this.on("disconnect", async ({ nodeId }: { nodeId: string }) => {
-                  this.log.info(`Node disconnected: ${nodeId}`);
-                  await callback(Number(nodeId), "DISCONNECT");
-                  console.log(this.threshold, this.validators);
-            });
-      };
-
-      private handleBroadcastMessage = (callback?: () => Promise<void>) => {
-            this.on("broadcast", async ({ message }: { message: ServerMessage }) => {
-                  this.log.info(`${message.message}`);
-                  this.validator.messages.set(0, message);
-
-                  if (message.type === MESSAGE_TYPES.keygenRoundHandler) {
-                        await KeygenSessionManager.keygenRoundProcessor(message);
-                  }
-                  if (message.type === MESSAGE_TYPES.keygenInit) {
-                        KeygenSessionManager.startNewSession({
-                              selfId: this.NODE_ID,
-                              partyIds: this.validators,
-                              threshold: this.threshold,
-                        });
-
-                        await KeygenSessionManager.finalizeCurrentRound(0);
-                  }
-                  if (message.type === MESSAGE_TYPES.LeaderElection) {
-                        let currentLeader = message.senderNode;
-                        try {
-                              const eligibleLalidators = this.validators.filter((v) => v !== currentLeader);
-                              const voteIndex = Math.abs(
-                                    Math.floor(Math.random() * eligibleLalidators.length - 1)
-                              );
-
-                              if (voteIndex < 0 || voteIndex > eligibleLalidators.length) {
-                                    throw new Error(`bad vote index. error in leader election`);
-                              }
-                              const thisNodesVoteResult = eligibleLalidators[voteIndex];
-
-                              if (!eligibleLalidators.includes(thisNodesVoteResult)) {
-                                    throw new Error(`bad vote result. error in leader election`);
-                              }
-
-                              this.sendDirect(currentLeader, {
-                                    message: `${this.NODE_ID} voted for ${thisNodesVoteResult}`,
-                                    type: MESSAGE_TYPES.LeaderVote,
-                                    data: { vote: thisNodesVoteResult, validators: eligibleLalidators },
-                                    senderNode: this.NODE_ID,
-                              });
-                        } catch (error) {
-                              this.broadcast({
-                                    message: `${this.NODE_ID} is updating leader`,
-                                    type: MESSAGE_TYPES.SetNewLeader,
-                                    data: { newLeader: currentLeader },
-                              });
-                        }
-                  }
-                  if (message.type === MESSAGE_TYPES.SetNewLeader) {
-                        const newLeader = (message.data as any).newLeader;
-                        const { ports, publickKeys } = ValidatorsGroup.getAllKeys();
-                        const newLeaderPublicKey = publickKeys[ports.indexOf(newLeader)];
-
-                        this.chain.leader = newLeaderPublicKey;
-                        P2pServer.leader = newLeader;
-
-                        await redisClient.setSignleData("leader", newLeader);
-                        await redisClient.setSignleData("leaderPublic", newLeaderPublicKey);
-
-                        console.log(`the new leader is ${newLeader} ${newLeaderPublicKey}`);
-                  }
-                  if (message.type === MESSAGE_TYPE.chain) {
-                        const data = (message.data as any).chain;
-                        this.chain.replaceChain(data);
-                  }
-                  if (message.type === MESSAGE_TYPE.transaction) {
-                        const data = JSON.parse(message.data as any);
-
-                        if (!this.transactionPool.transactionExists(data)) {
-                              this.transactionPool.addTransaction(data);
-                              this.sendTransaction(data);
-                        }
-                        if (this.transactionPool.thresholdReached()) {
-                              if (this.chain.leader == this.validator.getPublicKey()) {
-                                    let block = this.chain.createBlock(
-                                          this.transactionPool.transactions,
-                                          this.validator
-                                    );
-                                    this.sendBlock(block);
-                              }
-                        }
-                  }
-                  if (message.type === MESSAGE_TYPE.block) {
-                        const data = (JSON.parse(message.data as string) as any).block;
-                        if (this.chain.isValidBlock(data)) {
-                              this.sendBlock(data);
-                              this.transactionPool.clear();
-                        }
-                  }
-            });
-      };
-
-      private handleDirectMessage = (callback?: () => Promise<void>) => {
-            this.on("direct", async ({ message }: { message: ServerDirectMessage }) => {
-                  this.log.info(`${message.message}`);
-
-                  if (message.type === "TRANSACTION") {
-                        const data = message.data as any;
-
-                        if (!this.transactionPool.transactionExists(data)) {
-                              this.transactionPool.addTransaction(data);
-                              this.sendTransaction(data);
-                        }
-                        if (this.transactionPool.thresholdReached()) {
-                              if (this.chain.leader == this.validator.getPublicKey()) {
-                                    console.log("block created");
-                                    let block = this.chain.createBlock(
-                                          this.transactionPool.transactions,
-                                          this.validator
-                                    );
-                                    this.sendBlock(block);
-                              }
-                        }
-                  }
-                  if (message.type === MESSAGE_TYPE.chain) {
-                        const data = (JSON.parse(message.data as string) as any).chain;
-                        this.chain.replaceChain(data);
-                  }
-                  if (message.type === MESSAGE_TYPES.keygenDirectMessageHandler) {
-                        this.validator.directMessagesMap.set(
-                              KeygenSessionManager.currentRound,
-                              this.validator.nodeId,
-                              message.data.directMessages.Data
-                        );
-                        await KeygenSessionManager.keygenRoundDirectMessageProcessor(message);
-                  }
-                  if (message.type === MESSAGE_TYPES.LeaderVote) {
-                        let maxVotes = 0;
-                        let winner = P2pServer.leader;
-
-                        try {
-                              const { vote: recievedVote, validators } = (message as any).data;
-                              if (!recievedVote || !validators) {
-                                    throw new Error(`bad vote result. error in leader election`);
-                              }
-
-                              this.votes.push({ voter: message.senderNode, vote: recievedVote });
-                              const voters = this.votes.map((vote) => vote.voter);
-
-                              if (validators.every((itemA) => voters.includes(itemA))) {
-                                    const voteCount: Record<string, number> = {};
-                                    const votes = this.votes.map((vote) => vote.vote);
-
-                                    votes.forEach((v) => (voteCount[v] = voteCount[v] ? voteCount[v] + 1 : 1));
-                                    for (const candidate in voteCount) {
-                                          if (voteCount[candidate] > maxVotes) {
-                                                maxVotes = voteCount[candidate];
-                                                winner = candidate;
-                                          }
-                                    }
-                                    this.votes = [];
-                                    P2pServer.leader = winner;
-                                    await redisClient.setSignleData("leader", winner);
-                                    await delay(500);
-
-                                    this.broadcast({
-                                          message: `${this.NODE_ID} is updating leader`,
-                                          type: MESSAGE_TYPES.SetNewLeader,
-                                          data: { newLeader: winner },
-                                    });
-                              }
-                        } catch (error) {
-                              P2pServer.leader = winner;
-                              this.broadcast({
-                                    message: `${this.NODE_ID} is updating leader`,
-                                    type: MESSAGE_TYPES.SetNewLeader,
-                                    data: { newLeader: winner },
-                              });
-                        }
-                  }
-                  await callback();
-            });
-      };
 }
 
 export default P2pServer;
