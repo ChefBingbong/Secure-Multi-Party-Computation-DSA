@@ -13,7 +13,7 @@ class BlockPool {
 
       addBlock(block: Block): void {
             this.list.push(block);
-            console.log(`Added block to the pool`);
+            console.log(`ADDED BLOCK TO POOL\n`);
       }
 
       getBlock(hash: string): Block | undefined {

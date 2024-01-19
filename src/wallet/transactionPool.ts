@@ -1,6 +1,5 @@
-import Transaction from "./transaction";
-import { TRANSACTION_THRESHOLD } from "../config/config";
 import { app } from "../protocol";
+import Transaction from "./transaction";
 
 export interface BaseTransactionPoolInterface {
       transactions: Transaction<any>[];
@@ -12,7 +11,7 @@ class TransactionPool implements BaseTransactionPoolInterface {
       public transactions: Transaction<any>[] = [];
 
       public thresholdReached(): boolean {
-            return this.transactions.length >= TRANSACTION_THRESHOLD;
+            return this.transactions.length >= app.p2pServer.threshold;
       }
 
       public addTransaction<T extends {}>(transaction: Transaction<T>): boolean {

@@ -1,7 +1,7 @@
 import { v4 } from "uuid";
 import { Logger } from "winston";
 import config from "../config/config";
-import Blockchain from "../consensus/ledger";
+import Blockchain from "../consensus/consesnsus";
 import { redisClient } from "../db/redis";
 import { AppLogger } from "../http/middleware/logger";
 import { KeygenSessionManager } from "../protocol/keygenProtocol";
@@ -124,6 +124,7 @@ class P2pServer extends AppLogger {
                   }
             });
 
+            console.log(this.validators, this.threshold, this.chain.leader);
             this.isInitialized = true;
       }
 
@@ -285,7 +286,6 @@ class P2pServer extends AppLogger {
                         this.buildAndSendNetworkMessage<Block[]>({ type: "DIRECT", data, destination: nodeId });
                   }
                   await callback(Number(nodeId), "CONNECT");
-                  console.log(this.threshold, this.validators);
             });
       };
 
@@ -293,13 +293,11 @@ class P2pServer extends AppLogger {
             this.on("disconnect", async ({ nodeId }: { nodeId: string }) => {
                   this.log.info(`Node disconnected: ${nodeId}`);
                   await callback(Number(nodeId), "DISCONNECT");
-                  console.log(this.threshold, this.validators);
             });
       };
 
       private handleBroadcastMessage = (callback?: () => Promise<void>) => {
             this.on("broadcast", async ({ message }: { message: ServerMessage<any> }) => {
-                  this.log.info(`${message.message}`);
                   this.validator.messages.set(0, message);
                   //handle keygen & pBFT consensus for broadcasts
                   await KeygenSessionManager.handleKeygenConsensusMessage(message);
@@ -311,7 +309,6 @@ class P2pServer extends AppLogger {
 
       private handleDirectMessage = (callback?: () => Promise<void>) => {
             this.on("direct", async ({ message }: { message: ServerMessage<any> }) => {
-                  this.log.info(`${message.message}`);
                   try {
                         //handle keygen & pBFT consensus for direcct msgs
                         await KeygenSessionManager.handleKeygenConsensusMessage(message);

@@ -71,7 +71,7 @@ class Validator extends Wallet {
             nodeId: string
       ): boolean {
             if (!Message.isFor<T>(nodeId, message)) {
-                  console.log("messagwe not for you");
+                  console.log("MESSAGE NOT FOR YOU\n");
                   return false;
             }
 

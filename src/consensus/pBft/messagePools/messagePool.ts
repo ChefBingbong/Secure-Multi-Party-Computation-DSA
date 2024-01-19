@@ -35,7 +35,6 @@ class MessagePool implements AbstractPBFTMessagePool<RoundChangeMessage> {
       }
 
       public isValidMessage(message: RoundChangeMessage): boolean {
-            console.log("in valid here");
             return ChainUtil.verifySignature(
                   message.publicKey,
                   message.signature,

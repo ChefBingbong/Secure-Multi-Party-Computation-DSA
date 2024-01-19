@@ -100,6 +100,7 @@ export class KeygenSessionManager extends AppLogger {
             if (!lastRound.finished || !this.sessionInitialized) {
                   throw new Error(`Session is not isnitilized or last round has not finished`);
             }
+            console.log(`STARTING KEYGEN ROUND ${this.currentRound}\n`);
             const round = this.rounds[newRound].round;
             this.rounds[newRound] = {
                   round,
@@ -250,7 +251,7 @@ export class KeygenSessionManager extends AppLogger {
                         assert.deepEqual(proofs[i], proofs[j]);
                   }
             }
-            console.log(`keygeneration was successful, ${proofs}`);
+            console.log(`KEY GENERATION WAS SUCCESSFUL, ${proofs}\n`);
             this.validator.PartyKeyShare = this.rounds[5].round.output.UpdatedConfig.toJSON() as any;
             const leader = await redisClient.getSingleData<string>("leader");
 
@@ -264,9 +265,9 @@ export class KeygenSessionManager extends AppLogger {
                   1 * 1000
             );
             if (response) {
-                  console.log(`${this.selfId} publishing proof to chain`);
+                  console.log(`${this.selfId} PUBLISHING PROOF TO CHAIN\n`);
                   if (app.p2pServer.chain.transactionPool.thresholdReached()) {
-                        console.log(`KEYGEN ROUND FINISHED CREATING NEW BLOCK FROM PROOF`);
+                        console.log(`KEYGEN ROUND FINISHED CREATING NEW BLOCK FROM PROOF\n`);
                   }
             }
 
@@ -451,7 +452,6 @@ export class KeygenSessionManager extends AppLogger {
             inputForNextRound: KeygenRound5Output
       ): string | undefined {
             if (!this.isFinalRound(currentRound) || !inputForNextRound.UpdatedConfig) return undefined;
-            console.log(inputForNextRound.UpdatedConfig);
             return Hasher.create().update(inputForNextRound.UpdatedConfig).digestBigint().toString();
       }
 

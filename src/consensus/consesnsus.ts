@@ -25,7 +25,6 @@ import {
       LeaderElectionArgs,
 } from "./types";
 
-const MIN_APPROVALS = 2 * (3 / 3) + 0;
 class Blockchain implements BlockchainInterface {
       public chain: Block[];
       public leader: string;
@@ -131,10 +130,10 @@ class Blockchain implements BlockchainInterface {
                   Block.verifyBlock(block) &&
                   Block.verifyLeader(block, ValidatorsGroup.getPublickKeyFromNodeId(this.leader))
             ) {
-                  console.log("BLOCK VALID");
+                  console.log("BLOCK VALID\n");
                   return true;
             }
-            console.log("BLOCK VALID");
+            console.log("BLOCK VALID\n");
             return false;
       }
 
@@ -329,7 +328,8 @@ class Blockchain implements BlockchainInterface {
                         ) {
                               this.preparePool.addMessage(prepare);
                               this.handleStateUpdate<PrepareMessage>(MESSAGE_TYPE.prepare, prepare);
-                              if (this.preparePool.list[prepare.blockHash].length < MIN_APPROVALS) return;
+                              if (this.preparePool.list[prepare.blockHash].length < app.p2pServer.threshold)
+                                    return;
 
                               let commit = this.commitPool.message(prepare, this.validator);
                               this.handleStateUpdate<CommitMessage>(MESSAGE_TYPE.commit, commit);
@@ -352,7 +352,7 @@ class Blockchain implements BlockchainInterface {
                   try {
                         this.commitPool.addMessage(commit);
                         this.handleStateUpdate<CommitMessage>(MESSAGE_TYPE.commit, commit);
-                        if (this.commitPool.list[commit.blockHash].length < MIN_APPROVALS) return;
+                        if (this.commitPool.list[commit.blockHash].length < app.p2pServer.threshold) return;
 
                         this.addUpdatedBlock(commit.blockHash, this.blockPool, this.preparePool, this.commitPool);
 
@@ -376,7 +376,7 @@ class Blockchain implements BlockchainInterface {
                   try {
                         this.messagePool.addMessage(message);
                         this.handleStateUpdate<RoundChangeMessage>(MESSAGE_TYPE.round_change, message);
-                        if (this.messagePool.list[message.blockHash].length < MIN_APPROVALS) return;
+                        if (this.messagePool.list[message.blockHash].length < app.p2pServer.threshold) return;
 
                         await delay(500);
                         if (
@@ -461,7 +461,6 @@ class Blockchain implements BlockchainInterface {
                         break;
 
                   default:
-                        console.log(stateType);
                         throw new ErrorWithCode(`unsupported state update type`, ProtocolError.PARAMETER_ERROR);
             }
       };

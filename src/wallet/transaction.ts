@@ -19,7 +19,6 @@ class Transaction<T extends any> implements BaseTransactionInterface<T> {
       constructor(data: any, validator: Validator) {
             this.id = ChainUtil.id();
             this.from = validator.publicKey;
-            console.log(data);
             this.input = { data: data, timestamp: Date.now() };
             this.hash = ChainUtil.hash(this.input);
             this.signature = validator.sign(this.hash);

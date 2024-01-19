@@ -12,10 +12,7 @@ export interface Hashable {
 type Ingestable = IngestableBasic | ProjectivePoint | AffinePoint | Hashable;
 
 const isPoint = (data: Ingestable): boolean => {
-      return (
-            typeof (data as AffinePoint).x === "bigint" &&
-            typeof (data as AffinePoint).y === "bigint"
-      );
+      return typeof (data as AffinePoint).x === "bigint" && typeof (data as AffinePoint).y === "bigint";
 };
 
 const pointToHashable = (data: AffinePoint | ProjectivePoint): Hashable => {
@@ -93,20 +90,12 @@ export class Hasher {
       public update(data: Ingestable): Hasher {
             this.checkUsed();
             let buf: Array<IngestableBasic> = [];
-            if (
-                  data instanceof Uint8Array ||
-                  typeof data === "string" ||
-                  typeof data === "bigint"
-            ) {
+            if (data instanceof Uint8Array || typeof data === "string" || typeof data === "bigint") {
                   buf.push(data);
             } else if (typeof (data as Hashable).hashable === "function") {
                   buf = buf.concat((data as Hashable).hashable());
             } else if (isPoint(data)) {
-                  buf = buf.concat(
-                        pointToHashable(
-                              data as ProjectivePoint | AffinePoint
-                        ).hashable()
-                  );
+                  buf = buf.concat(pointToHashable(data as ProjectivePoint | AffinePoint).hashable());
             } else {
                   throw new Error(`Unsupported data type: ${data}`);
             }
@@ -144,7 +133,6 @@ export class Hasher {
                   throw new Error("Bad commitment length");
             }
             for (let i = 0; i < commitment.length; i += 1) {
-                  console.log(commitment[i], "committttt");
                   if (commitment[i] !== 0) {
                         return;
                   }
@@ -152,11 +140,7 @@ export class Hasher {
             throw new Error("commitment is 0");
       }
 
-      public decommit(
-            commitment: Uint8Array,
-            decommitment: Uint8Array,
-            data: Array<Ingestable>
-      ): boolean {
+      public decommit(commitment: Uint8Array, decommitment: Uint8Array, data: Array<Ingestable>): boolean {
             Hasher.validateCommitment(commitment);
             Hasher.validateCommitment(decommitment);
             const h = this.clone();

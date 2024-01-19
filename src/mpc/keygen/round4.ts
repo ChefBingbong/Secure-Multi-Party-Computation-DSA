@@ -69,7 +69,6 @@ export class KeygenRound4 extends AbstractKeygenRound {
                   // store
                   const DecryptedShare = this.input.inputForRound3.inputForRound2.paillierSecret.decrypt(share);
                   const Share = Fn.mod(DecryptedShare);
-                  console.log(Share, DecryptedShare);
                   if (Share !== DecryptedShare) {
                         throw new Error(`decrypted share is not in correct range`);
                   }
