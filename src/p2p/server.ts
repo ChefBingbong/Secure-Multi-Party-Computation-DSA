@@ -51,16 +51,15 @@ class P2pServer extends AppLogger {
       public readonly NODE_ID: string;
       public readonly neighbors: Map<string, string>;
       public readonly validator: Validator = new Validator();
+      private readonly emitter: P2PNetworkEventEmitter;
+
       public validators: string[];
       public chain: Blockchain;
       public wallet: Wallet;
       public transactionPool: TransactionPool;
-
-      public static leader: string;
       public votes: { voter: string; vote: string }[];
-
       public threshold: number;
-      private readonly emitter: P2PNetworkEventEmitter;
+
       private log: Logger;
       private server: Server;
       private seenMessages: Set<string> = new Set();
@@ -92,7 +91,7 @@ class P2pServer extends AppLogger {
 
       private async updateReplica(p: number, type: "DISCONNECT" | "CONNECT"): Promise<void> {
             let peers = await redisClient.getSingleData<number[]>("validators");
-            let leader = await redisClient.getSingleData<string>("leaderPublic");
+            let leader = await redisClient.getSingleData<string>("leader");
 
             if (!peers) {
                   await redisClient.setSignleData("validators", [p]);
@@ -194,8 +193,8 @@ class P2pServer extends AppLogger {
             this.handlePeerDisconnect(async (p: number) => {
                   await this.updateReplica(p, "DISCONNECT");
 
-                  if (P2pServer.leader === p.toString()) {
-                        await this.electNewLeader();
+                  if (this.chain.leader === p.toString()) {
+                        await this.chain.electNewLeader();
                   }
             });
 
@@ -363,81 +362,12 @@ class P2pServer extends AppLogger {
             });
       };
 
-      public syncChain = () => {
-            this.broadcast({
-                  message: `${this.NODE_ID} sending chain`,
-                  type: MESSAGE_TYPE.chain,
-                  data: JSON.stringify({
-                        chain: this.chain.chain.toString(),
-                  }),
-            });
-      };
-
-      public sendTransaction = (transaction: any) => {
-            this.broadcast({
-                  message: `${this.NODE_ID} sending transaction`,
-                  type: MESSAGE_TYPE.transaction,
-                  data: JSON.stringify({
-                        transaction: transaction,
-                  }),
-            });
-      };
-
-      public sendBlock = (block: any) => {
-            this.broadcast({
-                  message: `${this.NODE_ID} sending block`,
-                  type: MESSAGE_TYPE.block,
-                  data: JSON.stringify({
-                        block: block,
-                  }),
-            });
-      };
-
       private throwError = (error: string) => {
             throw new Error(error);
       };
 
-      public static getLeader = async () => {
-            const leader = this.leader ?? (await redisClient.getSingleData<string>("leader"));
-            if (leader) {
-                  this.leader = leader;
-                  await redisClient.setSignleData("leader", leader);
-            }
-            return leader;
-      };
-
-      public electNewLeader = async () => {
-            let leader = P2pServer.leader ?? (await redisClient.getSingleData<string>("leader"));
-            try {
-                  if (!leader) {
-                        leader = this.NODE_ID;
-                        await redisClient.setSignleData("leader", leader);
-                  } else {
-                        await redisClient.setSignleData("leader", leader);
-                  }
-                  if (KeygenSessionManager.sessionInitialized) {
-                        throw new Error(`cannot elect a new leader while a session is active`);
-                  }
-                  if (this.NODE_ID !== leader) {
-                        throw new Error(`election can only be started by previous rounds leader`);
-                  }
-
-                  this.broadcast({
-                        message: `${this.NODE_ID} is starting a new leader election`,
-                        type: MESSAGE_TYPES.LeaderElection,
-                        senderNode: leader,
-                  });
-            } catch (error) {
-                  this.broadcast({
-                        message: `${this.NODE_ID} is updating leader`,
-                        type: MESSAGE_TYPES.SetNewLeader,
-                        data: { newLeader: leader },
-                  });
-            }
-      };
-
       public startKeygen = async () => {
-            let leader = P2pServer.leader ?? (await redisClient.getSingleData<string>("leader"));
+            let leader = this.chain.leader ?? (await redisClient.getSingleData<string>("leader"));
             if (!leader || this.NODE_ID !== leader) {
                   throw new Error(`leader has not been initialized or you are not the leader`);
             }
@@ -523,12 +453,9 @@ class P2pServer extends AppLogger {
                         const { ports, publickKeys } = ValidatorsGroup.getAllKeys();
                         const newLeaderPublicKey = publickKeys[ports.indexOf(newLeader)];
 
-                        this.chain.leader = newLeaderPublicKey;
-                        P2pServer.leader = newLeader;
+                        this.chain.leader = newLeader;
 
                         await redisClient.setSignleData("leader", newLeader);
-                        await redisClient.setSignleData("leaderPublic", newLeaderPublicKey);
-
                         console.log(`the new leader is ${newLeader} ${newLeaderPublicKey}`);
                   }
                   if (message.type === MESSAGE_TYPE.chain) {
@@ -545,24 +472,6 @@ class P2pServer extends AppLogger {
             this.on("direct", async ({ message }: { message: ServerDirectMessage }) => {
                   this.log.info(`${message.message}`);
 
-                  if (message.type === "TRANSACTION") {
-                        const data = message.data as any;
-
-                        if (!this.transactionPool.transactionExists(data)) {
-                              this.transactionPool.addTransaction(data);
-                              this.sendTransaction(data);
-                        }
-                        if (this.transactionPool.thresholdReached()) {
-                              if (this.chain.leader == this.validator.getPublicKey()) {
-                                    console.log("block created");
-                                    let block = this.chain.createBlock(
-                                          this.transactionPool.transactions,
-                                          this.validator
-                                    );
-                                    this.sendBlock(block);
-                              }
-                        }
-                  }
                   if (message.type === MESSAGE_TYPE.chain) {
                         const data = (JSON.parse(message.data as string) as any).chain;
                         this.chain.replaceChain(data);
@@ -577,7 +486,7 @@ class P2pServer extends AppLogger {
                   }
                   if (message.type === MESSAGE_TYPES.LeaderVote) {
                         let maxVotes = 0;
-                        let winner = P2pServer.leader;
+                        let winner = this.chain.leader;
 
                         try {
                               const { vote: recievedVote, validators } = (message as any).data;
@@ -600,7 +509,7 @@ class P2pServer extends AppLogger {
                                           }
                                     }
                                     this.votes = [];
-                                    P2pServer.leader = winner;
+                                    this.chain.leader = winner;
                                     await redisClient.setSignleData("leader", winner);
                                     await delay(500);
 
@@ -611,7 +520,7 @@ class P2pServer extends AppLogger {
                                     });
                               }
                         } catch (error) {
-                              P2pServer.leader = winner;
+                              this.chain.leader = winner;
                               this.broadcast({
                                     message: `${this.NODE_ID} is updating leader`,
                                     type: MESSAGE_TYPES.SetNewLeader,

@@ -246,7 +246,7 @@ export class KeygenSessionManager extends AppLogger {
             await delay(200);
             this.resetSessionState();
             // const leader = await redisClient.getSingleData<string>("leader");
-            if (this.selfId === leader) app.p2pServer.electNewLeader();
+            if (this.selfId === leader) app.p2pServer.chain.electNewLeader();
       };
 
       private static validateRoundBroadcasts(activeRound: AbstractKeygenRound, currentRound: number) {

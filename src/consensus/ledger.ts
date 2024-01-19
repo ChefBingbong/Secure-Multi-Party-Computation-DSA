@@ -14,6 +14,8 @@ import { app } from "../protocol";
 import Validator from "../protocol/validators/validator";
 import config from "../config/config";
 import Transaction from "../wallet/transaction";
+import { KeygenSessionManager } from "../protocol/keygenProtocol";
+import { MESSAGE_TYPES } from "../protocol/utils/utils";
 
 export interface BlockchainInterface {
       addBlock(data: any): Promise<Block>;
@@ -22,7 +24,7 @@ export interface BlockchainInterface {
       replaceChain(newChain: Block[]): Promise<void>;
       isValidBlock(block: Block): boolean;
 }
-const MIN_APPROVALS = 2 * (3 / 3) + 1;
+const MIN_APPROVALS = 2 * (3 / 3) + 0;
 class Blockchain implements BlockchainInterface {
       public chain: Block[];
       public leader: string;
@@ -105,7 +107,7 @@ class Blockchain implements BlockchainInterface {
                         this.logger.log(`info`, `Received chain is invalid`);
                         return;
                   }
-                  // this.executeChain(newChain);
+                  // this.chain.executeChain(newChain);
                   this.chain = newChain;
                   await redisClient.setSignleData<any>("chain", newChain);
             } catch (error) {
@@ -123,7 +125,7 @@ class Blockchain implements BlockchainInterface {
                   block.lastHash === lastBlock.hash &&
                   block.hash === Block.blockHash(block) &&
                   Block.verifyBlock(block) &&
-                  Block.verifyLeader(block, this.leader)
+                  Block.verifyLeader(block, ValidatorsGroup.getPublickKeyFromNodeId(this.leader))
             ) {
                   console.log("BLOCK VALID");
                   return true;
@@ -131,6 +133,36 @@ class Blockchain implements BlockchainInterface {
             console.log("BLOCK VALID");
             return false;
       }
+
+      public electNewLeader = async () => {
+            let leader = this.leader ?? (await redisClient.getSingleData<string>("leader"));
+            try {
+                  if (!leader) {
+                        leader = this.validator.nodeId;
+                        await redisClient.setSignleData("leader", leader);
+                  } else {
+                        await redisClient.setSignleData("leader", leader);
+                  }
+                  if (KeygenSessionManager.sessionInitialized) {
+                        throw new Error(`cannot elect a new leader while a session is active`);
+                  }
+                  if (this.validator.nodeId !== leader) {
+                        throw new Error(`election can only be started by previous rounds leader`);
+                  }
+
+                  app.p2pServer.broadcast({
+                        message: `${this.validator.nodeId} is starting a new leader election`,
+                        type: MESSAGE_TYPES.LeaderElection,
+                        senderNode: leader,
+                  });
+            } catch (error) {
+                  app.p2pServer.broadcast({
+                        message: `${this.validator.nodeId} is updating leader`,
+                        type: MESSAGE_TYPES.SetNewLeader,
+                        data: { newLeader: leader },
+                  });
+            }
+      };
 
       public resetState = async () => {
             this.chain = [Block.genesis()];
@@ -142,30 +174,28 @@ class Blockchain implements BlockchainInterface {
                   if (data.type === MESSAGE_TYPE.transaction) {
                         const Data = JSON.parse(data.data);
                         const transaction = Data.transaction;
-                        // console.log(transaction);
                         if (
                               !this.transactionPool.transactionExists(transaction) &&
                               this.transactionPool.verifyTransaction(transaction) &&
                               ValidatorsGroup.isValidValidator(transaction.from)
                         ) {
                               let thresholdReached = this.transactionPool.addTransaction(transaction);
-                              // send transactions to other nodes
-                              this.sendTransaction(transaction, nodeId);
+                              this.sendTransaction(transaction, this.validator.nodeId);
 
-                              // check if limit reached
                               if (thresholdReached) {
                                     console.log("THRESHOLD REACHED");
-                                    // check the current node is the proposer
-                                    if (this.leader == this.validator.getPublicKey()) {
+                                    if (
+                                          ValidatorsGroup.getPublickKeyFromNodeId(this.leader) ==
+                                          this.validator.getPublicKey()
+                                    ) {
                                           console.log("PROPOSING BLOCK");
-                                          // if the node is the proposer, create a block and broadcast it
                                           let block = this.createBlock(
                                                 this.transactionPool.transactions,
                                                 this.validator
                                           );
                                           console.log("CREATED BLOCK", block);
                                           await delay(500);
-                                          this.broadcastPrePrepare(block, nodeId);
+                                          this.broadcastPrePrepare(block, this.validator.nodeId);
                                     }
                               } else {
                                     console.log("Transaction Added");
@@ -177,30 +207,33 @@ class Blockchain implements BlockchainInterface {
                               this.blockPool.addBlock(block);
 
                               await delay(500);
-                              this.broadcastPrePrepare(block, nodeId);
+                              this.broadcastPrePrepare(block, this.validator.nodeId);
                               let prepare = this.preparePool.prepare(block, this.validator);
                               await delay(500);
 
-                              this.broadcastPrepare(prepare, nodeId);
+                              this.broadcastPrepare(prepare, this.validator.nodeId);
                         }
                   } else if (data.type === MESSAGE_TYPE.prepare) {
                         const prepare = data.data.prepare;
+                        console.log(
+                              !this.preparePool.existingPrepare(prepare),
+                              this.preparePool.isValidPrepare(prepare),
+                              ValidatorsGroup.isValidValidator(prepare.publicKey)
+                        );
                         if (
                               !this.preparePool.existingPrepare(prepare) &&
                               this.preparePool.isValidPrepare(prepare) &&
                               ValidatorsGroup.isValidValidator(prepare.publicKey)
                         ) {
                               this.preparePool.addPrepare(prepare);
-                              this.broadcastPrepare(prepare, nodeId);
+                              this.broadcastPrepare(prepare, this.validator.nodeId);
 
-                              console.log("prepareLen", this.preparePool.list[prepare.blockHash].length);
-                              console.log("minappLen", MIN_APPROVALS);
-
+                              console.log(this.preparePool.list[prepare.blockHash]?.length, MIN_APPROVALS);
                               if (this.preparePool.list[prepare.blockHash].length >= MIN_APPROVALS) {
                                     let commit = this.commitPool.commit(prepare, this.validator);
                                     await delay(500);
 
-                                    this.broadcastCommit(commit, nodeId);
+                                    this.broadcastCommit(commit, this.validator.nodeId);
                               }
                         }
                   } else if (data.type === MESSAGE_TYPE.commit) {
@@ -211,7 +244,7 @@ class Blockchain implements BlockchainInterface {
                               ValidatorsGroup.isValidValidator(commit.publicKey)
                         ) {
                               this.commitPool.addCommit(commit);
-                              this.broadcastCommit(commit, nodeId);
+                              this.broadcastCommit(commit, this.validator.nodeId);
 
                               if (this.commitPool.list[commit.blockHash].length >= MIN_APPROVALS) {
                                     this.addUpdatedBlock(
@@ -226,23 +259,21 @@ class Blockchain implements BlockchainInterface {
                                     this.chain[this.chain.length - 1].hash,
                                     this.validator
                               );
-                              this.broadcastRoundChange(message, nodeId);
+                              this.broadcastRoundChange(message, this.validator.nodeId);
                         }
                   } else if (data.type === MESSAGE_TYPE.round_change) {
                         const message = data.data.message;
-                        // console.log(this.messagePool.list[message.blockHash].length, "hahahhahahhahahahah");
-
                         if (
                               !this.messagePool.existingMessage(message) &&
                               this.messagePool.isValidMessage(message) &&
                               ValidatorsGroup.isValidValidator(message.publicKey)
                         ) {
                               this.messagePool.addMessage(message);
-                              this.broadcastRoundChange(message, nodeId);
+                              this.broadcastRoundChange(message, this.validator.nodeId);
 
                               console.log(this.messagePool.list[message.blockHash].length);
                               if (this.messagePool.list[message.blockHash].length >= MIN_APPROVALS) {
-                                    console.log("clearrrrrinnnnngggggggg");
+                                    console.log("CLEARED POOL");
                                     this.transactionPool.clear();
                               }
                         }
