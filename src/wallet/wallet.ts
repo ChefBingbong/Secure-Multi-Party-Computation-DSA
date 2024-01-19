@@ -20,7 +20,7 @@ class Wallet {
             type: string,
             transactionPool: any
       ): Transaction<T> | undefined {
-            let transaction = new Transaction().newTransaction<T>(this, to, amount as any, type);
+            let transaction = Transaction.newTransaction<T>(this, to, amount as any, type);
             transactionPool.addTransaction(transaction);
             return transaction;
       }

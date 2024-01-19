@@ -81,7 +81,7 @@ export class App extends AppLogger implements AppInterface {
             this.app.listen(Number(config.port), async () => {
                   App.log.info(`Server listening on port ${Number(config.port)}.`);
                   this.p2pServer = new P2pServer();
-                  this.p2pServer.listen(Number(config.p2pPort), peers);
+                  this.p2pServer.listen(peers);
             });
       }
 }

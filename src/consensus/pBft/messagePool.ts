@@ -30,15 +30,16 @@ class MessagePool {
             return roundChange;
       }
 
-      existingMessage(message: RoundChangeMessage): RoundChangeMessage | undefined {
+      existingMessage(message: RoundChangeMessage): RoundChangeMessage | false {
             if (this.list[message.blockHash]) {
                   return this.list[message.blockHash].find((p) => p.publicKey === message.publicKey);
             } else {
-                  return undefined;
+                  return false;
             }
       }
 
       isValidMessage(message: RoundChangeMessage): boolean {
+            console.log("in valid here");
             return ChainUtil.verifySignature(
                   message.publicKey,
                   message.signature,
@@ -47,8 +48,7 @@ class MessagePool {
       }
 
       addMessage(message: RoundChangeMessage): void {
-            console.log(this.list[message.blockHash]);
-            this.list[message.blockHash].push(message);
+            this.list[message.blockHash]?.push(message);
       }
 }
 

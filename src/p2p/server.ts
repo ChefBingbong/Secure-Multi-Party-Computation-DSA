@@ -16,6 +16,8 @@ import { P2PNetworkEventEmitter } from "./eventEmitter";
 import { P2PNetwork } from "./types";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import Flatted from "flatted";
+import { Server, WebSocket } from "ws";
+import { IncomingMessage } from "http";
 
 export const MESSAGE_TYPE = {
       chain: "CHAIN",
@@ -44,8 +46,8 @@ export interface NetworkMessageBroadcast<T> extends NetworkMessageDirect<T> {
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-class P2pServer extends AppLogger implements P2PNetwork {
-      public readonly connections: Map<string, net.Socket>;
+class P2pServer extends AppLogger {
+      public readonly connections: Map<string, WebSocket>;
       public readonly NODE_ID: string;
       public readonly neighbors: Map<string, string>;
       public readonly validator: Validator = new Validator();
@@ -60,7 +62,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
       public threshold: number;
       private readonly emitter: P2PNetworkEventEmitter;
       private log: Logger;
-      private server: net.Server;
+      private server: Server;
       private seenMessages: Set<string> = new Set();
       private isInitialized: boolean = false;
 
@@ -77,7 +79,8 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.votes = [];
             this.log = this.getLogger("p2p-log");
 
-            this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
+            this.server = new WebSocket.Server({ port: Number(config.p2pPort) });
+
             this.transactionPool = new TransactionPool();
             this.chain = new Blockchain(this.log, this.transactionPool, this.validators, this.validator);
             this.updateReplica(Number(this.NODE_ID), "CONNECT");
@@ -177,46 +180,50 @@ class P2pServer extends AppLogger implements P2PNetwork {
       }
 
       //public methods
-      public listen(port: number, ports: number[], cb?: () => void): (cb?: any) => net.Server {
+      public listen(ports: number[], cb?: () => void): (cb?: any) => void {
             if (!this.isInitialized) this.throwError(`Cannot listen before server is initialized`);
 
-            this.server.listen(port, "0.0.0.0", () => {
-                  this.handlePeerConnection(async (p: number) => {
-                        await this.updateReplica(p, "CONNECT");
-                  });
+            this.server.on("connection", (socket) => {
+                  this.handleNewSocket(socket);
+            });
 
-                  this.handlePeerDisconnect(async (p: number) => {
-                        await this.updateReplica(p, "DISCONNECT");
+            this.handlePeerConnection(async (p: number) => {
+                  await this.updateReplica(p, "CONNECT");
+            });
 
-                        if (P2pServer.leader === p.toString()) {
-                              await this.electNewLeader();
-                        }
-                  });
+            this.handlePeerDisconnect(async (p: number) => {
+                  await this.updateReplica(p, "DISCONNECT");
 
-                  this.handleBroadcastMessage(async () => {});
-                  this.handleDirectMessage(async () => {});
+                  if (P2pServer.leader === p.toString()) {
+                        await this.electNewLeader();
+                  }
+            });
 
-                  ports.forEach((pot) => {
-                        this.connect("127.0.0.1", Number(pot), () => {
-                              this.log.info(`Connection to ${pot} established.`);
-                        });
+            this.handleBroadcastMessage(async () => {});
+            this.handleDirectMessage(async () => {});
+
+            ports.forEach((pot) => {
+                  this.connect(pot, () => {
+                        this.log.info(`Connection to ${pot} established.`);
                   });
             });
             return (cb) => this.server.close(cb);
       }
 
-      public connect = (ip: string, port: number, cb?: () => void) => {
-            const socket = new net.Socket();
+      public connect = (port: number, cb?: () => void) => {
+            const socket = new WebSocket(`ws://localhost:${port}`);
 
             socket.on("error", (err) => {
                   console.error(`Socket connection error: ${err.message}`);
             });
-            socket.connect(port, ip, () => {
+
+            socket.on("open", async () => {
                   this.handleNewSocket(socket);
+                  await this.updateReplica(Number(this.NODE_ID), "CONNECT");
                   cb && cb();
             });
 
-            return (cb: Error) => socket.destroy(cb);
+            return () => socket.terminate();
       };
 
       public broadcast = (
@@ -245,13 +252,15 @@ class P2pServer extends AppLogger implements P2PNetwork {
             });
       };
 
-      private handleNewSocket = (socket: net.Socket, emitConnect = true) => {
+      private handleNewSocket = (socket: WebSocket, emitConnect = true) => {
             const connectionId = v4();
+
             this.connections.set(connectionId, socket);
             if (emitConnect) this.emitter.emitConnect(connectionId, false);
 
-            socket.on("error", (err) => {
-                  console.error(`Socket connection error: ${err.message}`);
+            socket.on("message", (message: any) => {
+                  const receivedData = JSON.parse(message);
+                  this.emitter.emitMessage(connectionId, receivedData, false);
             });
 
             socket.on("close", () => {
@@ -259,10 +268,8 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   this.emitter.emitDisconnect(connectionId, false);
             });
 
-            socket.on("data", (message) => {
-                  // console.log(message.toString());
-                  const receivedData = JSON.parse(message.toString());
-                  this.emitter.emitMessage(connectionId, receivedData, false);
+            socket.on("error", (err) => {
+                  console.error(`Socket connection error: ${err.message}`);
             });
       };
 
@@ -270,7 +277,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             const socket = this.connections.get(connectionId);
 
             if (!socket) this.throwError(`Attempt to send data to connection that does not exist ${connectionId}`);
-            socket.write(Buffer.from(JSON.stringify(message)));
+            socket.send(JSON.stringify(message));
       };
 
       private findNodeId = (connectionId: string): string | undefined => {
@@ -291,7 +298,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
       private send = (nodeId: string, data: any) => {
             const connectionId = this.neighbors.get(nodeId);
-            // console.log({ type: "message", data });
             this._send(connectionId, { type: "message", data });
       };
 
@@ -308,7 +314,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
       };
 
       public close = (cb: () => void) => {
-            for (let [, socket] of this.connections) socket.destroy();
+            for (let [, socket] of this.connections) socket.terminate();
             this.server.close(cb);
       };
 
@@ -330,19 +336,12 @@ class P2pServer extends AppLogger implements P2PNetwork {
             try {
                   switch (type) {
                         case "BROADCAST":
-                              await this.broadcast(data.message, data.id, data.origin, data.ttl);
+                              this.broadcast(data.message, data.id, data.origin, data.ttl);
                               break;
                         case "DIRECT":
-                              await this.sendDirect(
-                                    data.destination,
-                                    data.message,
-                                    data.id,
-                                    data.origin,
-                                    data.ttl
-                              );
+                              this.sendDirect(data.destination, data.message, data.id, data.origin, data.ttl);
                               break;
                         default:
-                              // Handle unexpected type
                               throw new ErrorWithCode(
                                     `Invalid message type: ${type}`,
                                     ProtocolError.INTERNAL_ERROR
@@ -456,8 +455,6 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   if (chain) this.chain.chain = chain;
 
                   if (nodeId !== this.NODE_ID) {
-                        console.log("yayyy");
-                        await delay(2000);
                         this.sendChain(nodeId);
                   }
                   await callback(Number(nodeId), "CONNECT");
@@ -538,31 +535,9 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         const data = (message.data as any).chain;
                         this.chain.replaceChain(data);
                   }
-                  // if (message.type === MESSAGE_TYPE.transaction) {
-                  //       const data = JSON.parse(message.data as any);
 
-                  //       if (!this.transactionPool.transactionExists(data)) {
-                  //             this.transactionPool.addTransaction(data);
-                  //             this.sendTransaction(data);
-                  //       }
-                  //       if (this.transactionPool.thresholdReached()) {
-                  //             if (this.chain.leader == this.validator.getPublicKey()) {
-                  //                   let block = this.chain.createBlock(
-                  //                         this.transactionPool.transactions,
-                  //                         this.validator
-                  //                   );
-                  //                   this.sendBlock(block);
-                  //             }
-                  //       }
-                  // }
-                  // if (message.type === MESSAGE_TYPE.block) {
-                  //       const data = (JSON.parse(message.data as string) as any).block;
-                  //       if (this.chain.isValidBlock(data)) {
-                  //             this.sendBlock(data);
-                  //             this.transactionPool.clear();
-                  //       }
-                  // }
                   this.chain.handleMessage(message, this.NODE_ID);
+                  await callback();
             });
       };
 

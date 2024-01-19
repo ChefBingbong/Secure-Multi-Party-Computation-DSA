@@ -24,7 +24,7 @@ try {
 
 export const TOTAL_COINS = 1000;
 
-export const TRANSACTION_THRESHOLD = 3;
+export const TRANSACTION_THRESHOLD = 5;
 
 export const FIRST_LEADER = "";
 

@@ -34,7 +34,7 @@ class PreparePool {
       }
 
       addPrepare(prepare: PrepareMessage): void {
-            this.list[prepare.blockHash].push(prepare);
+            this.list[prepare.blockHash]?.push(prepare);
       }
 
       existingPrepare(prepare: PrepareMessage): PrepareMessage | undefined {

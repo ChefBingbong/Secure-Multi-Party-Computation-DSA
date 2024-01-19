@@ -22,7 +22,7 @@ export interface BlockchainInterface {
       replaceChain(newChain: Block[]): Promise<void>;
       isValidBlock(block: Block): boolean;
 }
-
+const MIN_APPROVALS = 2 * (3 / 3) + 1;
 class Blockchain implements BlockchainInterface {
       public chain: Block[];
       public leader: string;
@@ -47,12 +47,9 @@ class Blockchain implements BlockchainInterface {
             this.messagePool = new MessagePool();
       }
 
-      public async addBlock(data: any): Promise<Block> {
+      public async addBlock(block: any): Promise<Block> {
             try {
-                  const initialNode = new Wallet("initial node");
-                  const block = Block.createBlock(this.chain[this.chain.length - 1], data, initialNode);
-
-                  this.chain = [...this.chain, block];
+                  this.chain.push(block);
                   await redisClient.setSignleData<any>("chain", this.chain);
 
                   return block;
@@ -122,15 +119,17 @@ class Blockchain implements BlockchainInterface {
       public isValidBlock(block: Block): boolean {
             const lastBlock = this.chain[this.chain.length - 1];
             if (
-                  block.lastHash !== lastBlock.hash ||
-                  block.hash !== Block.blockHash(block) ||
-                  !Block.verifyBlock(block) ||
-                  !Block.verifyLeader(block, this.leader)
-            )
-                  return false;
-            this.addBlock(block);
-            console.log("block added");
-            return true;
+                  lastBlock.sequenceNumber + 1 == block.sequenceNumber &&
+                  block.lastHash === lastBlock.hash &&
+                  block.hash === Block.blockHash(block) &&
+                  Block.verifyBlock(block) &&
+                  Block.verifyLeader(block, this.leader)
+            ) {
+                  console.log("BLOCK VALID");
+                  return true;
+            }
+            console.log("BLOCK VALID");
+            return false;
       }
 
       public resetState = async () => {
@@ -139,116 +138,117 @@ class Blockchain implements BlockchainInterface {
       };
 
       public handleMessage = async (data: any, nodeId: string) => {
-            if (data.type === MESSAGE_TYPE.transaction) {
-                  const Data = JSON.parse(data.data);
-                  const transaction = Data.transaction;
-                  if (
-                        !this.transactionPool.transactionExists(transaction) &&
-                        this.transactionPool.verifyTransaction(transaction) &&
-                        ValidatorsGroup.isValidValidator(transaction.input.from)
-                  ) {
-                        let thresholdReached = this.transactionPool.addTransaction(transaction);
-                        this.sendTransaction(transaction, config.p2pPort);
+            try {
+                  if (data.type === MESSAGE_TYPE.transaction) {
+                        const Data = JSON.parse(data.data);
+                        const transaction = Data.transaction;
+                        // console.log(transaction);
+                        if (
+                              !this.transactionPool.transactionExists(transaction) &&
+                              this.transactionPool.verifyTransaction(transaction) &&
+                              ValidatorsGroup.isValidValidator(transaction.from)
+                        ) {
+                              let thresholdReached = this.transactionPool.addTransaction(transaction);
+                              // send transactions to other nodes
+                              this.sendTransaction(transaction, nodeId);
 
-                        if (thresholdReached) {
-                              console.log("THRESHOLD REACHED");
-
-                              if (this.leader == this.validator.getPublicKey()) {
-                                    console.log("PROPOSING BLOCK");
-                                    let block = this.createBlock(
-                                          this.transactionPool.transactions,
-                                          this.validator
-                                    );
-                                    console.log("CREATED BLOCK", block);
-                                    this.broadcastPrePrepare(block, config.p2pPort);
+                              // check if limit reached
+                              if (thresholdReached) {
+                                    console.log("THRESHOLD REACHED");
+                                    // check the current node is the proposer
+                                    if (this.leader == this.validator.getPublicKey()) {
+                                          console.log("PROPOSING BLOCK");
+                                          // if the node is the proposer, create a block and broadcast it
+                                          let block = this.createBlock(
+                                                this.transactionPool.transactions,
+                                                this.validator
+                                          );
+                                          console.log("CREATED BLOCK", block);
+                                          await delay(500);
+                                          this.broadcastPrePrepare(block, nodeId);
+                                    }
+                              } else {
+                                    console.log("Transaction Added");
                               }
-                        } else {
-                              console.log("Transaction Added");
                         }
-                  }
-            } else if (data.type === MESSAGE_TYPE.pre_prepare) {
-                  console.log("haaaaaaaaaa");
-                  // console.log(!this.blockPool.existingBlock(block) && this.isValidBlock(block));
-                  const block = data.data.block;
-                  // console.log(!this.blockPool.existingBlock(block) && this.isValidBlock(block));
+                  } else if (data.type === MESSAGE_TYPE.pre_prepare) {
+                        const block = data.data.block;
+                        if (!this.blockPool.existingBlock(block) && this.isValidBlock(block)) {
+                              this.blockPool.addBlock(block);
 
-                  if (!this.blockPool.existingBlock(block) && this.isValidBlock(block)) {
-                        console.log("yoooo");
+                              await delay(500);
+                              this.broadcastPrePrepare(block, nodeId);
+                              let prepare = this.preparePool.prepare(block, this.validator);
+                              await delay(500);
 
-                        this.blockPool.addBlock(block);
-                        await delay(1000);
+                              this.broadcastPrepare(prepare, nodeId);
+                        }
+                  } else if (data.type === MESSAGE_TYPE.prepare) {
+                        const prepare = data.data.prepare;
+                        if (
+                              !this.preparePool.existingPrepare(prepare) &&
+                              this.preparePool.isValidPrepare(prepare) &&
+                              ValidatorsGroup.isValidValidator(prepare.publicKey)
+                        ) {
+                              this.preparePool.addPrepare(prepare);
+                              this.broadcastPrepare(prepare, nodeId);
 
-                        this.broadcastPrePrepare(block, config.p2pPort);
-                        let prepare = this.preparePool.prepare(block, this.validator);
-                        await delay(1000);
-                        this.broadcastPrepare(prepare, nodeId);
-                  }
-            } else if (data.type === MESSAGE_TYPE.prepare) {
-                  const prepare = data.data.prepare;
-                  if (
-                        !this.preparePool.existingPrepare(prepare) &&
-                        this.preparePool.isValidPrepare(prepare) &&
-                        ValidatorsGroup.isValidValidator(prepare.publicKey)
-                  ) {
-                        this.preparePool.addPrepare(prepare);
-                        await delay(1000);
-                        this.broadcastPrepare(prepare, nodeId);
+                              console.log("prepareLen", this.preparePool.list[prepare.blockHash].length);
+                              console.log("minappLen", MIN_APPROVALS);
 
-                        if (this.preparePool.list[prepare.blockHash].length >= 2 * (5 / 3) + 1) {
-                              let commit = this.commitPool.commit(prepare, this.validator);
-                              await delay(1000);
+                              if (this.preparePool.list[prepare.blockHash].length >= MIN_APPROVALS) {
+                                    let commit = this.commitPool.commit(prepare, this.validator);
+                                    await delay(500);
 
+                                    this.broadcastCommit(commit, nodeId);
+                              }
+                        }
+                  } else if (data.type === MESSAGE_TYPE.commit) {
+                        const commit = data.data.commit;
+                        if (
+                              !this.commitPool.existingCommit(commit) &&
+                              this.commitPool.isValidCommit(commit) &&
+                              ValidatorsGroup.isValidValidator(commit.publicKey)
+                        ) {
+                              this.commitPool.addCommit(commit);
                               this.broadcastCommit(commit, nodeId);
-                        }
-                  }
-            } else if (data.type === MESSAGE_TYPE.commit) {
-                  const commit = data.data.commit;
-                  if (
-                        !this.commitPool.existingCommit(commit) &&
-                        this.commitPool.isValidCommit(commit) &&
-                        ValidatorsGroup.isValidValidator(commit.publicKey)
-                  ) {
-                        this.commitPool.addCommit(commit);
-                        await delay(1000);
-                        this.broadcastCommit(commit, config.p2pPort);
 
-                        if (this.commitPool.list[commit.blockHash].length >= 2 * (5 / 3) + 1) {
-                              await delay(1000);
-                              console.log(this.commitPool.list[commit.blockHash].length);
+                              if (this.commitPool.list[commit.blockHash].length >= MIN_APPROVALS) {
+                                    this.addUpdatedBlock(
+                                          commit.blockHash,
+                                          this.blockPool,
+                                          this.preparePool,
+                                          this.commitPool
+                                    );
+                              }
 
-                              this.addUpdatedBlock(
-                                    commit.blockHash,
-                                    this.blockPool,
-                                    this.preparePool,
-                                    this.commitPool
+                              let message = this.messagePool.createMessage(
+                                    this.chain[this.chain.length - 1].hash,
+                                    this.validator
                               );
+                              this.broadcastRoundChange(message, nodeId);
                         }
+                  } else if (data.type === MESSAGE_TYPE.round_change) {
+                        const message = data.data.message;
+                        // console.log(this.messagePool.list[message.blockHash].length, "hahahhahahhahahahah");
 
-                        let message = this.messagePool.createMessage(
-                              this.chain[this.chain.length - 1].hash,
-                              this.validator
-                        );
-                        await delay(1000);
-                        this.broadcastRoundChange(message, config.p2pPort);
-                  }
-            } else if (data.type === MESSAGE_TYPE.round_change) {
-                  const message = data.data.message;
-                  console.log(this.messagePool.list);
-                  if (
-                        !this.messagePool.existingMessage(message) &&
-                        this.messagePool.isValidMessage(message) &&
-                        ValidatorsGroup.isValidValidator(message.publicKey)
-                  ) {
-                        this.messagePool.addMessage(message);
-                        await delay(1000);
+                        if (
+                              !this.messagePool.existingMessage(message) &&
+                              this.messagePool.isValidMessage(message) &&
+                              ValidatorsGroup.isValidValidator(message.publicKey)
+                        ) {
+                              this.messagePool.addMessage(message);
+                              this.broadcastRoundChange(message, nodeId);
 
-                        this.broadcastRoundChange(message, config.p2pPort);
-
-                        if (this.messagePool.list[message.blockHash].length >= 2 * (5 / 3) + 1) {
-                              console.log("clearrrrrinnnnngggggggg");
-                              this.transactionPool.clear();
+                              console.log(this.messagePool.list[message.blockHash].length);
+                              if (this.messagePool.list[message.blockHash].length >= MIN_APPROVALS) {
+                                    console.log("clearrrrrinnnnngggggggg");
+                                    this.transactionPool.clear();
+                              }
                         }
                   }
+            } catch (error) {
+                  console.log(error);
             }
       };
 

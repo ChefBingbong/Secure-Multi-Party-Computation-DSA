@@ -37,6 +37,7 @@ export const startProtocol = async (): Promise<void> => {
             .on("SIGINT", async (reason) => {
                   log.error(`SIGINT. ${reason}`);
                   await updatePeerReplica(port, "DISCONNECT");
+                  process.exit();
             })
             .on("SIGTERM", async (reason) => {
                   log.error(`SIGTERM. ${reason}`);

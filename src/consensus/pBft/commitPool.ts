@@ -24,11 +24,10 @@ class CommitPool {
       }
 
       private createCommit(prepare: { blockHash: string }, wallet: Wallet): CommitMessage {
-            const commit: CommitMessage = {
-                  blockHash: prepare.blockHash,
-                  publicKey: wallet.getPublicKey(),
-                  signature: wallet.sign(prepare.blockHash),
-            };
+            let commit: CommitMessage = {} as CommitMessage;
+            commit.blockHash = prepare.blockHash;
+            commit.publicKey = wallet.getPublicKey();
+            commit.signature = wallet.sign(prepare.blockHash);
 
             return commit;
       }
