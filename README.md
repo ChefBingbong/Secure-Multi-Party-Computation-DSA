@@ -38,6 +38,14 @@ I have also implemented a p2p network and http server to allow nodes to interact
 ### In Memory DB with redis
 ive implemented an in memory database to store the state of the validators array to Disk such that when a new node joins the network they dont need to provide an configuration about the existing state of the VM before they joined. this in combination with state relplication amoung nodes keeps the validators list up-to-date always amoungst all nodes, new and old.
 
+### practical byzantine fault tolerance consensus
+ive started implemented an a distributed blockchain ledger following the practical byzantine fault tolerance method. Right now whenever a keygeneration session has conculded each node will submit a transaction of their final proof to the chain. i have set the current block threshold to be  2f + 1 of the nodes so every time a keygen session concludes a new block will be created purley to server as a public validation of the previous roubds key generation. im not sure whether i will always keep this or not but i will need  ledger later when i start implementing the actual bridge such that users can submit proof of a lock transaction that can serve as ameans to kickstart a signing process.
+
+my current thinking on the topic is to follow an approach similar to Ren protocol whereby we can predertmine sign an event such as a lock deposit and have this signature be able to be reconstricted later from known paramaters such as the transaction payload pHash, the gHash (which from renvm) corresponds to the current gateway shard or collection of darknodes that is currently under management of the keys of said transactions locked funds. whilst this project is small in scope i will probably mock something similar. i might try something similar here. using methods like this the signature signed the VM can be recalcukated and spent in a smart contracts on evm compatabile chains. 
+
+So going forward the next steps for me will be to finish implementing the mpc signing part of the protocol and then start to look int BTC json RPC na perhaos making a wrapper for it such that i can query/initiate relevant transactions. one thing im so far unfamiliar with is how to use bitcoin scripting to my advantage. maybe there is a way to use bitcoin scipting to emit events on such lock depositi addresses.
+
+
 ## Usage
 to use this and run the keygen process yourself. first clone the repo run 
 ```
