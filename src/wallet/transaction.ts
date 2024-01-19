@@ -8,7 +8,7 @@ export type TransactonOutput<T extends any> = { to: string; amount: T; fee: numb
 export interface BaseTransactionInterface<T> {
       newTransaction(senderWallet: any, to: string, amount: T, type: string): Transaction<T> | undefined;
       signTransaction(transaction: Transaction<any>, senderWallet: any): void;
-      verifyTransaction(transaction: Transaction<any>): boolean;
+      // verifyTransaction(transaction: Transaction<any>): boolean;
 }
 class Transaction<T extends any> implements BaseTransactionInterface<T> {
       public id: string;
@@ -69,7 +69,7 @@ class Transaction<T extends any> implements BaseTransactionInterface<T> {
             };
       }
 
-      public verifyTransaction(transaction: Transaction<any>): boolean {
+      public static verifyTransaction(transaction: Transaction<any>): boolean {
             return ChainUtil.verifySignature(
                   transaction.input.from,
                   transaction.input.signature,

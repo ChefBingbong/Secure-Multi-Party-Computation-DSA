@@ -126,3 +126,13 @@ export const postElectLeader = async (req: Request, res: Response, next: NextFun
             next(error);
       }
 };
+
+export const resetState = async (req: Request, res: Response, next: NextFunction) => {
+      try {
+            await app.p2pServer.chain.resetState();
+            res.status(200).json();
+      } catch (error) {
+            console.log(error);
+            next(error);
+      }
+};

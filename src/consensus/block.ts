@@ -18,6 +18,8 @@ class Block implements BaseBlockParams<any> {
       public data: any[];
       public validator: string;
       public signature: string;
+      public prepareMessages: any[];
+      public commitMessages: any[];
 
       constructor(
             timestamp: string | number,

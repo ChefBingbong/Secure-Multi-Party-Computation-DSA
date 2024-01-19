@@ -32,6 +32,10 @@ export class ValidatorsGroup {
                   publickKeys: partyIds.map((info) => Validator.parseWalletInfo(info).publicKey),
             };
       };
+
+      public static isValidValidator(validator) {
+            return this.getAllKeys().publickKeys.includes(validator);
+      }
 }
 
 // export default Validators;

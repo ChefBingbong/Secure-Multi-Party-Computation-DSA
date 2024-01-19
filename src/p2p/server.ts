@@ -17,11 +17,15 @@ import { P2PNetwork } from "./types";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import Flatted from "flatted";
 
-const MESSAGE_TYPE = {
+export const MESSAGE_TYPE = {
       chain: "CHAIN",
       block: "BLOCK",
       transaction: "TRANSACTION",
       clear_transactions: "CLEAR_TRANSACTIONS",
+      prepare: "PREPARE",
+      pre_prepare: "PRE-PREPARE",
+      commit: "COMMIT",
+      round_change: "ROUND_CHANGE",
 };
 // const root = protobuf.loadSync("../../types_pb");
 
@@ -74,8 +78,8 @@ class P2pServer extends AppLogger implements P2PNetwork {
             this.log = this.getLogger("p2p-log");
 
             this.server = net.createServer((socket: net.Socket) => this.handleNewSocket(socket));
-            this.chain = new Blockchain(this.log);
             this.transactionPool = new TransactionPool();
+            this.chain = new Blockchain(this.log, this.transactionPool, this.validators, this.validator);
             this.updateReplica(Number(this.NODE_ID), "CONNECT");
 
             new ValidatorsGroup(this.validator.toString());
@@ -256,6 +260,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
             });
 
             socket.on("data", (message) => {
+                  // console.log(message.toString());
                   const receivedData = JSON.parse(message.toString());
                   this.emitter.emitMessage(connectionId, receivedData, false);
             });
@@ -286,6 +291,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
 
       private send = (nodeId: string, data: any) => {
             const connectionId = this.neighbors.get(nodeId);
+            // console.log({ type: "message", data });
             this._send(connectionId, { type: "message", data });
       };
 
@@ -295,6 +301,7 @@ class P2pServer extends AppLogger implements P2PNetwork {
                   this.seenMessages.add(packet.id);
             } else {
                   for (const $nodeId of this.neighbors.keys()) {
+                        // if ($nodeId === this.NODE_ID) continue;
                         this.send($nodeId, packet);
                         // this.seenMessages.add(packet.id);
                   }
@@ -532,30 +539,31 @@ class P2pServer extends AppLogger implements P2PNetwork {
                         const data = (message.data as any).chain;
                         this.chain.replaceChain(data);
                   }
-                  if (message.type === MESSAGE_TYPE.transaction) {
-                        const data = JSON.parse(message.data as any);
+                  // if (message.type === MESSAGE_TYPE.transaction) {
+                  //       const data = JSON.parse(message.data as any);
 
-                        if (!this.transactionPool.transactionExists(data)) {
-                              this.transactionPool.addTransaction(data);
-                              this.sendTransaction(data);
-                        }
-                        if (this.transactionPool.thresholdReached()) {
-                              if (this.chain.leader == this.validator.getPublicKey()) {
-                                    let block = this.chain.createBlock(
-                                          this.transactionPool.transactions,
-                                          this.validator
-                                    );
-                                    this.sendBlock(block);
-                              }
-                        }
-                  }
-                  if (message.type === MESSAGE_TYPE.block) {
-                        const data = (JSON.parse(message.data as string) as any).block;
-                        if (this.chain.isValidBlock(data)) {
-                              this.sendBlock(data);
-                              this.transactionPool.clear();
-                        }
-                  }
+                  //       if (!this.transactionPool.transactionExists(data)) {
+                  //             this.transactionPool.addTransaction(data);
+                  //             this.sendTransaction(data);
+                  //       }
+                  //       if (this.transactionPool.thresholdReached()) {
+                  //             if (this.chain.leader == this.validator.getPublicKey()) {
+                  //                   let block = this.chain.createBlock(
+                  //                         this.transactionPool.transactions,
+                  //                         this.validator
+                  //                   );
+                  //                   this.sendBlock(block);
+                  //             }
+                  //       }
+                  // }
+                  // if (message.type === MESSAGE_TYPE.block) {
+                  //       const data = (JSON.parse(message.data as string) as any).block;
+                  //       if (this.chain.isValidBlock(data)) {
+                  //             this.sendBlock(data);
+                  //             this.transactionPool.clear();
+                  //       }
+                  // }
+                  this.chain.handleMessage(message, this.NODE_ID);
             });
       };
 
