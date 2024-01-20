@@ -43,6 +43,9 @@ export enum MESSAGE_TYPE {
       LeaderVote = "LeaderVote",
       SetNewLeader = "SetNewLeader",
       KeygenTransaction = "KeygenTransaction",
+      signSessionInit = "signSessionInit",
+      signSessionRoundHandler = "signSessionRoundHandler",
+      signSessionDirectMessageHandler = "signSessionDirectMessageHandler",
 }
 
 export const NetworkMessages: { [x: string]: string } = {

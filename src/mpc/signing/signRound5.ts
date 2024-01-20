@@ -37,13 +37,19 @@ export class SignBroadcastForRound5 {
 export class SignerRound5 {
       public session: SignSession;
       private roundInput: SignInputForRound5;
+      public output: any;
 
       private SigmaShares: Record<PartyId, bigint> = {};
 
-      // constructor(session: SignSession, roundInput: SignInputForRound5) {
-      //       this.roundInput = roundInput;
-      //       this.session = session;
-      // }
+      public currentRound: number;
+      public isBroadcastRound: boolean;
+      public isDirectMessageRound: boolean;
+
+      constructor() {
+            this.isBroadcastRound = true;
+            this.isDirectMessageRound = false;
+            this.currentRound = 1;
+      }
 
       public init({ session, input }: { session?: SignSession; input?: any }): void {
             this.session = session;

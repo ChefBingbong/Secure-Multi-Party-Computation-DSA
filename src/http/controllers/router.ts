@@ -122,13 +122,7 @@ export const postStart = async (req: Request, res: Response, next: NextFunction)
 
 export const postStartSignSession = async (req: Request, res: Response, next: NextFunction) => {
       try {
-            const signSession = new SigningSessionManager(
-                  app.p2pServer.validator,
-                  app.p2pServer.validators,
-                  "hello"
-            );
-            signSession.init();
-            // await app.p2pServer.startKeygen();
+            await app.p2pServer.startSignSession();
             res.status(200).json();
       } catch (error) {
             console.log(error);

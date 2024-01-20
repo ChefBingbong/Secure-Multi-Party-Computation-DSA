@@ -90,14 +90,20 @@ export class SignMessageForRound2 {
 export class SignerRound2 {
       public session: SignSession;
       private roundInput: SignPartyInputRound2;
+      public output: any;
 
       private K: Record<PartyId, bigint> = {};
       private G: Record<PartyId, bigint> = {};
 
-      // constructor(session: SignSession, roundInput: SignPartyInputRound2) {
-      //       this.roundInput = roundInput;
-      //       this.session = session;
-      // }
+      public currentRound: number;
+      public isBroadcastRound: boolean;
+      public isDirectMessageRound: boolean;
+
+      constructor() {
+            this.isBroadcastRound = true;
+            this.isDirectMessageRound = true;
+            this.currentRound = 2;
+      }
 
       public init({ session, input }: { session?: SignSession; input?: any }): void {
             this.session = session;
@@ -139,14 +145,12 @@ export class SignerRound2 {
       public process(): SignPartyOutputRound2 {
             // TODO: check if all parties have sent their messages
 
-            const broadcasts: [SignBroadcastForRound3] = [
-                  SignBroadcastForRound3.from({
-                        from: this.session.selfId,
-                        BigGammaShare: this.roundInput.BigGammaShare,
-                  }),
-            ];
+            const broadcasts: any = SignBroadcastForRound3.from({
+                  from: this.session.selfId,
+                  BigGammaShare: this.roundInput.BigGammaShare,
+            }).toJSON();
 
-            const messages: Array<SignMessageForRound3> = [];
+            const messages: Array<any> = [];
 
             const otherIds = otherPartyIds(this.session.partyIds, this.session.selfId);
             const pubData = this.roundInput.inputForRound1.partiesPublic;
@@ -204,7 +208,7 @@ export class SignerRound2 {
                               DeltaF,
                               DeltaProof,
                               ProofLog: proof,
-                        })
+                        }).toJSON()
                   );
 
                   return { DeltaBeta, ChiBeta, partyId };
@@ -217,6 +221,13 @@ export class SignerRound2 {
                   ChiShareBetas[partyId] = ChiBeta;
             });
 
+            this.output = {
+                  DeltaShareBetas,
+                  ChiShareBetas,
+                  K: this.K,
+                  G: this.G,
+                  inputForRound2: this.roundInput,
+            };
             const roundOutput: SignPartyOutputRound2 = {
                   broadcasts,
                   messages,

@@ -254,6 +254,7 @@ export class KeygenSessionManager extends AppLogger {
                         assert.deepEqual(proofs[i], proofs[j]);
                   }
             }
+
             console.log(`KEY GENERATION WAS SUCCESSFUL, ${proofs}\n`);
             // this.validator.PartyKeyShare = this.rounds[5].round.output.UpdatedConfig.toJSON() as any;
             const leader = await redisClient.getSingleData<string>("leader");

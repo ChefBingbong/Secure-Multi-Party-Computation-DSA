@@ -1,9 +1,9 @@
 import { bytesToNumberBE } from "@noble/curves/abstract/utils";
 import { abs, bitLength, isProbablyPrime, lcm, modMultiply, modPow, randBytesSync } from "bigint-crypto-utils";
 import { sampleUnitModN } from "../math/sample";
-import { PaillierPublicKey } from "./paillierPublicKey";
+import { PaillierPublicKey } from "./paillierKeygen";
 
-const SEC_PARAM = 64;
+const SEC_PARAM = 256;
 const BITS_BLUM_PRIME = 4 * SEC_PARAM;
 const BITS_PAILLIER = 2 * BITS_BLUM_PRIME;
 const SIEVE_SIZE = 2 ** 18;
@@ -164,11 +164,11 @@ export const generateRandomNonce = (modulus: bigint): bigint => {
 };
 
 export const paillierAdd = (publicKey: PaillierPublicKey, ciphertextA: bigint, ciphertextB: bigint): bigint => {
-      const ciphertextSum = modMultiply([ciphertextA, ciphertextB], publicKey.n2);
+      const ciphertextSum = modMultiply([ciphertextA, ciphertextB], publicKey.nSquared);
       return ciphertextSum;
 };
 
 export const paillierMultiply = (publicKey: PaillierPublicKey, ciphertext: bigint, scalar: bigint): bigint => {
-      const ciphertextProduct = modPow(ciphertext, scalar, publicKey.n2);
+      const ciphertextProduct = modPow(ciphertext, scalar, publicKey.nSquared);
       return ciphertextProduct;
 };

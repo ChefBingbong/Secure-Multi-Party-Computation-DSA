@@ -138,6 +138,7 @@ export class PaillierPublicKey implements Hashable, JSONable {
       public encryptWithNonce(message: bigint, nonce: bigint): bigint {
             const messageAbs = abs(message);
             const nHalf = this.n / 2n;
+            console.log(messageAbs, nHalf);
             if (messageAbs > nHalf) {
                   throw new Error("MESSAGE_TOO_LARGE");
             }

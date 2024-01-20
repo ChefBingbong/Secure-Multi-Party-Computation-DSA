@@ -1,12 +1,12 @@
 import { bytesToNumberBE } from "@noble/curves/abstract/utils";
 import { bitLength, isProbablyPrime, randBytesSync } from "bigint-crypto-utils";
 
-const SEC_PARAM = 128;
-const BITS_BLUM_PRIME = 2 * SEC_PARAM;
+const SEC_PARAM = 256;
+const BITS_BLUM_PRIME = 4 * SEC_PARAM;
 const BITS_PAILLIER = 2 * BITS_BLUM_PRIME;
-const SIEVE_SIZE = 2 ** 2;
-const PRIME_BOUND = 2 ** 2;
-const BLUM_PRIMALITY_ITERATIONS = 1;
+const SIEVE_SIZE = 2 ** 18;
+const PRIME_BOUND = 2 ** 20;
+const BLUM_PRIMALITY_ITERATIONS = 20;
 const primes = (below: number): bigint[] => {
       const sieve = new Uint8Array(below).fill(1);
       sieve[0] = 0;

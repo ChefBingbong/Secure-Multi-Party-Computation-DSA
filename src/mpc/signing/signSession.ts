@@ -21,10 +21,18 @@ export class SignSession {
       public sessionId: bigint;
       public threshold: number;
       public hasher: Hasher;
-
+      public output: any;
       public inputForRound1: SignPartyInputRound1;
 
-      constructor() {}
+      // public currentRound: number;
+      public isBroadcastRound: boolean;
+      public isDirectMessageRound: boolean;
+
+      constructor() {
+            this.isBroadcastRound = false;
+            this.isDirectMessageRound = false;
+            // this.currentRound = 0
+      }
 
       public init(signRequest: SignRequest, keyConfig: PartySecretKeyConfig) {
             this.partyIds = signRequest.signerIds;
@@ -54,6 +62,14 @@ export class SignSession {
             this.hasher.update(this.protocolId);
             this.hasher.update(keyConfig);
             this.hasher.update(signRequest.message);
+
+            this.output = {
+                  message: signRequest.message,
+                  secretEcdsa: Fn.mul(lag[keyConfig.partyId], keyConfig.ecdsa),
+                  secretPaillier: keyConfig.paillier,
+                  publicKey: publicKey.toAffine(),
+                  partiesPublic,
+            };
 
             this.inputForRound1 = {
                   message: signRequest.message,

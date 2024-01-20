@@ -101,14 +101,20 @@ export class SignMessageForRound4 {
 export class SignerRound4 {
       public session: SignSession;
       private roundInput: SignInputForRound4;
+      public output: any;
 
       private DeltaShares: Record<PartyId, bigint> = {};
       private BigDeltaShares: Record<PartyId, AffinePoint> = {};
 
-      // constructor(session: SignSession, roundInput: SignInputForRound4) {
-      //       this.roundInput = roundInput;
-      //       this.session = session;
-      // }
+      public currentRound: number;
+      public isBroadcastRound: boolean;
+      public isDirectMessageRound: boolean;
+
+      constructor() {
+            this.isBroadcastRound = true;
+            this.isDirectMessageRound = false;
+            this.currentRound = 1;
+      }
 
       public init({ session, input }: { session?: SignSession; input?: any }): void {
             this.session = session;
@@ -163,24 +169,22 @@ export class SignerRound4 {
 
             const sigmaShare = Fn.add(Fn.mul(R, this.roundInput.ChiShare), km);
 
-            const broadcasts: [SignBroadcastForRound5] = [
-                  SignBroadcastForRound5.from({
-                        from: this.session.selfId,
-                        SigmaShare: sigmaShare,
-                  }),
-            ];
+            const broadcasts: any = SignBroadcastForRound5.from({
+                  from: this.session.selfId,
+                  SigmaShare: sigmaShare,
+            }).toJSON();
 
             this.session.currentRound = "round5";
-
+            this.output = {
+                  Delta,
+                  BigDelta: BigDelta.toAffine(),
+                  BigR: BigR.toAffine(),
+                  R,
+                  inputForRound4: this.roundInput,
+            };
             return {
                   broadcasts,
-                  inputForRound5: {
-                        Delta,
-                        BigDelta: BigDelta.toAffine(),
-                        BigR: BigR.toAffine(),
-                        R,
-                        inputForRound4: this.roundInput,
-                  },
+                  inputForRound5: this.output,
             };
       }
 }

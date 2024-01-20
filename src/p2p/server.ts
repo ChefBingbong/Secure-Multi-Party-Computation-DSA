@@ -15,6 +15,7 @@ import TransactionPool from "../wallet/transactionPool";
 import Wallet from "../wallet/wallet";
 import { Listener, P2PNetworkEventEmitter } from "./eventEmitter";
 import { MESSAGE_TYPE, NetworkMessages } from "./types";
+import { SigningSessionManager } from "../protocol/signingProtocol";
 
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -38,6 +39,7 @@ class P2pServer extends AppLogger {
       private server: Server;
       private seenMessages: Set<string> = new Set();
       private isInitialized: boolean = false;
+      public signSessionProcessor: SigningSessionManager;
 
       constructor() {
             super();
@@ -300,9 +302,18 @@ class P2pServer extends AppLogger {
             this.on("broadcast", async ({ message }: { message: ServerMessage<any> }) => {
                   this.validator.messages.set(0, message);
                   //handle keygen & pBFT consensus for broadcasts
+                  // console.log(message);
+                  if (!this.signSessionProcessor && message.type === MESSAGE_TYPE.signSessionInit) {
+                        this.signSessionProcessor = new SigningSessionManager(
+                              this.validator,
+                              this.validators,
+                              "hello"
+                        );
+                        this.signSessionProcessor.init(this.threshold, this.validators);
+                  }
+                  await this.signSessionProcessor?.handleSignSessionConsensusMessage(message);
                   await KeygenSessionManager.handleKeygenConsensusMessage(message);
                   await this.chain.handleBlockchainConsensusMessage(message);
-
                   await callback();
             });
       };
@@ -311,6 +322,7 @@ class P2pServer extends AppLogger {
             this.on("direct", async ({ message }: { message: ServerMessage<any> }) => {
                   try {
                         //handle keygen & pBFT consensus for direcct msgs
+                        await this.signSessionProcessor?.handleSignSessionConsensusMessage(message);
                         await KeygenSessionManager.handleKeygenConsensusMessage(message);
                         await this.chain.handleBlockchainConsensusMessage(message);
                         await callback();
@@ -334,6 +346,21 @@ class P2pServer extends AppLogger {
                   this.broadcast({
                         message: `${this.NODE_ID} is starting a new keygen session`,
                         type: MESSAGE_TYPE.keygenInit,
+                  });
+            } catch (err) {
+                  console.log(err);
+            }
+      };
+
+      public startSignSession = async () => {
+            // let leader = this.chain.leader ?? (await redisClient.getSingleData<string>("leader"));
+            // if (!leader || this.NODE_ID !== leader) {
+            //       throw new Error(`leader has not been initialized or you are not the leader`);
+            // }
+            try {
+                  this.broadcast({
+                        message: `${this.NODE_ID} is starting a new sign session`,
+                        type: MESSAGE_TYPE.signSessionInit,
                   });
             } catch (err) {
                   console.log(err);

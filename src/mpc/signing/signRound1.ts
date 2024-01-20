@@ -7,11 +7,17 @@ import { SignPartyInputRound1, SignPartyOutputRound1 } from "./types";
 export class SignerRound1 {
       public session: SignSession;
       private roundInput: SignPartyInputRound1;
+      public output: any;
 
-      // constructor(session: SignSession, roundInput: SignPartyInputRound1) {
-      //       this.session = session;
-      //       this.roundInput = roundInput;
-      // }
+      public currentRound: number;
+      public isBroadcastRound: boolean;
+      public isDirectMessageRound: boolean;
+
+      constructor() {
+            this.isBroadcastRound = true;
+            this.isDirectMessageRound = true;
+            this.currentRound = 1;
+      }
 
       public init({ session, input }: { session?: SignSession; input?: any }): void {
             this.session = session;
@@ -31,7 +37,7 @@ export class SignerRound1 {
                   from: this.session.selfId,
                   K,
                   G,
-            });
+            }).toJSON();
 
             const messages: Array<SignMessageForRound2> = [];
 
@@ -59,25 +65,26 @@ export class SignerRound1 {
                         from: this.session.selfId,
                         to: partyId,
                         proofEnc: proof,
-                  });
-                  messages.push(message);
+                  }).toJSON();
+                  messages.push(message as any);
             });
 
             this.session.currentRound = "round2";
 
+            this.output = {
+                  inputForRound1: this.roundInput,
+                  K,
+                  G,
+                  BigGammaShare,
+                  GammaShare,
+                  KShare,
+                  KNonce,
+                  GNonce,
+            };
             return {
-                  broadcasts: [broadcast],
+                  broadcasts: broadcast as any,
                   messages,
-                  inputForRound2: {
-                        inputForRound1: this.roundInput,
-                        K,
-                        G,
-                        BigGammaShare,
-                        GammaShare,
-                        KShare,
-                        KNonce,
-                        GNonce,
-                  },
+                  inputForRound2: this.output,
             };
       }
 }

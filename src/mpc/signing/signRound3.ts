@@ -157,16 +157,21 @@ export class SignMessageForRound3 {
 export class SignerRound3 {
       public session: SignSession;
       private roundInput: SignInputForRound3;
+      public output: any;
 
       private BigGammaShare: Record<PartyId, AffinePoint> = {};
       private DeltaShareAlpha: Record<PartyId, bigint> = {};
       private ChiShareAlpha: Record<PartyId, bigint> = {};
 
-      // constructor(session: SignSession, roundInput: SignInputForRound3) {
-      //       this.roundInput = roundInput;
-      //       this.session = session;
-      // }
+      public currentRound: number;
+      public isBroadcastRound: boolean;
+      public isDirectMessageRound: boolean;
 
+      constructor() {
+            this.isBroadcastRound = true;
+            this.isDirectMessageRound = true;
+            this.currentRound = 1;
+      }
       public init({ session, input }: { session?: SignSession; input?: any }): void {
             this.session = session;
             this.roundInput = input;
@@ -270,15 +275,13 @@ export class SignerRound3 {
             };
 
             const DeltaShareScalar = Fn.mod(DeltaShare);
-            const broadcasts: [SignBroadcastForRound4] = [
-                  SignBroadcastForRound4.from({
-                        from: this.session.selfId,
-                        DeltaShare: DeltaShareScalar,
-                        BigDeltaShare: BigDeltaShare.toAffine(),
-                  }),
-            ];
+            const broadcasts: any = SignBroadcastForRound4.from({
+                  from: this.session.selfId,
+                  DeltaShare: DeltaShareScalar,
+                  BigDeltaShare: BigDeltaShare.toAffine(),
+            }).toJSON();
 
-            const messages: Array<SignMessageForRound4> = [];
+            const messages: Array<any> = [];
             const pubData = this.roundInput.inputForRound2.inputForRound1.partiesPublic;
             otherIds.forEach((partyId) => {
                   const pub: ZkLogstarPublic = {
@@ -294,22 +297,22 @@ export class SignerRound3 {
                               from: this.session.selfId,
                               to: partyId,
                               ProofLog: proof,
-                        })
+                        }).toJSON()
                   );
             });
 
             this.session.currentRound = "round4";
-
+            this.output = {
+                  DeltaShare,
+                  BigDeltaShare,
+                  Gamma: Gamma.toAffine(),
+                  ChiShare: Fn.mod(ChiShare),
+                  inputForRound3: this.roundInput,
+            };
             return {
                   broadcasts,
                   messages,
-                  inputForRound4: {
-                        DeltaShare,
-                        BigDeltaShare,
-                        Gamma: Gamma.toAffine(),
-                        ChiShare: Fn.mod(ChiShare),
-                        inputForRound3: this.roundInput,
-                  },
+                  inputForRound4: this.output,
             };
       }
 }
