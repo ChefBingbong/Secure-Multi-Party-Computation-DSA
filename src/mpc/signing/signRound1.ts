@@ -1,7 +1,6 @@
 import { SignSession } from "./signSession";
 import { SignBroadcastForRound2, SignMessageForRound2, SignPartyInputRound2 } from "./signRound2";
-import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey.js";
-import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey.js";
+import { PaillierPublicKey, PaillierSecretKey } from "../paillierKeyPair/paillierKeygen";
 import { ZkEncPrivate, ZkEncPublic, zkEncCreateProof } from "../zk/enc";
 import { sampleScalar } from "../math/sample";
 import { AffinePoint } from "../types";
