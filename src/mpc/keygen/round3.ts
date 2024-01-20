@@ -1,7 +1,7 @@
 import { Exponent } from "../math/polynomial/exponent";
 import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
 import { paillierValidateN } from "../paillierKeyPair/paillierCryptoUtils";
-import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
+import { PaillierPublicKey } from "../paillierKeyPair/paillierKeygen";
 import { AffinePoint } from "../types";
 import { Hasher } from "../utils/hasher";
 import { ZkFacPrivate, ZkFacPublic, zkFacCreateProof } from "../zk/fac";
@@ -75,7 +75,7 @@ export class KeygenRound3 extends AbstractKeygenRound {
 
                   this.RIDs[from] = bmsg.RID;
                   this.ChainKeys[from] = bmsg.C;
-                  this.PaillierPublic[from] = new PaillierPublicKey(bmsg.pedersenPublic.n);
+                  this.PaillierPublic[from] = PaillierPublicKey.fromN(bmsg.pedersenPublic.n);
                   this.Pedersen[from] = bmsg.pedersenPublic;
                   this.vssPolynomials[from] = vssPolynomial;
                   this.SchnorrCommitments[from] = bmsg.schnorrCommitment;

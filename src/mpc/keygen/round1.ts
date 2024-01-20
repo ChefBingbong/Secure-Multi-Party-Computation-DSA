@@ -2,12 +2,13 @@ import { randBetween } from "bigint-crypto-utils";
 import { Exponent } from "../math/polynomial/exponent";
 import { generateElGamalKeyPair } from "../math/sample";
 import { randomPaillierPrimes } from "../paillierKeyPair/paillierCryptoUtils";
-import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
+import { PaillierSecretKey } from "../paillierKeyPair/paillierKeygen";
 import { zkSchCreateRandomness } from "../zk/zksch";
 import { AbstractKeygenRound } from "./abstractRound";
 import { KeygenBroadcastForRound2 } from "./keygenMessages/broadcasts";
 import { partyIdToScalar } from "./partyKey";
 import { KeygenInputForRound2, KeygenRound1Output, KeygenBroadcastForRound2JSON } from "./types";
+import { validatePaillierPrime } from "../paillierKeyPair/paillierBackup";
 
 export class KeygenRound1 extends AbstractKeygenRound {
       public output: KeygenInputForRound2;
@@ -21,8 +22,16 @@ export class KeygenRound1 extends AbstractKeygenRound {
       public async process(): Promise<KeygenRound1Output> {
             // generate large random primes and use these to create a paillier keypair
             try {
-                  const { p, q } = await randomPaillierPrimes();
-                  const paillierSecret = new PaillierSecretKey(p, q);
+                  let paillierSecret: PaillierSecretKey;
+                  if (this.input.precomputedPaillierPrimes) {
+                        const { p, q } = this.input.precomputedPaillierPrimes;
+                        await validatePaillierPrime(p);
+                        await validatePaillierPrime(q);
+                        paillierSecret = PaillierSecretKey.fromPrimes(p, q);
+                  } else {
+                        const { p, q } = await randomPaillierPrimes();
+                        paillierSecret = PaillierSecretKey.fromPrimes(p, q);
+                  }
 
                   // a pedersen commit is used to add extra security with the
                   // paillier key pair

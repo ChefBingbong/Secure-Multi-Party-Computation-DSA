@@ -1,9 +1,7 @@
-import { Helper } from "../../protocol/helper/helper";
 import { Exponent } from "../math/polynomial/exponent";
 import { Polynomial } from "../math/polynomial/polynomial";
 import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
-import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
-import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
+import { PaillierSecretKey, PaillierPublicKey } from "../paillierKeyPair/paillierKeygen";
 import { AffinePoint } from "../types";
 import { ZkFacProofJSON } from "../zk/fac";
 import { ZkSchCommitment, ZkSchRandomness } from "../zk/zksch";
@@ -23,7 +21,6 @@ export type SessionConfig = {
 //Keygen round input types
 export type KeygenInputForRound1 = {
       vssSecret: Polynomial;
-      helper?: Helper;
       precomputedPaillierPrimes?: {
             p: bigint;
             q: bigint;
