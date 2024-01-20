@@ -12,6 +12,14 @@ export class PaillierPublicKey {
             this.n1 = n + 1n;
       }
 
+      public encryptWithNonce(message: bigint, nonce: bigint): bigint {
+            const messageAbs = abs(message);
+            const nHalf = this.n / 2n;
+            if (messageAbs > nHalf) {
+                  throw new Error("MESSAGE_TOO_LARGE");
+            }
+      }
+
       public encrypt(message: bigint): { ciphertext: bigint; nonce: bigint } {
             if (abs(message) > this.n / 2n) throw new Error("MESSAGE_TOO_LARGE");
 

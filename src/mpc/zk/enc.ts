@@ -1,11 +1,12 @@
 import { modMultiply, modPow } from "bigint-crypto-utils";
 
-import Fn from "../Fn.js";
-import { isValidModN, isInIntervalLeps } from "../arith.js";
-import { PaillierPublicKey, paillierAdd, paillierMultiply } from "../paillier.js";
-import { PedersenParams } from "../pedersen.js";
-import { sampleUnitModN, sampleIntervalLeps, sampleIntervalLN, sampleIntervalLepsN } from "../sample.js";
-import { Hasher } from "../Hasher.js";
+import Fn from "../math/polynomial/Fn";
+import { isValidModN, isInIntervalLeps } from "../math/arith";
+import { paillierAdd, paillierMultiply } from "../paillierKeyPair/paillierCryptoUtils";
+import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
+import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
+import { sampleUnitModN, sampleIntervalLeps, sampleIntervalLN, sampleIntervalLepsN } from "../math/sample";
+import { Hasher } from "../utils/hasher";
 
 export type ZkEncPublic = {
       K: bigint; // Paillier ciphertext
@@ -172,7 +173,7 @@ export const zkEncIsPublicValid = (proof: ZkEncProof, pub: ZkEncPublic): boolean
 
 const challenge = (pub: ZkEncPublic, commitment: ZkEncCommitment, hasher: Hasher): bigint => {
       const bigHash = hasher
-            .updateMulti([pub.aux, pub.prover, pub.K, commitment.S, commitment.A, commitment.C])
+            .updateMulti([pub.aux, pub.prover as any, pub.K, commitment.S, commitment.A, commitment.C])
             .digestBigint();
 
       const challenge = Fn.sub(bigHash, 2n ** 255n); // TODO
