@@ -1,11 +1,7 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 
 import { PartyId } from "../keygen/partyKey";
-
-export type SignRequestJSON = {
-      messageHex: string;
-      signerIds: Array<string>;
-};
+import { SignRequestJSON } from "./types";
 
 export class SignRequest {
       public readonly message: Uint8Array;

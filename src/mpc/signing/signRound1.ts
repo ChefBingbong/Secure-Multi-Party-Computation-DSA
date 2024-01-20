@@ -1,32 +1,8 @@
-import { SignSession } from "./signSession";
-import { SignBroadcastForRound2, SignMessageForRound2, SignPartyInputRound2 } from "./signRound2";
-import { PaillierPublicKey, PaillierSecretKey } from "../paillierKeyPair/paillierKeygen";
+import { sampleScalar, sampleScalarPointPair } from "../math/sample";
 import { ZkEncPrivate, ZkEncPublic, zkEncCreateProof } from "../zk/enc";
-import { sampleScalar } from "../math/sample";
-import { AffinePoint } from "../types";
-import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
-import { sampleScalarPointPair } from "../math/sample";
-
-export type SignPartyInputRound1 = {
-      publicKey: AffinePoint;
-      secretEcdsa: bigint;
-      secretPaillier: PaillierSecretKey;
-      partiesPublic: Record<
-            string,
-            {
-                  paillier: PaillierPublicKey;
-                  pedersen: PedersenParams;
-                  ecdsa: AffinePoint;
-            }
-      >;
-      message: Uint8Array;
-};
-
-export type SignPartyOutputRound1 = {
-      broadcasts: [SignBroadcastForRound2];
-      messages: Array<SignMessageForRound2>;
-      inputForRound2: SignPartyInputRound2;
-};
+import { SignBroadcastForRound2, SignMessageForRound2 } from "./signRound2";
+import { SignSession } from "./signSession";
+import { SignPartyInputRound1, SignPartyOutputRound1 } from "./types";
 
 export class SignerRound1 {
       public session: SignSession;
@@ -35,6 +11,18 @@ export class SignerRound1 {
       constructor(session: SignSession, roundInput: SignPartyInputRound1) {
             this.session = session;
             this.roundInput = roundInput;
+      }
+
+      public init({
+            session,
+            input,
+      }: {
+            session?: KeygenSession;
+            input?: GenericKeygenRoundInput;
+            sessionConfig?: SessionConfig;
+      }): void {
+            this.session = session;
+            this.input = input;
       }
 
       public process(): SignPartyOutputRound1 {

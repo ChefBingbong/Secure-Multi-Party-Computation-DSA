@@ -3,10 +3,10 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import { PartyId, PartySecretKeyConfig } from "../keygen/partyKey";
 import { lagrange } from "../math/polynomial/lagrange.js";
 import Fn from "../math/polynomial/Fn";
-import { SignPartyInputRound1 } from "./signRound1";
 import { Hasher } from "../utils/hasher.js";
 import { randBetween } from "bigint-crypto-utils";
 import { SignRequest } from "./sign";
+import { SignPartyInputRound1 } from "./types";
 
 export class SignSession {
       // private signRequest: SignRequest;

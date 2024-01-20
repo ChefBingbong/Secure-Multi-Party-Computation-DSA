@@ -8,18 +8,25 @@ import { PartyPublicKeyConfigJSON, PartySecretKeyConfig, PartySecretKeyConfigJSO
 
 import { PaillierPublicKey, PaillierSecretKey } from "../paillierKeyPair/paillierKeygen";
 import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
-import { SignRequestJSON, SignRequest } from "./sign.js";
-import { SignPartyInputRound1, SignPartyOutputRound1 } from "./signRound1";
+import { SignRequest } from "./sign.js";
+import {
+      SignPartyInputRound1,
+      SignPartyOutputRound1,
+      SignRequestJSON,
+      SignPartyOutputRound4,
+      SignPartyOutputRound3,
+      SignPartyOutputRound5,
+      SignPartyOutputRound2,
+} from "./types";
 import { SignerRound1 } from "./signRound1";
-import { SignBroadcastForRound2, SignMessageForRound2, SignPartyOutputRound2, SignerRound2 } from "./signRound2";
-import { SignBroadcastForRound3, SignMessageForRound3, SignPartyOutputRound3, SignerRound3 } from "./signRound3";
-import { SignBroadcastForRound4, SignMessageForRound4, SignPartyOutputRound4, SignerRound4 } from "./signRound4";
-import { SignBroadcastForRound5, SignPartyOutputRound5, SignerRound5 } from "./signRound5";
+import { SignBroadcastForRound2, SignMessageForRound2, SignerRound2 } from "./signRound2";
+import { SignBroadcastForRound3, SignMessageForRound3, SignerRound3 } from "./signRound3";
+import { SignBroadcastForRound4, SignMessageForRound4, SignerRound4 } from "./signRound4";
+import { SignBroadcastForRound5, SignerRound5 } from "./signRound5";
 import { SignSession } from "./signSession";
 import { ethAddress, sigEthereum } from "../eth.js";
 import { bytesToHex } from "@noble/hashes/utils";
 import { keccak_256 } from "@noble/hashes/sha3";
-
 export type PedersenParametersJSON = {
       nHex: string;
       sHex: string;

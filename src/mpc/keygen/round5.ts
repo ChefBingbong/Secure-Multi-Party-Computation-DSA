@@ -1,3 +1,4 @@
+import { app } from "../../protocol";
 import { zkSchIsResponseValid, zkSchVerifyResponse } from "../zk/zksch";
 import { AbstractKeygenRound } from "./abstractRound";
 import { KeygenBroadcastForRound5 } from "./keygenMessages/broadcasts";
@@ -36,6 +37,7 @@ export class KeygenRound5 extends AbstractKeygenRound {
             this.output = {
                   UpdatedConfig: this.input.UpdatedConfig,
             };
+            app.p2pServer.validator.PartyKeyShare = this.input.UpdatedConfig;
             return {
                   UpdatedConfig: this.input.UpdatedConfig,
             };

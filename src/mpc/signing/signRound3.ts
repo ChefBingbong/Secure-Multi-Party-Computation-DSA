@@ -1,25 +1,24 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { AffinePoint, AffinePointJSON } from "../types";
 import { PartyId, otherPartyIds } from "../keygen/partyKey";
-import { ZkAffgProof, ZkAffgProofJSON, ZkAffgPublic, zkAffgVerifyProof } from "../zk/affg";
+import { isIdentity, pointFromJSON, pointToJSON } from "../math/curve.js";
+import Fn from "../math/polynomial/Fn";
+import { AffinePoint } from "../types";
+import { ZkAffgProof, ZkAffgPublic, zkAffgVerifyProof } from "../zk/affg";
 import {
       ZkLogstarPrivate,
       ZkLogstarProof,
-      ZkLogstarProofJSON,
       ZkLogstarPublic,
       zkLogstarCreateProof,
       zkLogstarVerifyProof,
 } from "../zk/logstar";
-import { isIdentity, pointFromJSON, pointToJSON } from "../math/curve.js";
-import { SignPartyInputRound2 } from "./signRound2";
-import Fn from "../math/polynomial/Fn";
-import { SignBroadcastForRound4, SignInputForRound4, SignMessageForRound4 } from "./signRound4";
+import { SignBroadcastForRound4, SignMessageForRound4 } from "./signRound4";
 import { SignSession } from "./signSession";
-
-export type SignBroadcastForRound3JSON = {
-      from: string;
-      BigGammaShare: AffinePointJSON;
-};
+import {
+      SignBroadcastForRound3JSON,
+      SignInputForRound3,
+      SignMessageForRound3JSON,
+      SignPartyOutputRound3,
+} from "./types";
 
 export class SignBroadcastForRound3 {
       public readonly from: PartyId;
@@ -56,19 +55,6 @@ export class SignBroadcastForRound3 {
             };
       }
 }
-
-export type SignMessageForRound3JSON = {
-      from: string;
-      to: string;
-
-      DeltaDhex: string; // Ciphertext
-      DeltaFhex: string; // Ciphertext
-      DeltaProof: ZkAffgProofJSON;
-      ChiDhex: string; // Ciphertext
-      ChiFhex: string; // Ciphertext
-      ChiProof: ZkAffgProofJSON;
-      ProofLog: ZkLogstarProofJSON;
-};
 
 export class SignMessageForRound3 {
       public readonly from: PartyId;
@@ -167,20 +153,6 @@ export class SignMessageForRound3 {
             };
       }
 }
-
-export type SignInputForRound3 = {
-      DeltaShareBetas: Record<PartyId, bigint>;
-      ChiShareBetas: Record<PartyId, bigint>;
-      K: Record<PartyId, bigint>;
-      G: Record<PartyId, bigint>;
-      inputForRound2: SignPartyInputRound2;
-};
-
-export type SignPartyOutputRound3 = {
-      broadcasts: Array<SignBroadcastForRound4>;
-      messages: Array<SignMessageForRound4>;
-      inputForRound4: SignInputForRound4;
-};
 
 export class SignerRound3 {
       public session: SignSession;

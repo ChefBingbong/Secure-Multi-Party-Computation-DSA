@@ -64,6 +64,8 @@ export class App extends AppLogger implements AppInterface {
             this.router.post("/direct-message", handlers.postDirectMessage);
             this.router.post("/broadcast", handlers.postBroadcast);
             this.router.post("/start", handlers.postStart);
+            this.router.post("/startSignSesion", handlers.postStartSignSession);
+
             this.router.post("/elect-leader", handlers.postElectLeader);
             this.router.post("/reset-state", handlers.resetState);
 

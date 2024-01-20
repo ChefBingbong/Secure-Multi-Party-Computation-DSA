@@ -1,28 +1,15 @@
-import { SignPartyInputRound1 } from "./signRound1";
-import { AffinePoint } from "../types";
 import { otherPartyIds, PartyId } from "../keygen/partyKey.js";
 import { ZkEncProof, ZkEncProofJSON, ZkEncPublic, zkEncVerifyProof } from "../zk/enc";
-import { SignBroadcastForRound3, SignInputForRound3, SignMessageForRound3 } from "./signRound3";
+import { zkLogstarCreateProof, ZkLogstarPrivate, ZkLogstarPublic } from "../zk/logstar";
 import { mtaProveAffG } from "../zk/mta";
-import { ZkLogstarPrivate, ZkLogstarPublic, zkLogstarCreateProof } from "../zk/logstar";
+import { SignBroadcastForRound3, SignMessageForRound3 } from "./signRound3";
 import { SignSession } from "./signSession";
-
-export type SignPartyInputRound2 = {
-      inputForRound1: SignPartyInputRound1;
-      K: bigint; // Paillier ciphertext
-      G: bigint; // Paillier ciphertext
-      BigGammaShare: AffinePoint;
-      GammaShare: bigint;
-      KShare: bigint;
-      KNonce: bigint;
-      GNonce: bigint;
-};
-
-export type SignBroadcastForRound2JSON = {
-      from: string;
-      Khex: string;
-      Ghex: string;
-};
+import {
+      SignBroadcastForRound2JSON,
+      SignMessageForRound2JSON,
+      SignPartyInputRound2,
+      SignPartyOutputRound2,
+} from "./types.js";
 
 export class SignBroadcastForRound2 {
       public readonly from: PartyId;
@@ -57,12 +44,6 @@ export class SignBroadcastForRound2 {
             };
       }
 }
-
-export type SignMessageForRound2JSON = {
-      from: string;
-      to: string;
-      proofEnc: ZkEncProofJSON;
-};
 
 export class SignMessageForRound2 {
       public readonly from: PartyId;
@@ -105,12 +86,6 @@ export class SignMessageForRound2 {
             };
       }
 }
-
-export type SignPartyOutputRound2 = {
-      broadcasts: Array<SignBroadcastForRound3>;
-      messages: Array<SignMessageForRound3>;
-      inputForRound3: SignInputForRound3;
-};
 
 export class SignerRound2 {
       public session: SignSession;

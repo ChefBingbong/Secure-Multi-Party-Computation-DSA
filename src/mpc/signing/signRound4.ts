@@ -1,18 +1,17 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { AffinePoint, AffinePointJSON } from "../types";
-import { isIdentity, pointFromJSON, pointToJSON, scalarFromHash } from "../math/curve";
 import { PartyId } from "../keygen/partyKey.js";
-import { ZkLogstarProof, ZkLogstarProofJSON, ZkLogstarPublic, zkLogstarVerifyProof } from "../zk/logstar.js";
-import { SignInputForRound3 } from "./signRound3";
+import { isIdentity, pointFromJSON, pointToJSON, scalarFromHash } from "../math/curve";
 import Fn from "../math/polynomial/Fn.js";
-import { SignBroadcastForRound5, SignInputForRound5 } from "./signRound5";
+import { AffinePoint } from "../types";
+import { ZkLogstarProof, ZkLogstarPublic, zkLogstarVerifyProof } from "../zk/logstar.js";
+import { SignBroadcastForRound5 } from "./signRound5";
 import { SignSession } from "./signSession";
-
-export type SignBroadcastForRound4JSON = {
-      from: string;
-      DeltaShareHex: string;
-      BigDeltaShare: AffinePointJSON;
-};
+import {
+      SignBroadcastForRound4JSON,
+      SignInputForRound4,
+      SignMessageForRound4JSON,
+      SignPartyOutputRound4,
+} from "./types";
 
 export class SignBroadcastForRound4 {
       public readonly from: PartyId;
@@ -59,12 +58,6 @@ export class SignBroadcastForRound4 {
       }
 }
 
-export type SignMessageForRound4JSON = {
-      from: string;
-      to: string;
-      ProofLog: ZkLogstarProofJSON;
-};
-
 export class SignMessageForRound4 {
       public readonly from: PartyId;
       public readonly to: PartyId;
@@ -104,19 +97,6 @@ export class SignMessageForRound4 {
             };
       }
 }
-
-export type SignInputForRound4 = {
-      DeltaShare: bigint;
-      BigDeltaShare: AffinePoint;
-      Gamma: AffinePoint;
-      ChiShare: bigint;
-      inputForRound3: SignInputForRound3;
-};
-
-export type SignPartyOutputRound4 = {
-      broadcasts: Array<SignBroadcastForRound5>;
-      inputForRound5: SignInputForRound5;
-};
 
 export class SignerRound4 {
       public session: SignSession;

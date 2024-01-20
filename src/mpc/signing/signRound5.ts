@@ -1,14 +1,8 @@
-import Fn from "../math/polynomial/Fn";
-import { AffinePoint } from "../types";
 import { PartyId } from "../keygen/partyKey.js";
-import { SignInputForRound4 } from "./signRound4";
 import { verifySignature } from "../math/curve.js";
+import Fn from "../math/polynomial/Fn";
 import { SignSession } from "./signSession";
-
-export type SignBroadcastForRound5JSON = {
-      from: string;
-      SigmaShareHex: string;
-};
+import { SignBroadcastForRound5JSON, SignInputForRound5, SignPartyOutputRound5 } from "./types";
 
 export class SignBroadcastForRound5 {
       public readonly from: PartyId;
@@ -39,21 +33,6 @@ export class SignBroadcastForRound5 {
             };
       }
 }
-
-export type SignInputForRound5 = {
-      Delta: bigint;
-      BigDelta: AffinePoint;
-      BigR: AffinePoint;
-      R: bigint;
-      inputForRound4: SignInputForRound4;
-};
-
-export type SignPartyOutputRound5 = {
-      signature: {
-            R: AffinePoint;
-            S: bigint;
-      };
-};
 
 export class SignerRound5 {
       public session: SignSession;

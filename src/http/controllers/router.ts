@@ -5,6 +5,7 @@ import { app } from "../../protocol";
 import Validator from "../../protocol/validators/validator";
 import { ValidatorsGroup } from "../../protocol/validators/validators";
 import Transaction from "../../wallet/transaction";
+import { SigningSessionManager } from "../../protocol/signingProtocol";
 
 export const getRoot = (req: Request, res: Response) => {
       res.status(200).send({ result: "ok" });
@@ -112,6 +113,22 @@ export const postBroadcast = (req: Request, res: Response, next: NextFunction) =
 export const postStart = async (req: Request, res: Response, next: NextFunction) => {
       try {
             await app.p2pServer.startKeygen();
+            res.status(200).json();
+      } catch (error) {
+            console.log(error);
+            next(error);
+      }
+};
+
+export const postStartSignSession = async (req: Request, res: Response, next: NextFunction) => {
+      try {
+            const signSession = new SigningSessionManager(
+                  app.p2pServer.validator,
+                  app.p2pServer.validators,
+                  "hello"
+            );
+            signSession.init();
+            // await app.p2pServer.startKeygen();
             res.status(200).json();
       } catch (error) {
             console.log(error);

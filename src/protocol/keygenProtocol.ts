@@ -255,7 +255,7 @@ export class KeygenSessionManager extends AppLogger {
                   }
             }
             console.log(`KEY GENERATION WAS SUCCESSFUL, ${proofs}\n`);
-            this.validator.PartyKeyShare = this.rounds[5].round.output.UpdatedConfig.toJSON() as any;
+            // this.validator.PartyKeyShare = this.rounds[5].round.output.UpdatedConfig.toJSON() as any;
             const leader = await redisClient.getSingleData<string>("leader");
 
             if (this.selfId === this.validators[0]) {
