@@ -1,8 +1,9 @@
 import { modInv, modMultiply, modPow, randBetween } from "bigint-crypto-utils";
-import { PedersenParams } from "./Pedersen/pendersen";
+import { JSONable, PedersenParams } from "./Pedersen/pendersen";
 import { sampleUnitModN } from "../math/sample";
 import { modSymmetric } from "./paillierCryptoUtils";
 import { PaillierPublicKey } from "./paillierPublicKey";
+import { PaillierSecretKeyJSON } from "./types";
 
 export class PaillierSecretKey {
       public p: bigint;
@@ -11,7 +12,7 @@ export class PaillierSecretKey {
       public phiInv: bigint;
       public publicKey: PaillierPublicKey;
 
-      public constructor(p: bigint, q: bigint) {
+      public constructor(p: bigint, q: bigint, x?: any, y?: any, z?: any) {
             const n = p * q;
             const phi = (p - 1n) * (q - 1n);
             const phiInv = modInv(phi, n);
@@ -22,6 +23,12 @@ export class PaillierSecretKey {
             this.phi = phi;
             this.phiInv = phiInv;
             this.publicKey = publicKey;
+      }
+
+      public static fromJSON(secretKeyJson: PaillierSecretKeyJSON): PaillierSecretKey {
+            const p = BigInt("0x" + secretKeyJson.pHex);
+            const q = BigInt("0x" + secretKeyJson.qHex);
+            return PaillierSecretKey.fromPrimes(p, q);
       }
 
       public decrypt(ciphertext: bigint): bigint {
@@ -37,6 +44,15 @@ export class PaillierSecretKey {
 
             return message;
       }
+      public static fromPrimes = (p: bigint, q: bigint): PaillierSecretKey => {
+            const n = p * q;
+            const phi = (p - 1n) * (q - 1n);
+            const phiInv = modInv(phi, n);
+            const publicKey: PaillierPublicKey = PaillierPublicKey.fromN(n);
+            const paillierSecretKey = new PaillierSecretKey(p, q, phi, phiInv, publicKey);
+            Object.freeze(paillierSecretKey);
+            return paillierSecretKey;
+      };
 
       public generatePedersen(): {
             pedersen: PedersenParams;

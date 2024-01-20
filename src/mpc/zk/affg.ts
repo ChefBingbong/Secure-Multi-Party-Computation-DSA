@@ -3,9 +3,9 @@ import { modMultiply, modPow } from "bigint-crypto-utils";
 
 import { isInIntervalLeps, isInIntervalLprimeEps, isValidModN } from "../math/arith";
 import { AffinePoint, AffinePointJSON } from "../types";
-import { paillierAdd, paillierMultiply } from "../paillierKeyPair/paillierCryptoUtils";
 import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
-import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
+import { paillierAdd, paillierMultiply, PaillierPublicKey } from "../paillierKeyPair/paillierKeygen";
+
 import {
       sampleIntervalLN,
       sampleIntervalLeps,

@@ -2,8 +2,8 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 
 import { isInIntervalLeps, isValidModN } from "../math/arith";
 import { AffinePoint, AffinePointJSON } from "../types";
-import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey.js";
-import { paillierAdd, paillierMultiply } from "../paillierKeyPair/paillierCryptoUtils";
+import { paillierAdd, paillierMultiply, PaillierPublicKey } from "../paillierKeyPair/paillierKeygen";
+
 import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen.js";
 import { sampleIntervalLN, sampleIntervalLeps, sampleIntervalLepsN, sampleUnitModN } from "../math/sample";
 import Fn from "../math/polynomial/Fn";

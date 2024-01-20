@@ -1,8 +1,11 @@
 import { Hasher } from "../utils/hasher";
 import { AffinePoint } from "../types";
-import { paillierAdd, paillierMultiply } from "../paillierKeyPair/paillierCryptoUtils";
-import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
-import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
+import {
+      paillierAdd,
+      paillierMultiply,
+      PaillierPublicKey,
+      PaillierSecretKey,
+} from "../paillierKeyPair/paillierKeygen";
 import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
 import { sampleIntervalLprime } from "../math/sample";
 import { ZkAffgPrivate, ZkAffgProof, ZkAffgPublic, zkAffgCreateProof } from "../zk/affg";

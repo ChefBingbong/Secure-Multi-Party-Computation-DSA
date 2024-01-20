@@ -1,11 +1,8 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { AffinePoint, AffinePointJSON } from "../types";
-import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
-import { PaillierSecretKey } from "../paillierKeyPair/paillierSecretKey";
-import {
-      PaillierPublicKeyJSON,
-      PaillierSecretKeyJSON,
-} from "../paillierKeyPair/types";
+import { PaillierSecretKey, PaillierPublicKey } from "../paillierKeyPair/paillierKeygen";
+
+import { PaillierPublicKeyJSON, PaillierSecretKeyJSON } from "../paillierKeyPair/types";
 import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
 import { PedersenParametersJSON } from "../paillierKeyPair/Pedersen/types";
 import { lagrange } from "../math/polynomial/lagrange";
@@ -37,15 +34,13 @@ export class PartyPublicKeyConfig implements Hashable {
             this.pedersen = pedersen;
       }
 
-      public static fromJSON(
-            serialized: PartyPublicKeyConfigJSON
-      ): PartyPublicKeyConfig {
+      public static fromJSON(serialized: PartyPublicKeyConfigJSON): PartyPublicKeyConfig {
             const n = BigInt("0x" + serialized.paillier.nHex);
             const pcfg = new PartyPublicKeyConfig(
                   serialized.partyId,
                   pointFromJSON(serialized.ecdsa),
                   pointFromJSON(serialized.elgamal),
-                  new PaillierPublicKey(n),
+                  PaillierPublicKey.fromJSON(serialized.paillier),
                   new PedersenParams(
                         BigInt("0x" + serialized.pedersen.nHex),
                         BigInt("0x" + serialized.pedersen.sHex),
@@ -69,13 +64,7 @@ export class PartyPublicKeyConfig implements Hashable {
             paillier: PaillierPublicKey;
             pedersen: PedersenParams;
       }): PartyPublicKeyConfig {
-            const pcfg = new PartyPublicKeyConfig(
-                  partyId,
-                  ecdsa,
-                  elgamal,
-                  paillier,
-                  pedersen
-            );
+            const pcfg = new PartyPublicKeyConfig(partyId, ecdsa, elgamal, paillier, pedersen);
             Object.freeze(pcfg);
             return pcfg;
       }
@@ -100,7 +89,7 @@ export class PartyPublicKeyConfig implements Hashable {
                   this.ecdsa.y,
                   this.elgamal.x,
                   this.elgamal.y,
-                  ...[this.paillier.n, this.paillier.n2, this.paillier.n1],
+                  ...[this.paillier.n, this.paillier.nSquared, this.paillier.nPlusOne],
                   ...[this.pedersen.n, this.pedersen.s, this.pedersen.t],
             ];
       }
@@ -147,18 +136,12 @@ export class PartySecretKeyConfig implements Hashable {
             this.publicPartyData = publicPartyData;
       }
 
-      public static fromJSON(
-            serialized: PartySecretKeyConfigJSON
-      ): PartySecretKeyConfig {
+      public static fromJSON(serialized: PartySecretKeyConfigJSON): PartySecretKeyConfig {
             const publicPartyData = Object.fromEntries(
-                  Object.entries(serialized.publicPartyData).map(
-                        ([partyId, partyPublicKeyConfigSerialized]) => [
-                              partyId,
-                              PartyPublicKeyConfig.fromJSON(
-                                    partyPublicKeyConfigSerialized
-                              ),
-                        ]
-                  )
+                  Object.entries(serialized.publicPartyData).map(([partyId, partyPublicKeyConfigSerialized]) => [
+                        partyId,
+                        PartyPublicKeyConfig.fromJSON(partyPublicKeyConfigSerialized),
+                  ])
             );
 
             const scfg = new PartySecretKeyConfig(
@@ -167,10 +150,7 @@ export class PartySecretKeyConfig implements Hashable {
                   serialized.threshold,
                   BigInt("0x" + serialized.ecdsaHex),
                   BigInt("0x" + serialized.elgamalHex),
-                  new PaillierSecretKey(
-                        BigInt("0x" + serialized.paillier.pHex),
-                        BigInt("0x" + serialized.paillier.qHex)
-                  ),
+                  PaillierSecretKey.fromJSON(serialized.paillier),
                   BigInt("0x" + serialized.ridHex),
                   BigInt("0x" + serialized.chainKeyHex),
                   publicPartyData
@@ -217,12 +197,10 @@ export class PartySecretKeyConfig implements Hashable {
 
       public toJSON(): PartySecretKeyConfigJSON {
             const publicPartyData = Object.fromEntries(
-                  Object.entries(this.publicPartyData).map(
-                        ([partyId, partyPublicKeyConfig]) => [
-                              partyId,
-                              partyPublicKeyConfig.toJSON(),
-                        ]
-                  )
+                  Object.entries(this.publicPartyData).map(([partyId, partyPublicKeyConfig]) => [
+                        partyId,
+                        partyPublicKeyConfig.toJSON(),
+                  ])
             );
 
             return {
@@ -259,9 +237,7 @@ export class PartySecretKeyConfig implements Hashable {
                   BigInt(this.threshold),
                   ...Object.keys(this.publicPartyData).sort(),
                   this.rid,
-                  ...Object.values(this.publicPartyData).flatMap((p) =>
-                        p.hashable()
-                  ),
+                  ...Object.values(this.publicPartyData).flatMap((p) => p.hashable()),
             ];
       }
 }
@@ -278,10 +254,7 @@ export type PartySecretKeyConfigJSON = {
       publicPartyData: Record<string, PartyPublicKeyConfigJSON>;
 };
 
-export const otherPartyIds = (
-      partyIds: Array<PartyId>,
-      selfId: PartyId
-): Array<PartyId> => {
+export const otherPartyIds = (partyIds: Array<PartyId>, selfId: PartyId): Array<PartyId> => {
       return partyIds.filter((partyId) => partyId !== selfId);
 };
 

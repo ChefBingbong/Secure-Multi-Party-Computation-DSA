@@ -1,5 +1,6 @@
 import { abs, gcd, modMultiply, modPow } from "bigint-crypto-utils";
 import { generateRandomNonce } from "./paillierCryptoUtils";
+import { PaillierPublicKeyJSON } from "./types";
 
 export class PaillierPublicKey {
       public n: bigint;
@@ -12,6 +13,16 @@ export class PaillierPublicKey {
             this.n1 = n + 1n;
       }
 
+      public static fromJSON(publicKeyJson: PaillierPublicKeyJSON): PaillierPublicKey {
+            const n = BigInt("0x" + publicKeyJson.nHex);
+            return PaillierPublicKey.fromN(n);
+      }
+
+      public static fromN(n: bigint): PaillierPublicKey {
+            const ppk = new PaillierPublicKey(n);
+            Object.freeze(ppk);
+            return ppk;
+      }
       public encryptWithNonce(message: bigint, nonce: bigint): bigint {
             const messageAbs = abs(message);
             const nHalf = this.n / 2n;

@@ -2,8 +2,8 @@ import { modMultiply, modPow } from "bigint-crypto-utils";
 
 import Fn from "../math/polynomial/Fn";
 import { isValidModN, isInIntervalLeps } from "../math/arith";
-import { paillierAdd, paillierMultiply } from "../paillierKeyPair/paillierCryptoUtils";
-import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
+import { paillierAdd, paillierMultiply, PaillierPublicKey } from "../paillierKeyPair/paillierKeygen";
+// import { PaillierPublicKey } from "../paillierKeyPair/paillierPublicKey";
 import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";
 import { sampleUnitModN, sampleIntervalLeps, sampleIntervalLN, sampleIntervalLepsN } from "../math/sample";
 import { Hasher } from "../utils/hasher";
