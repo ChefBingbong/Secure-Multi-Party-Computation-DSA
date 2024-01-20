@@ -4,11 +4,7 @@ import { CommitMessage } from "../../types";
 import AbstractPBFTMessagePool from "../abstractPBFTPool";
 
 class CommitPool implements AbstractPBFTMessagePool<CommitMessage> {
-      public list: { [blockHash: string]: CommitMessage[] };
-
-      constructor() {
-            this.list = {};
-      }
+      public list: { [blockHash: string]: CommitMessage[] } = {};
 
       // Commit function initializes a list of commit messages for a prepare message
       // and adds the commit message for the current node and returns it

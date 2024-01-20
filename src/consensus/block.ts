@@ -44,7 +44,7 @@ class Block implements BaseBlockParams<any> {
       }
 
       public static genesis(): Block {
-            return new this("genesis time", "----", "genesis-hash", [], "P4@P@53R", "SIGN", 0);
+            return new this("genesis time", "----", "genesis-hash", [], "-------", "------", 0);
       }
 
       public static createBlock(lastBlock: Block, _data: any, wallet: any): Block {

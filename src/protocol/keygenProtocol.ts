@@ -30,6 +30,7 @@ import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
 import { KeygenCurrentState, KeygenMessageData, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
 import Validator from "./validators/validator";
 import TransactionPool from "../wallet/transactionPool";
+import { Logger } from "winston";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -39,6 +40,7 @@ export class KeygenSessionManager extends AppLogger {
       public static finalRound: number = 5;
       public static currentRound: number = 0;
       public static proofs: Array<bigint> = [];
+      public static log: Logger;
 
       private static validators: string[] = [];
       private static validator: Validator;
@@ -98,7 +100,8 @@ export class KeygenSessionManager extends AppLogger {
             const newRound = ++this.currentRound;
 
             if (!lastRound.finished || !this.sessionInitialized) {
-                  throw new Error(`Session is not isnitilized or last round has not finished`);
+                  this.log.error(`Session is not isnitilized or last round has not finished`);
+                  return;
             }
             console.log(`STARTING KEYGEN ROUND ${this.currentRound}\n`);
             const round = this.rounds[newRound].round;
