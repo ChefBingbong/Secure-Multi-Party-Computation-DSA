@@ -4,11 +4,7 @@ import { PrepareMessage } from "../../types";
 import AbstractPBFTMessagePool from "../abstractPBFTPool";
 
 class PreparePool implements AbstractPBFTMessagePool<PrepareMessage> {
-      public list: { [blockHash: string]: PrepareMessage[] };
-
-      constructor() {
-            this.list = {};
-      }
+      public list: { [blockHash: string]: PrepareMessage[] } = {};
 
       // @ts-ignore
       public message(block: { hash: string }, wallet: Wallet): PrepareMessage {

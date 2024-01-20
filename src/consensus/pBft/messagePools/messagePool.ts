@@ -4,13 +4,8 @@ import { RoundChangeMessage } from "../../types";
 import AbstractPBFTMessagePool from "../abstractPBFTPool";
 
 class MessagePool implements AbstractPBFTMessagePool<RoundChangeMessage> {
-      public list: { [blockHash: string]: RoundChangeMessage[] };
-      public msg: string;
-
-      constructor() {
-            this.list = {};
-            this.msg = "INITIATE NEW ROUND";
-      }
+      public list: { [blockHash: string]: RoundChangeMessage[] } = {};
+      public msg: string = "INITIATE NEW ROUND";
 
       message(): any {}
       // Creates a round change message for the given block hash

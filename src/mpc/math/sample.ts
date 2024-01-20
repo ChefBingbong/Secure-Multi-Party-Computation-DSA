@@ -96,4 +96,10 @@ export const generateElGamalKeyPair = (): [bigint, AffinePoint] => {
       return [scalar, point.toAffine()];
 };
 
+export const sampleScalarPointPair = (): [bigint, AffinePoint] => {
+      const scalar = randBetween(Fn.N - 1n);
+      const point = secp256k1.ProjectivePoint.BASE.multiply(scalar);
+      return [scalar, point.toAffine()];
+};
+
 export const sampleScalar = (): bigint => randBetween(Fn.N - 1n);
