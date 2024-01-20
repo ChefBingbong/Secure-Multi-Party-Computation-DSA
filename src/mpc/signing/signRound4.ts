@@ -5,7 +5,7 @@ import { PartyId } from "../keygen/partyKey.js";
 import { ZkLogstarProof, ZkLogstarProofJSON, ZkLogstarPublic, zkLogstarVerifyProof } from "../zk/logstar.js";
 import { SignInputForRound3 } from "./signRound3";
 import Fn from "../math/polynomial/Fn.js";
-import { SignBroadcastForRound5, SignInputForRound5 } from "./SignerRound5.js";
+import { SignBroadcastForRound5, SignInputForRound5 } from "./signRound5";
 import { SignSession } from "./signSession";
 
 export type SignBroadcastForRound4JSON = {

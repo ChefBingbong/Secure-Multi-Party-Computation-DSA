@@ -18,6 +18,12 @@ export class PaillierPublicKey {
             if (messageAbs > nHalf) {
                   throw new Error("MESSAGE_TOO_LARGE");
             }
+
+            const c = modPow(this.n1, message, this.n2);
+            const rhoN = modPow(nonce, this.n, this.n2);
+            const ciphertext = modMultiply([c, rhoN], this.n2);
+
+            return ciphertext;
       }
 
       public encrypt(message: bigint): { ciphertext: bigint; nonce: bigint } {
