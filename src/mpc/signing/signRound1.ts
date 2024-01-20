@@ -8,21 +8,14 @@ export class SignerRound1 {
       public session: SignSession;
       private roundInput: SignPartyInputRound1;
 
-      constructor(session: SignSession, roundInput: SignPartyInputRound1) {
-            this.session = session;
-            this.roundInput = roundInput;
-      }
+      // constructor(session: SignSession, roundInput: SignPartyInputRound1) {
+      //       this.session = session;
+      //       this.roundInput = roundInput;
+      // }
 
-      public init({
-            session,
-            input,
-      }: {
-            session?: KeygenSession;
-            input?: GenericKeygenRoundInput;
-            sessionConfig?: SessionConfig;
-      }): void {
+      public init({ session, input }: { session?: SignSession; input?: any }): void {
             this.session = session;
-            this.input = input;
+            this.roundInput = input;
       }
 
       public process(): SignPartyOutputRound1 {

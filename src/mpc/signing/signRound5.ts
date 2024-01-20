@@ -1,5 +1,5 @@
-import { PartyId } from "../keygen/partyKey.js";
-import { verifySignature } from "../math/curve.js";
+import { PartyId } from "../keygen/partyKey";
+import { verifySignature } from "../math/curve";
 import Fn from "../math/polynomial/Fn";
 import { SignSession } from "./signSession";
 import { SignBroadcastForRound5JSON, SignInputForRound5, SignPartyOutputRound5 } from "./types";
@@ -40,9 +40,14 @@ export class SignerRound5 {
 
       private SigmaShares: Record<PartyId, bigint> = {};
 
-      constructor(session: SignSession, roundInput: SignInputForRound5) {
-            this.roundInput = roundInput;
+      // constructor(session: SignSession, roundInput: SignInputForRound5) {
+      //       this.roundInput = roundInput;
+      //       this.session = session;
+      // }
+
+      public init({ session, input }: { session?: SignSession; input?: any }): void {
             this.session = session;
+            this.roundInput = input;
       }
 
       public handleBroadcastMessage(bmsg: SignBroadcastForRound5): void {

@@ -1,6 +1,6 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { PartyId, otherPartyIds } from "../keygen/partyKey";
-import { isIdentity, pointFromJSON, pointToJSON } from "../math/curve.js";
+import { isIdentity, pointFromJSON, pointToJSON } from "../math/curve";
 import Fn from "../math/polynomial/Fn";
 import { AffinePoint } from "../types";
 import { ZkAffgProof, ZkAffgPublic, zkAffgVerifyProof } from "../zk/affg";
@@ -162,9 +162,14 @@ export class SignerRound3 {
       private DeltaShareAlpha: Record<PartyId, bigint> = {};
       private ChiShareAlpha: Record<PartyId, bigint> = {};
 
-      constructor(session: SignSession, roundInput: SignInputForRound3) {
-            this.roundInput = roundInput;
+      // constructor(session: SignSession, roundInput: SignInputForRound3) {
+      //       this.roundInput = roundInput;
+      //       this.session = session;
+      // }
+
+      public init({ session, input }: { session?: SignSession; input?: any }): void {
             this.session = session;
+            this.roundInput = input;
       }
 
       public handleBroadcastMessage(bmsg: SignBroadcastForRound3): void {

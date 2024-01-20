@@ -1,4 +1,4 @@
-import { otherPartyIds, PartyId } from "../keygen/partyKey.js";
+import { otherPartyIds, PartyId } from "../keygen/partyKey";
 import { ZkEncProof, ZkEncProofJSON, ZkEncPublic, zkEncVerifyProof } from "../zk/enc";
 import { zkLogstarCreateProof, ZkLogstarPrivate, ZkLogstarPublic } from "../zk/logstar";
 import { mtaProveAffG } from "../zk/mta";
@@ -94,9 +94,14 @@ export class SignerRound2 {
       private K: Record<PartyId, bigint> = {};
       private G: Record<PartyId, bigint> = {};
 
-      constructor(session: SignSession, roundInput: SignPartyInputRound2) {
-            this.roundInput = roundInput;
+      // constructor(session: SignSession, roundInput: SignPartyInputRound2) {
+      //       this.roundInput = roundInput;
+      //       this.session = session;
+      // }
+
+      public init({ session, input }: { session?: SignSession; input?: any }): void {
             this.session = session;
+            this.roundInput = input;
       }
 
       public handleBroadcastMessage(bmsg: SignBroadcastForRound2): void {

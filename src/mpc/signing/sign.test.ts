@@ -4,7 +4,7 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import * as ethers from "ethers";
 
 import { AffinePointJSON } from "../types";
-import { PartyPublicKeyConfigJSON, PartySecretKeyConfig, PartySecretKeyConfigJSON } from "../keygen/partyKey.js";
+import { PartyPublicKeyConfigJSON, PartySecretKeyConfig, PartySecretKeyConfigJSON } from "../keygen/partyKey";
 
 import { PaillierPublicKey, PaillierSecretKey } from "../paillierKeyPair/paillierKeygen";
 import { PedersenParams } from "../paillierKeyPair/Pedersen/pendersen";

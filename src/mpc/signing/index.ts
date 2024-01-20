@@ -13,7 +13,7 @@ export enum SignSessionRounds {
       KeygenRound5 = "KeygenRound5",
 }
 
-export const AllKeyGenRounds: {
+export const AllSignSessionRounds: {
       SignSession: SignSession;
       SignerRound1: SignerRound1;
       SignerRound2: SignerRound2;

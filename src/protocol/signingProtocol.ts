@@ -46,8 +46,9 @@ import { bytesToHex } from "@noble/hashes/utils";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { SignRequest } from "../mpc/signing/sign";
 import { SignSession } from "../mpc/signing/signSession";
+import { AllSignSessionRounds, SignSessionRounds } from "../mpc/signing/index";
 
-const KeygenRounds = Object.values(AllKeyGenRounds);
+const SignRounds = Object.values(AllSignSessionRounds);
 
 export class SigningSessionManager extends AppLogger {
       private messageToSign: any;
@@ -71,6 +72,7 @@ export class SigningSessionManager extends AppLogger {
 
       private publicKeyConfig: PartyPublicKeyConfigJSON;
       private secretKeyConfig: PartySecretKeyConfigJSON;
+      private partyKeyConfig: PartySecretKeyConfig;
       public log: Logger;
 
       // verify initiators party key
@@ -89,28 +91,32 @@ export class SigningSessionManager extends AppLogger {
             this.signRequest = SignRequest.fromJSON(this.signRequestSerialized);
             this.secretKeyConfig = validator.PartyKeyShare.toJSON();
             this.publicKeyConfig = validator.PartyKeyShare.publicPartyData[this.validator.nodeId].toJSON();
+            this.partyKeyConfig = PartySecretKeyConfig.fromJSON(this.secretKeyConfig);
 
             console.log(this.secretKeyConfig, this.publicKeyConfig);
       }
 
       public init() {
+            if (this.sessionInitialized) {
+                  throw new ErrorWithCode(`Session was not initialized correctly.`, ProtocolError.PARAMETER_ERROR);
+            }
             this.checkPaillierFixture(this.publicKeyConfig.paillier, this.secretKeyConfig.paillier);
             this.checkCurvePointFixture(this.publicKeyConfig.ecdsa, this.secretKeyConfig.ecdsaHex);
             this.checkCurvePointFixture(this.publicKeyConfig.elgamal, this.secretKeyConfig.elgamalHex);
             this.checkPedersenFixture(this.publicKeyConfig.pedersen);
+            const initializedSucessfully = this.startNewSession();
 
-            console.log(`validator party key has successfully been verified`);
+            if (!initializedSucessfully) {
+                  throw new ErrorWithCode(`Session was not initialized correctly.`, ProtocolError.INTERNAL_ERROR);
+            }
+            console.log(this.session, this.rounds);
       }
 
-      public startNewSession(sessionConfig: SessionConfig): void {
-            if (this.sessionInitialized) {
-                  throw new Error(`session has not beeen initialized. please call init`);
-            }
-
+      private startNewSession(): boolean {
             this.directMessages = new MessageQueueArray(this.finalRound + 1);
             this.messages = new MessageQueueMap(this.validators, this.finalRound + 1);
 
-            this.rounds = KeygenRounds.reduce((accumulator, round, i) => {
+            this.rounds = SignRounds.reduce((accumulator, round, i) => {
                   accumulator[i] = {
                         round,
                         initialized: i === 0,
@@ -118,15 +124,16 @@ export class SigningSessionManager extends AppLogger {
                         finished: i === 0,
                   };
                   return accumulator;
-            }, {} as Record<number, Round>);
+            }, {} as Record<number, any>);
 
-            this.session = this.rounds[0].round as KeygenSession;
-            this.session.init({ sessionConfig });
+            this.session = this.rounds[0].round as SignSession;
+            this.session.init(this.signRequest, this.partyKeyConfig);
 
-            if (!this.session.output.vssSecret) {
+            if (!this.session.inputForRound1) {
                   throw new ErrorWithCode(`Session was not initialized correctly.`, ProtocolError.PARAMETER_ERROR);
             }
             this.sessionInitialized = true;
+            return this.sessionInitialized;
       }
 
       public checkPaillierFixture = (

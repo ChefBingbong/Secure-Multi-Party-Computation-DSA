@@ -1,9 +1,9 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 
 import { PartyId, PartySecretKeyConfig } from "../keygen/partyKey";
-import { lagrange } from "../math/polynomial/lagrange.js";
+import { lagrange } from "../math/polynomial/lagrange";
 import Fn from "../math/polynomial/Fn";
-import { Hasher } from "../utils/hasher.js";
+import { Hasher } from "../utils/hasher";
 import { randBetween } from "bigint-crypto-utils";
 import { SignRequest } from "./sign";
 import { SignPartyInputRound1 } from "./types";
@@ -24,10 +24,9 @@ export class SignSession {
 
       public inputForRound1: SignPartyInputRound1;
 
-      constructor(signRequest: SignRequest, keyConfig: PartySecretKeyConfig) {
-            // this.signRequest = signRequest;
-            // this.keyConfig = keyConfig;
+      constructor() {}
 
+      public init(signRequest: SignRequest, keyConfig: PartySecretKeyConfig) {
             this.partyIds = signRequest.signerIds;
             this.selfId = keyConfig.partyId;
             this.threshold = keyConfig.threshold;

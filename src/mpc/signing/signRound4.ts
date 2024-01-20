@@ -1,9 +1,9 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { PartyId } from "../keygen/partyKey.js";
+import { PartyId } from "../keygen/partyKey";
 import { isIdentity, pointFromJSON, pointToJSON, scalarFromHash } from "../math/curve";
-import Fn from "../math/polynomial/Fn.js";
+import Fn from "../math/polynomial/Fn";
 import { AffinePoint } from "../types";
-import { ZkLogstarProof, ZkLogstarPublic, zkLogstarVerifyProof } from "../zk/logstar.js";
+import { ZkLogstarProof, ZkLogstarPublic, zkLogstarVerifyProof } from "../zk/logstar";
 import { SignBroadcastForRound5 } from "./signRound5";
 import { SignSession } from "./signSession";
 import {
@@ -105,9 +105,14 @@ export class SignerRound4 {
       private DeltaShares: Record<PartyId, bigint> = {};
       private BigDeltaShares: Record<PartyId, AffinePoint> = {};
 
-      constructor(session: SignSession, roundInput: SignInputForRound4) {
-            this.roundInput = roundInput;
+      // constructor(session: SignSession, roundInput: SignInputForRound4) {
+      //       this.roundInput = roundInput;
+      //       this.session = session;
+      // }
+
+      public init({ session, input }: { session?: SignSession; input?: any }): void {
             this.session = session;
+            this.roundInput = input;
       }
 
       public handleBroadcastMessage(bmsg: SignBroadcastForRound4): void {
