@@ -11,7 +11,7 @@ import {
       zkLogstarCreateProof,
       zkLogstarVerifyProof,
 } from "../zk/logstar";
-import { SignBroadcastForRound4, SignMessageForRound4 } from "./signRound4";
+import { SignBroadcastForRound4 } from "./signMessages/broadcasts";
 import { SignSession } from "./signSession";
 import {
       SignBroadcastForRound3JSON,
@@ -19,142 +19,11 @@ import {
       SignMessageForRound3JSON,
       SignPartyOutputRound3,
 } from "./types";
+import { SignMessageForRound3, SignMessageForRound4 } from "./signMessages/directMessages";
+import { AbstractSignRound } from "./abstractSignRound";
+import { SignBroadcastForRound3 } from "./signMessages/broadcasts";
 
-export class SignBroadcastForRound3 {
-      public readonly from: PartyId;
-      public readonly BigGammaShare: AffinePoint;
-
-      private constructor(from: PartyId, BigGammaShare: AffinePoint) {
-            this.from = from;
-            this.BigGammaShare = BigGammaShare;
-      }
-
-      public static from({
-            from,
-            BigGammaShare,
-      }: {
-            from: PartyId;
-            BigGammaShare: AffinePoint;
-      }): SignBroadcastForRound3 {
-            const bmsg = new SignBroadcastForRound3(from, BigGammaShare);
-            Object.freeze(bmsg);
-            return bmsg;
-      }
-
-      public static fromJSON(json: SignBroadcastForRound3JSON): SignBroadcastForRound3 {
-            return SignBroadcastForRound3.from({
-                  from: json.from as PartyId,
-                  BigGammaShare: pointFromJSON(json.BigGammaShare),
-            });
-      }
-
-      public toJSON(): SignBroadcastForRound3JSON {
-            return {
-                  from: this.from,
-                  BigGammaShare: pointToJSON(this.BigGammaShare),
-            };
-      }
-}
-
-export class SignMessageForRound3 {
-      public readonly from: PartyId;
-      public readonly to: PartyId;
-      public readonly DeltaD: bigint; // Ciphertext
-      public readonly DeltaF: bigint; // Ciphertext
-      public readonly DeltaProof: ZkAffgProof;
-      public readonly ChiD: bigint; // Ciphertext
-      public readonly ChiF: bigint; // Ciphertext
-      public readonly ChiProof: ZkAffgProof;
-      public readonly ProofLog: ZkLogstarProof;
-
-      private constructor(
-            from: PartyId,
-            to: PartyId,
-            DeltaD: bigint,
-            DeltaF: bigint,
-            DeltaProof: ZkAffgProof,
-            ChiD: bigint,
-            ChiF: bigint,
-            ChiProof: ZkAffgProof,
-            ProofLog: ZkLogstarProof
-      ) {
-            this.from = from;
-            this.to = to;
-            this.DeltaD = DeltaD;
-            this.DeltaF = DeltaF;
-            this.DeltaProof = DeltaProof;
-            this.ChiD = ChiD;
-            this.ChiF = ChiF;
-            this.ChiProof = ChiProof;
-            this.ProofLog = ProofLog;
-      }
-
-      public static from({
-            from,
-            to,
-            DeltaD,
-            DeltaF,
-            DeltaProof,
-            ChiD,
-            ChiF,
-            ChiProof,
-            ProofLog,
-      }: {
-            from: PartyId;
-            to: PartyId;
-            DeltaD: bigint;
-            DeltaF: bigint;
-            DeltaProof: ZkAffgProof;
-            ChiD: bigint;
-            ChiF: bigint;
-            ChiProof: ZkAffgProof;
-            ProofLog: ZkLogstarProof;
-      }): SignMessageForRound3 {
-            const msg = new SignMessageForRound3(
-                  from,
-                  to,
-                  DeltaD,
-                  DeltaF,
-                  DeltaProof,
-                  ChiD,
-                  ChiF,
-                  ChiProof,
-                  ProofLog
-            );
-            Object.freeze(msg);
-            return msg;
-      }
-
-      public static fromJSON(json: SignMessageForRound3JSON): SignMessageForRound3 {
-            return SignMessageForRound3.from({
-                  from: json.from as PartyId,
-                  to: json.to as PartyId,
-                  DeltaD: BigInt(`0x${json.DeltaDhex}`),
-                  DeltaF: BigInt(`0x${json.DeltaFhex}`),
-                  DeltaProof: ZkAffgProof.fromJSON(json.DeltaProof),
-                  ChiD: BigInt(`0x${json.ChiDhex}`),
-                  ChiF: BigInt(`0x${json.ChiFhex}`),
-                  ChiProof: ZkAffgProof.fromJSON(json.ChiProof),
-                  ProofLog: ZkLogstarProof.fromJSON(json.ProofLog),
-            });
-      }
-
-      public toJSON(): SignMessageForRound3JSON {
-            return {
-                  from: this.from,
-                  to: this.to,
-                  DeltaDhex: this.DeltaD.toString(16),
-                  DeltaFhex: this.DeltaF.toString(16),
-                  DeltaProof: this.DeltaProof.toJSON(),
-                  ChiDhex: this.ChiD.toString(16),
-                  ChiFhex: this.ChiF.toString(16),
-                  ChiProof: this.ChiProof.toJSON(),
-                  ProofLog: this.ProofLog.toJSON(),
-            };
-      }
-}
-
-export class SignerRound3 {
+export class SignerRound3 extends AbstractSignRound {
       public session: SignSession;
       private roundInput: SignInputForRound3;
       public output: any;
@@ -168,9 +37,7 @@ export class SignerRound3 {
       public isDirectMessageRound: boolean;
 
       constructor() {
-            this.isBroadcastRound = true;
-            this.isDirectMessageRound = true;
-            this.currentRound = 1;
+            super({ isBroadcastRound: true, isDriectMessageRound: true, currentRound: 3 });
       }
       public init({ session, input }: { session?: SignSession; input?: any }): void {
             this.session = session;
@@ -246,7 +113,7 @@ export class SignerRound3 {
             this.ChiShareAlpha[msg.from] = ChiShareAlpha;
       }
 
-      public process(): SignPartyOutputRound3 {
+      public async process(): Promise<SignPartyOutputRound3> {
             let Gamma = secp256k1.ProjectivePoint.ZERO;
             Object.values(this.BigGammaShare).forEach((afPoint) => {
                   const point = secp256k1.ProjectivePoint.fromAffine(afPoint);

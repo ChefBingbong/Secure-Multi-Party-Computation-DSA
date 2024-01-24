@@ -68,3 +68,10 @@ export type KeygenRoundHandlerMessage = any;
 export interface Messages {
       [round: string]: KeygenRoundHandlerMessage[];
 }
+
+export type SessionState<P> = {
+      currentRound: number;
+      roundState: any;
+      round: any;
+      session: P;
+};

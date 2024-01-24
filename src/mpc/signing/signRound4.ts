@@ -4,7 +4,6 @@ import { isIdentity, pointFromJSON, pointToJSON, scalarFromHash } from "../math/
 import Fn from "../math/polynomial/Fn";
 import { AffinePoint } from "../types";
 import { ZkLogstarProof, ZkLogstarPublic, zkLogstarVerifyProof } from "../zk/logstar";
-import { SignBroadcastForRound5 } from "./signRound5";
 import { SignSession } from "./signSession";
 import {
       SignBroadcastForRound4JSON,
@@ -12,93 +11,12 @@ import {
       SignMessageForRound4JSON,
       SignPartyOutputRound4,
 } from "./types";
+import { SignMessageForRound4 } from "./signMessages/directMessages";
+import { AbstractSignRound } from "./abstractSignRound";
+import { SignBroadcastForRound4, SignBroadcastForRound5 } from "./signMessages/broadcasts";
+import { AbstractSignBroadcast } from "./signMessages/abstractSignBroadcast";
 
-export class SignBroadcastForRound4 {
-      public readonly from: PartyId;
-      public readonly DeltaShare: bigint;
-      public readonly BigDeltaShare: AffinePoint;
-
-      private constructor(from: PartyId, DeltaShare: bigint, BigDeltaShare: AffinePoint) {
-            this.from = from;
-            this.DeltaShare = DeltaShare;
-            this.BigDeltaShare = BigDeltaShare;
-      }
-
-      public static from({
-            from,
-            DeltaShare,
-            BigDeltaShare,
-      }: {
-            from: PartyId;
-            DeltaShare: bigint;
-            BigDeltaShare: AffinePoint;
-      }): SignBroadcastForRound4 {
-            const bmsg = new SignBroadcastForRound4(from, DeltaShare, BigDeltaShare);
-            Object.freeze(bmsg);
-            return bmsg;
-      }
-
-      public static fromJSON({
-            from,
-            DeltaShareHex,
-            BigDeltaShare,
-      }: SignBroadcastForRound4JSON): SignBroadcastForRound4 {
-            const DeltaShare = BigInt(`0x${DeltaShareHex}`);
-            const bmsg = new SignBroadcastForRound4(from, DeltaShare, pointFromJSON(BigDeltaShare));
-            Object.freeze(bmsg);
-            return bmsg;
-      }
-
-      public toJSON(): SignBroadcastForRound4JSON {
-            return {
-                  from: this.from,
-                  DeltaShareHex: this.DeltaShare.toString(16),
-                  BigDeltaShare: pointToJSON(this.BigDeltaShare),
-            };
-      }
-}
-
-export class SignMessageForRound4 {
-      public readonly from: PartyId;
-      public readonly to: PartyId;
-      public readonly ProofLog: ZkLogstarProof;
-
-      private constructor(from: PartyId, to: PartyId, ProofLog: ZkLogstarProof) {
-            this.from = from;
-            this.to = to;
-            this.ProofLog = ProofLog;
-      }
-
-      public static from({
-            from,
-            to,
-            ProofLog,
-      }: {
-            from: PartyId;
-            to: PartyId;
-            ProofLog: ZkLogstarProof;
-      }): SignMessageForRound4 {
-            const msg = new SignMessageForRound4(from, to, ProofLog);
-            Object.freeze(msg);
-            return msg;
-      }
-
-      public static fromJSON({ from, to, ProofLog }: SignMessageForRound4JSON): SignMessageForRound4 {
-            const msg = new SignMessageForRound4(from, to, ZkLogstarProof.fromJSON(ProofLog));
-            Object.freeze(msg);
-            return msg;
-      }
-
-      public toJSON(): SignMessageForRound4JSON {
-            return {
-                  from: this.from,
-                  to: this.to,
-                  ProofLog: this.ProofLog.toJSON(),
-            };
-      }
-}
-
-export class SignerRound4 {
+export class SignerRound4 extends AbstractSignRound {
       public session: SignSession;
       private roundInput: SignInputForRound4;
       public output: any;
@@ -111,9 +29,7 @@ export class SignerRound4 {
       public isDirectMessageRound: boolean;
 
       constructor() {
-            this.isBroadcastRound = true;
-            this.isDirectMessageRound = false;
-            this.currentRound = 1;
+            super({ isBroadcastRound: true, isDriectMessageRound: false, currentRound: 4 });
       }
 
       public init({ session, input }: { session?: SignSession; input?: any }): void {
@@ -146,7 +62,7 @@ export class SignerRound4 {
             }
       }
 
-      public process(): SignPartyOutputRound4 {
+      public async process(): Promise<SignPartyOutputRound4> {
             let Delta = 0n;
             let BigDelta = secp256k1.ProjectivePoint.ZERO;
             this.session.partyIds.forEach((partyId) => {
