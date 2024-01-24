@@ -1,6 +1,7 @@
 import { PartyId } from "../keygen/partyKey";
 import { verifySignature } from "../math/curve";
 import Fn from "../math/polynomial/Fn";
+import { AbstractSignRound } from "./abstractSignRound";
 import { SignSession } from "./signSession";
 import { SignBroadcastForRound5JSON, SignInputForRound5, SignPartyOutputRound5 } from "./types";
 
@@ -34,7 +35,7 @@ export class SignBroadcastForRound5 {
       }
 }
 
-export class SignerRound5 {
+export class SignerRound5 extends AbstractSignRound {
       public session: SignSession;
       private roundInput: SignInputForRound5;
       public output: any;
@@ -46,9 +47,7 @@ export class SignerRound5 {
       public isDirectMessageRound: boolean;
 
       constructor() {
-            this.isBroadcastRound = true;
-            this.isDirectMessageRound = false;
-            this.currentRound = 1;
+            super({ isBroadcastRound: true, isDriectMessageRound: false, currentRound: 5 });
       }
 
       public init({ session, input }: { session?: SignSession; input?: any }): void {
@@ -56,6 +55,7 @@ export class SignerRound5 {
             this.roundInput = input;
       }
 
+      public handleDirectMessage(bmsg: any): void {}
       public handleBroadcastMessage(bmsg: SignBroadcastForRound5): void {
             if (bmsg.SigmaShare === 0n) {
                   throw new Error(`SigmaShare from ${bmsg.from} is zero`);
@@ -63,7 +63,7 @@ export class SignerRound5 {
             this.SigmaShares[bmsg.from] = bmsg.SigmaShare;
       }
 
-      public process(): SignPartyOutputRound5 {
+      public async process(): Promise<SignPartyOutputRound5> {
             let Sigma = 0n;
             this.session.partyIds.forEach((partyId) => {
                   Sigma = Fn.add(Sigma, this.SigmaShares[partyId]);

@@ -2,7 +2,9 @@ import { otherPartyIds, PartyId } from "../keygen/partyKey";
 import { ZkEncProof, ZkEncProofJSON, ZkEncPublic, zkEncVerifyProof } from "../zk/enc";
 import { zkLogstarCreateProof, ZkLogstarPrivate, ZkLogstarPublic } from "../zk/logstar";
 import { mtaProveAffG } from "../zk/mta";
-import { SignBroadcastForRound3, SignMessageForRound3 } from "./signRound3";
+import { AbstractSignRound } from "./abstractSignRound";
+import { SignMessageForRound2, SignMessageForRound3 } from "./signMessages/directMessages";
+import { SignBroadcastForRound3 } from "./signRound3";
 import { SignSession } from "./signSession";
 import {
       SignBroadcastForRound2JSON,
@@ -45,49 +47,7 @@ export class SignBroadcastForRound2 {
       }
 }
 
-export class SignMessageForRound2 {
-      public readonly from: PartyId;
-      public readonly to: PartyId;
-      public readonly proofEnc: ZkEncProof;
-
-      private constructor(from: PartyId, to: PartyId, proofEnc: ZkEncProof) {
-            this.from = from;
-            this.to = to;
-            this.proofEnc = proofEnc;
-      }
-
-      public static from({
-            from,
-            to,
-            proofEnc,
-      }: {
-            from: PartyId;
-            to: PartyId;
-            proofEnc: ZkEncProof;
-      }): SignMessageForRound2 {
-            const msg = new SignMessageForRound2(from, to, proofEnc);
-            Object.freeze(msg);
-            return msg;
-      }
-
-      public static fromJSON(json: SignMessageForRound2JSON): SignMessageForRound2 {
-            return SignMessageForRound2.from({
-                  from: json.from as PartyId,
-                  to: json.to as PartyId,
-                  proofEnc: ZkEncProof.fromJSON(json.proofEnc),
-            });
-      }
-
-      public toJSON(): SignMessageForRound2JSON {
-            return {
-                  from: this.from,
-                  to: this.to,
-                  proofEnc: this.proofEnc.toJSON(),
-            };
-      }
-}
-
-export class SignerRound2 {
+export class SignerRound2 extends AbstractSignRound {
       public session: SignSession;
       private roundInput: SignPartyInputRound2;
       public output: any;
@@ -100,9 +60,7 @@ export class SignerRound2 {
       public isDirectMessageRound: boolean;
 
       constructor() {
-            this.isBroadcastRound = true;
-            this.isDirectMessageRound = true;
-            this.currentRound = 2;
+            super({ isBroadcastRound: true, isDriectMessageRound: true, currentRound: 2 });
       }
 
       public init({ session, input }: { session?: SignSession; input?: any }): void {
@@ -142,7 +100,7 @@ export class SignerRound2 {
             }
       }
 
-      public process(): SignPartyOutputRound2 {
+      public async process(): Promise<SignPartyOutputRound2> {
             // TODO: check if all parties have sent their messages
 
             const broadcasts: any = SignBroadcastForRound3.from({

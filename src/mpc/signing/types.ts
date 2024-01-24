@@ -5,9 +5,10 @@ import { AffinePoint, AffinePointJSON } from "../types";
 import { ZkAffgProofJSON } from "../zk/affg";
 import { ZkEncProofJSON } from "../zk/enc";
 import { ZkLogstarProofJSON } from "../zk/logstar";
-import { SignBroadcastForRound2, SignMessageForRound2 } from "./signRound2";
-import { SignBroadcastForRound3, SignMessageForRound3 } from "./signRound3";
-import { SignBroadcastForRound4, SignMessageForRound4 } from "./signRound4";
+import { SignMessageForRound2, SignMessageForRound3, SignMessageForRound4 } from "./signMessages/directMessages";
+import { SignBroadcastForRound2 } from "./signRound2";
+import { SignBroadcastForRound3 } from "./signRound3";
+import { SignBroadcastForRound4 } from "./signRound4";
 import { SignBroadcastForRound5 } from "./signRound5";
 
 export type SignRequestJSON = {
@@ -57,6 +58,7 @@ export type SignMessageForRound2JSON = {
       from: string;
       to: string;
       proofEnc: ZkEncProofJSON;
+      type: 2;
 };
 
 export type SignBroadcastForRound2JSON = {
@@ -73,6 +75,7 @@ export type SignBroadcastForRound3JSON = {
 export type SignMessageForRound3JSON = {
       from: string;
       to: string;
+      type: 3;
 
       DeltaDhex: string; // Ciphertext
       DeltaFhex: string; // Ciphertext
@@ -115,6 +118,7 @@ export type SignMessageForRound4JSON = {
       from: string;
       to: string;
       ProofLog: ZkLogstarProofJSON;
+      type: 4;
 };
 
 export type SignPartyOutputRound4 = {

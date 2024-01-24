@@ -47,13 +47,19 @@ import { keccak_256 } from "@noble/hashes/sha3";
 import { SignRequest } from "../mpc/signing/sign";
 import { SignSession } from "../mpc/signing/signSession";
 import { AllSignSessionRounds, SignSessionRounds } from "../mpc/signing/index";
-import { SignBroadcastForRound2, SignMessageForRound2 } from "../mpc/signing/signRound2";
-import { SignBroadcastForRound4, SignMessageForRound4 } from "../mpc/signing/signRound4";
+import { SignBroadcastForRound2 } from "../mpc/signing/signRound2";
+import { SignBroadcastForRound4 } from "../mpc/signing/signRound4";
 import { SignBroadcastForRound5 } from "../mpc/signing/signRound5";
-import { SignBroadcastForRound3, SignMessageForRound3 } from "../mpc/signing/signRound3";
+import { SignBroadcastForRound3 } from "../mpc/signing/signRound3";
 import { ethAddress, sigEthereum } from "../mpc/eth";
 import { ethers } from "ethers";
 import { AffinePoint } from "@noble/curves/abstract/curve";
+import { btcAddress } from "../mpc/btc";
+import {
+      SignMessageForRound2,
+      SignMessageForRound3,
+      SignMessageForRound4,
+} from "../mpc/signing/signMessages/directMessages";
 
 const SignRounds = Object.values(AllSignSessionRounds);
 
@@ -307,6 +313,8 @@ export class SigningSessionManager extends AppLogger {
       public verifyAndEndSession = async () => {
             const pubPoint = this.partyKeyConfig.publicPoint();
             const address = ethAddress(pubPoint);
+            const bitcoinaddress = btcAddress(pubPoint);
+            console.log(bitcoinaddress);
 
             const ethSig = sigEthereum(this.signature.R, this.signature.S);
             const addressRec = ethers

@@ -50,7 +50,7 @@ export abstract class AbstractSignRound implements BaseSignRound {
 
       public abstract handleBroadcastMessage(bmsg: any): void;
       public abstract handleDirectMessage(dmsg: any): void;
-      public abstract process(): Promise<SignRoundOutputExtended>;
+      public abstract process(): Promise<any>;
 
       constructor({
             isBroadcastRound,

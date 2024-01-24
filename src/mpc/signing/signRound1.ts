@@ -1,10 +1,12 @@
 import { sampleScalar, sampleScalarPointPair } from "../math/sample";
 import { ZkEncPrivate, ZkEncPublic, zkEncCreateProof } from "../zk/enc";
-import { SignBroadcastForRound2, SignMessageForRound2 } from "./signRound2";
+import { AbstractSignRound } from "./abstractSignRound";
+import { SignMessageForRound2 } from "./signMessages/directMessages";
+import { SignBroadcastForRound2 } from "./signRound2";
 import { SignSession } from "./signSession";
 import { SignPartyInputRound1, SignPartyOutputRound1 } from "./types";
 
-export class SignerRound1 {
+export class SignerRound1 extends AbstractSignRound {
       public session: SignSession;
       private roundInput: SignPartyInputRound1;
       public output: any;
@@ -14,9 +16,7 @@ export class SignerRound1 {
       public isDirectMessageRound: boolean;
 
       constructor() {
-            this.isBroadcastRound = true;
-            this.isDirectMessageRound = true;
-            this.currentRound = 1;
+            super({ isBroadcastRound: true, isDriectMessageRound: true, currentRound: 1 });
       }
 
       public init({ session, input }: { session?: SignSession; input?: any }): void {
@@ -24,7 +24,10 @@ export class SignerRound1 {
             this.roundInput = input;
       }
 
-      public process(): SignPartyOutputRound1 {
+      public handleBroadcastMessage(bmsg: any): void {}
+      public handleDirectMessage(bmsg: any): void {}
+
+      public async process(): Promise<SignPartyOutputRound1> {
             const [GammaShare, BigGammaShare] = sampleScalarPointPair();
             const { ciphertext: G, nonce: GNonce } =
                   this.roundInput.partiesPublic[this.session.selfId].paillier.encrypt(GammaShare);
