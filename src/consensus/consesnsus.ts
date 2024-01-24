@@ -146,7 +146,7 @@ class Blockchain implements BlockchainInterface {
                   } else {
                         await redisClient.setSignleData("leader", leader);
                   }
-                  if (KeygenSessionManager.sessionInitialized) {
+                  if (app.p2pServer.keygenSessionProcessor.sessionInitialized) {
                         throw new Error(`cannot elect a new leader while a session is active`);
                   }
                   if (this.validator.nodeId !== leader) {

@@ -1,8 +1,8 @@
 import { sampleScalar, sampleScalarPointPair } from "../math/sample";
 import { ZkEncPrivate, ZkEncPublic, zkEncCreateProof } from "../zk/enc";
 import { AbstractSignRound } from "./abstractSignRound";
+import { SignBroadcastForRound2 } from "./signMessages/broadcasts";
 import { SignMessageForRound2 } from "./signMessages/directMessages";
-import { SignBroadcastForRound2 } from "./signRound2";
 import { SignSession } from "./signSession";
 import { SignPartyInputRound1, SignPartyOutputRound1 } from "./types";
 

@@ -1,66 +1,36 @@
+import { AffinePoint } from "@noble/curves/abstract/curve";
+import { secp256k1 } from "@noble/curves/secp256k1";
+import { keccak_256 } from "@noble/hashes/sha3";
+import { bytesToHex } from "@noble/hashes/utils";
 import assert from "assert";
-import axios from "axios";
-import { createHash } from "crypto";
-import Flatted from "flatted";
-import config from "../config/config";
-import { redisClient } from "../db/redis";
-import { AppLogger } from "../http/middleware/logger";
-import { AllKeyGenRounds } from "../mpc/keygen";
-import { AbstractKeygenRound, GenericKeygenRoundBroadcast } from "../mpc/keygen/abstractRound";
-import { AbstractKeygenBroadcast } from "../mpc/keygen/keygenMessages/abstractKeygenBroadcast";
-import { KeygenDirectMessageForRound4 } from "../mpc/keygen/keygenMessages/directMessages";
-import { KeygenSession } from "../mpc/keygen/keygenSession";
-import { PartyPublicKeyConfigJSON, PartySecretKeyConfig, PartySecretKeyConfigJSON } from "../mpc/keygen/partyKey";
-import {
-      GenericKeygenRoundInput,
-      GenericRoundOutput,
-      KeygenDirectMessageForRound4JSON,
-      KeygenRound5Output,
-      SessionConfig,
-} from "../mpc/keygen/types";
-import { Hasher } from "../mpc/utils/hasher";
-import { delay } from "../p2p/server";
-import { MESSAGE_TYPE } from "../p2p/types";
-import { tryNTimes } from "../rpc/utils/helpers";
-import { ErrorWithCode, ProtocolError } from "../utils/errors";
-import { extractError } from "../utils/extractError";
-import { app } from "./index";
-import { Message as Msg } from "./message/message";
-import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
-import { KeygenCurrentState, KeygenMessageData, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
-import Validator from "./validators/validator";
-import TransactionPool from "../wallet/transactionPool";
+import { ethers } from "ethers";
 import { Logger } from "winston";
+import { btcAddress } from "../mpc/btc";
+import { ethAddress, sigEthereum } from "../mpc/eth";
+import { PartyPublicKeyConfigJSON, PartySecretKeyConfig, PartySecretKeyConfigJSON } from "../mpc/keygen/partyKey";
+import { PedersenParams } from "../mpc/paillierKeyPair/Pedersen/pendersen";
 import {
       PaillierPublicKey,
       PaillierPublicKeyJSON,
       PaillierSecretKey,
       PaillierSecretKeyJSON,
 } from "../mpc/paillierKeyPair/paillierKeygen";
-import { AffinePointJSON } from "../mpc/types";
-import { secp256k1 } from "@noble/curves/secp256k1";
-import { PedersenParams } from "../mpc/paillierKeyPair/Pedersen/pendersen";
-import { PedersenParametersJSON } from "../mpc/signing/sign.test";
-import { SignRequestJSON } from "../mpc/signing/types";
-import { bytesToHex } from "@noble/hashes/utils";
-import { keccak_256 } from "@noble/hashes/sha3";
+import { AllSignSessionRounds } from "../mpc/signing/index";
 import { SignRequest } from "../mpc/signing/sign";
+import { PedersenParametersJSON } from "../mpc/signing/sign.test";
 import { SignSession } from "../mpc/signing/signSession";
-import { AllSignSessionRounds, SignSessionRounds } from "../mpc/signing/index";
-import { SignBroadcastForRound2 } from "../mpc/signing/signRound2";
-import { SignBroadcastForRound4 } from "../mpc/signing/signRound4";
-import { SignBroadcastForRound5 } from "../mpc/signing/signRound5";
-import { SignBroadcastForRound3 } from "../mpc/signing/signRound3";
-import { ethAddress, sigEthereum } from "../mpc/eth";
-import { ethers } from "ethers";
-import { AffinePoint } from "@noble/curves/abstract/curve";
-import { btcAddress } from "../mpc/btc";
-import {
-      SignMessageForRound2,
-      SignMessageForRound3,
-      SignMessageForRound4,
-} from "../mpc/signing/signMessages/directMessages";
-
+import { SignRequestJSON } from "../mpc/signing/types";
+import { AffinePointJSON } from "../mpc/types";
+import { delay } from "../p2p/server";
+import { MESSAGE_TYPE } from "../p2p/types";
+import { ErrorWithCode, ProtocolError } from "../utils/errors";
+import { extractError } from "../utils/extractError";
+import { AbstractProcolManager } from "./abstractProtocolHandler";
+import { app } from "./index";
+import { Message as Msg } from "./message/message";
+import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
+import { ServerDirectMessage, ServerMessage } from "./types";
+import Validator from "./validators/validator";
 const SignRounds = Object.values(AllSignSessionRounds);
 
 export type SignSessionCurrentState = {
@@ -70,25 +40,10 @@ export type SignSessionCurrentState = {
       session: SignSession;
 };
 
-export class SigningSessionManager extends AppLogger {
-      private messageToSign: any;
+export class SigningSessionManager extends AbstractProcolManager<SignSession> {
+      private messageToSign: "hello";
       private signRequest: SignRequest;
       private signRequestSerialized: SignRequestJSON;
-      private validators: string[] = [];
-      private validator: Validator;
-
-      private selfId: string;
-
-      public sessionInitialized: boolean | undefined;
-      public threshold: number | undefined;
-      public finalRound: number = 5;
-      public currentRound: number = 0;
-
-      private session: SignSession | undefined;
-      private rounds: any;
-
-      private directMessages: MessageQueueArray<any>;
-      private messages: MessageQueueMap<any>;
 
       private publicKeyConfig: PartyPublicKeyConfigJSON;
       private secretKeyConfig: PartySecretKeyConfigJSON;
@@ -102,7 +57,7 @@ export class SigningSessionManager extends AppLogger {
       // verify initiators party key
       // initiate new session and all rounds
       constructor(validator: Validator, validators: string[], message: any) {
-            super();
+            super(validator, validators);
             this.validator = validator;
             this.selfId = validator.nodeId;
 
@@ -138,7 +93,7 @@ export class SigningSessionManager extends AppLogger {
             }
       }
 
-      private startNewSession(): boolean {
+      public startNewSession(): boolean {
             this.directMessages = new MessageQueueArray(this.finalRound + 1);
             this.messages = new MessageQueueMap(this.validators, this.finalRound + 1);
 
@@ -165,10 +120,10 @@ export class SigningSessionManager extends AppLogger {
       public handleSignSessionConsensusMessage = async <Type extends ServerMessage<any>>(message: Type) => {
             switch (message.type) {
                   case MESSAGE_TYPE.signSessionDirectMessageHandler:
-                        await this.signSessionRoundDirectMessageProcessor(message);
+                        await this.sessionRoundDirectMessageProcessor(message);
                         break;
                   case MESSAGE_TYPE.signSessionRoundHandler:
-                        await this.signSessionRoundProcessor(message);
+                        await this.sessionRoundProcessor(message);
                         break;
                   case MESSAGE_TYPE.signSessionInit:
                         await this.finalizeCurrentRound(0);
@@ -182,7 +137,7 @@ export class SigningSessionManager extends AppLogger {
             this.rounds[currentRound].finished = true;
             this.startNewRound();
             await delay(1500);
-            await this.signSessionRoundVerifier();
+            await this.sessionRoundVerifier();
       }
 
       public startNewRound() {
@@ -206,7 +161,7 @@ export class SigningSessionManager extends AppLogger {
             round.init({ session: this.session, input: roundInput as any });
       }
 
-      public signSessionRoundProcessor = async (data: ServerMessage<any>) => {
+      public sessionRoundProcessor = async (data: ServerMessage<any>) => {
             if (!this.sessionInitialized) return;
             try {
                   const { broadcasts } = data.data;
@@ -216,7 +171,7 @@ export class SigningSessionManager extends AppLogger {
                   const dmsLen = this.directMessages.getNonNullValuesLength(currentRound);
                   if (round.isDirectMessageRound && dmsLen < this.threshold - 1) {
                         await delay(200);
-                        await this.signSessionRoundProcessor(data);
+                        await this.sessionRoundProcessor(data);
 
                         // this.generateBroadcastHashes<MessageQueueArray<KeygenDirectMessageForRound4JSON>>(
                         //       this.directMessages,
@@ -246,7 +201,7 @@ export class SigningSessionManager extends AppLogger {
             }
       };
 
-      public signSessionRoundDirectMessageProcessor = async (data: ServerDirectMessage) => {
+      public sessionRoundDirectMessageProcessor = async (data: ServerDirectMessage) => {
             if (!this.sessionInitialized) return;
             try {
                   const { directMessages } = data.data;
@@ -266,7 +221,7 @@ export class SigningSessionManager extends AppLogger {
             }
       };
 
-      public signSessionRoundVerifier = async () => {
+      public sessionRoundVerifier = async () => {
             try {
                   console.log("heyyyyyyy");
                   const { round, roundState, currentRound } = this.getCurrentState();
@@ -325,99 +280,6 @@ export class SigningSessionManager extends AppLogger {
             console.log(`SIGNING WAS SUCCESSFUL, ${address}, ${addressRec}\n`);
       };
 
-      private validateRoundBroadcasts(activeRound: any, currentRound: number) {
-            const previousRound = this.rounds[currentRound - 1]?.round;
-            if (!previousRound?.isBroadcastRound) return;
-
-            this.messages
-                  .getRoundValues(currentRound - 1)
-                  .map((broadcast) => this.getRoundBroadcast(currentRound).fromJSON(broadcast as any))
-                  .forEach((broadcast) => activeRound.handleBroadcastMessage(broadcast));
-      }
-
-      private validateRoundDirectMessages(activeRound: any, currentRound: number) {
-            const previousRound = this.rounds[currentRound]?.round;
-            if (!previousRound?.isDirectMessageRound) return;
-
-            this.directMessages
-                  .getRoundValues(currentRound - 1)
-                  .map((directMsg) => this.getRoundDirectMesssage(currentRound).fromJSON(directMsg))
-                  .filter((directMsg) => directMsg.to === this.selfId)
-                  .forEach((directMsg) => activeRound.handleDirectMessage(directMsg));
-      }
-
-      private createDirectMessage = (round: any, messageType: any[], currentRound: number): Msg<any>[] => {
-            if (!round.isDirectMessageRound) return [];
-
-            return messageType.map((msg) => {
-                  return Msg.create<any>(this.selfId, msg?.to, this.session.protocolId, currentRound, msg, false);
-            });
-      };
-
-      private createBroadcastMessage = (
-            round: any,
-            messageType: any,
-            currentRound: number
-      ): Msg<any> | undefined => {
-            if (!round.isBroadcastRound) return undefined;
-            return Msg.create<any>(this.selfId, "", this.session.protocolId, currentRound, messageType, true);
-      };
-
-      private storePeerBroadcastResponse(
-            newMessage: Msg<any> | undefined,
-            round: any,
-            currentRound: number,
-            senderNode: string
-      ) {
-            if (
-                  round.isBroadcastRound &&
-                  newMessage &&
-                  this.validator.canAccept(newMessage, this.session as any, this.selfId)
-            ) {
-                  this.messages.set(currentRound, senderNode, newMessage.Data);
-            }
-            return this.messages.getRoundMessagesLen(currentRound);
-      }
-
-      private storePeerDirectMessageResponse(newDirectMessage: Msg<any>, round: any, currentRound: number) {
-            if (
-                  round.isDirectMessageRound &&
-                  newDirectMessage &&
-                  this.validator.canAccept(newDirectMessage, this.session as any, this.selfId)
-            ) {
-                  this.directMessages.set(currentRound, newDirectMessage.Data);
-            }
-            return this.directMessages.getNonNullValuesLength(currentRound);
-      }
-
-      private getRoundBroadcast(currentRound: number): any {
-            switch (currentRound) {
-                  case 2:
-                        return SignBroadcastForRound2;
-                  case 3:
-                        return SignBroadcastForRound3;
-                  case 4:
-                        return SignBroadcastForRound4;
-                  case 5:
-                        return SignBroadcastForRound5;
-                  default:
-                        throw new Error("Invalid sign bc round type");
-            }
-      }
-
-      private getRoundDirectMesssage(currentRound: number): any {
-            switch (currentRound) {
-                  case 2:
-                        return SignMessageForRound2;
-                  case 3:
-                        return SignMessageForRound3;
-                  case 4:
-                        return SignMessageForRound4;
-                  default:
-                        throw new Error("Invalid sign dm round type");
-            }
-      }
-
       public checkPaillierFixture = (
             publicSerialized: PaillierPublicKeyJSON,
             privateSerialized: PaillierSecretKeyJSON
@@ -457,16 +319,4 @@ export class SigningSessionManager extends AppLogger {
                   throw new ErrorWithCode(`public key does not match secret key`, ProtocolError.PARAMETER_ERROR);
             }
       };
-
-      public getCurrentState(): SignSessionCurrentState {
-            const currentRound = this.currentRound;
-            const roundState = this.rounds[currentRound];
-            const session = this.session;
-            return {
-                  currentRound,
-                  roundState,
-                  round: roundState.round,
-                  session,
-            };
-      }
 }

@@ -11,7 +11,7 @@ import {
       zkLogstarCreateProof,
       zkLogstarVerifyProof,
 } from "../zk/logstar";
-import { SignBroadcastForRound4 } from "./signRound4";
+import { SignBroadcastForRound4 } from "./signMessages/broadcasts";
 import { SignSession } from "./signSession";
 import {
       SignBroadcastForRound3JSON,
@@ -21,42 +21,7 @@ import {
 } from "./types";
 import { SignMessageForRound3, SignMessageForRound4 } from "./signMessages/directMessages";
 import { AbstractSignRound } from "./abstractSignRound";
-
-export class SignBroadcastForRound3 {
-      public readonly from: PartyId;
-      public readonly BigGammaShare: AffinePoint;
-
-      public constructor(from: PartyId, BigGammaShare: AffinePoint) {
-            this.from = from;
-            this.BigGammaShare = BigGammaShare;
-      }
-
-      public static from({
-            from,
-            BigGammaShare,
-      }: {
-            from: PartyId;
-            BigGammaShare: AffinePoint;
-      }): SignBroadcastForRound3 {
-            const bmsg = new SignBroadcastForRound3(from, BigGammaShare);
-            Object.freeze(bmsg);
-            return bmsg;
-      }
-
-      public static fromJSON(json: SignBroadcastForRound3JSON): SignBroadcastForRound3 {
-            return SignBroadcastForRound3.from({
-                  from: json.from as PartyId,
-                  BigGammaShare: pointFromJSON(json.BigGammaShare),
-            });
-      }
-
-      public toJSON(): SignBroadcastForRound3JSON {
-            return {
-                  from: this.from,
-                  BigGammaShare: pointToJSON(this.BigGammaShare),
-            };
-      }
-}
+import { SignBroadcastForRound3 } from "./signMessages/broadcasts";
 
 export class SignerRound3 extends AbstractSignRound {
       public session: SignSession;

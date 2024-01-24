@@ -2,38 +2,9 @@ import { PartyId } from "../keygen/partyKey";
 import { verifySignature } from "../math/curve";
 import Fn from "../math/polynomial/Fn";
 import { AbstractSignRound } from "./abstractSignRound";
+import { SignBroadcastForRound5 } from "./signMessages/broadcasts";
 import { SignSession } from "./signSession";
 import { SignBroadcastForRound5JSON, SignInputForRound5, SignPartyOutputRound5 } from "./types";
-
-export class SignBroadcastForRound5 {
-      public readonly from: PartyId;
-      public readonly SigmaShare: bigint;
-
-      private constructor(from: PartyId, SigmaShare: bigint) {
-            this.from = from;
-            this.SigmaShare = SigmaShare;
-      }
-
-      public static from({ from, SigmaShare }: { from: PartyId; SigmaShare: bigint }): SignBroadcastForRound5 {
-            const bmsg = new SignBroadcastForRound5(from, SigmaShare);
-            Object.freeze(bmsg);
-            return bmsg;
-      }
-
-      public static fromJSON({ from, SigmaShareHex }: SignBroadcastForRound5JSON): SignBroadcastForRound5 {
-            const SigmaShare = BigInt(`0x${SigmaShareHex}`);
-            const bmsg = new SignBroadcastForRound5(from, SigmaShare);
-            Object.freeze(bmsg);
-            return bmsg;
-      }
-
-      public toJSON(): SignBroadcastForRound5JSON {
-            return {
-                  from: this.from,
-                  SigmaShareHex: this.SigmaShare.toString(16),
-            };
-      }
-}
 
 export class SignerRound5 extends AbstractSignRound {
       public session: SignSession;

@@ -4,7 +4,6 @@ import { isIdentity, pointFromJSON, pointToJSON, scalarFromHash } from "../math/
 import Fn from "../math/polynomial/Fn";
 import { AffinePoint } from "../types";
 import { ZkLogstarProof, ZkLogstarPublic, zkLogstarVerifyProof } from "../zk/logstar";
-import { SignBroadcastForRound5 } from "./signRound5";
 import { SignSession } from "./signSession";
 import {
       SignBroadcastForRound4JSON,
@@ -14,51 +13,8 @@ import {
 } from "./types";
 import { SignMessageForRound4 } from "./signMessages/directMessages";
 import { AbstractSignRound } from "./abstractSignRound";
-
-export class SignBroadcastForRound4 {
-      public readonly from: PartyId;
-      public readonly DeltaShare: bigint;
-      public readonly BigDeltaShare: AffinePoint;
-
-      private constructor(from: PartyId, DeltaShare: bigint, BigDeltaShare: AffinePoint) {
-            this.from = from;
-            this.DeltaShare = DeltaShare;
-            this.BigDeltaShare = BigDeltaShare;
-      }
-
-      public static from({
-            from,
-            DeltaShare,
-            BigDeltaShare,
-      }: {
-            from: PartyId;
-            DeltaShare: bigint;
-            BigDeltaShare: AffinePoint;
-      }): SignBroadcastForRound4 {
-            const bmsg = new SignBroadcastForRound4(from, DeltaShare, BigDeltaShare);
-            Object.freeze(bmsg);
-            return bmsg;
-      }
-
-      public static fromJSON({
-            from,
-            DeltaShareHex,
-            BigDeltaShare,
-      }: SignBroadcastForRound4JSON): SignBroadcastForRound4 {
-            const DeltaShare = BigInt(`0x${DeltaShareHex}`);
-            const bmsg = new SignBroadcastForRound4(from, DeltaShare, pointFromJSON(BigDeltaShare));
-            Object.freeze(bmsg);
-            return bmsg;
-      }
-
-      public toJSON(): SignBroadcastForRound4JSON {
-            return {
-                  from: this.from,
-                  DeltaShareHex: this.DeltaShare.toString(16),
-                  BigDeltaShare: pointToJSON(this.BigDeltaShare),
-            };
-      }
-}
+import { SignBroadcastForRound4, SignBroadcastForRound5 } from "./signMessages/broadcasts";
+import { AbstractSignBroadcast } from "./signMessages/abstractSignBroadcast";
 
 export class SignerRound4 extends AbstractSignRound {
       public session: SignSession;

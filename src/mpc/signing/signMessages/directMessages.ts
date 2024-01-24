@@ -3,15 +3,16 @@ import { ZkAffgProof } from "../../zk/affg";
 import { ZkEncProof } from "../../zk/enc";
 import { ZkLogstarProof } from "../../zk/logstar";
 import { SignMessageForRound2JSON, SignMessageForRound3JSON, SignMessageForRound4JSON } from "../types";
-import { AbstractSignDirectMessage } from "./abstractSignDirectMessage";
+import { AbstractSignDirectMessage } from "./abstractDirectMessage";
 
 export class SignMessageForRound4 extends AbstractSignDirectMessage {
       public readonly from: PartyId;
       public readonly to: PartyId;
       public readonly ProofLog: ZkLogstarProof;
+      public readonly type;
 
       public constructor(from: PartyId, to: PartyId, ProofLog: ZkLogstarProof) {
-            super(from, 4);
+            super(from, to, 4);
             this.from = from;
             this.to = to;
             this.ProofLog = ProofLog;
@@ -57,6 +58,7 @@ export class SignMessageForRound3 extends AbstractSignDirectMessage {
       public readonly ChiF: bigint; // Ciphertext
       public readonly ChiProof: ZkAffgProof;
       public readonly ProofLog: ZkLogstarProof;
+      public readonly type;
 
       private constructor(
             from: PartyId,
@@ -69,7 +71,7 @@ export class SignMessageForRound3 extends AbstractSignDirectMessage {
             ChiProof: ZkAffgProof,
             ProofLog: ZkLogstarProof
       ) {
-            super(from, 3);
+            super(from, to, 3);
             this.from = from;
             this.to = to;
             this.DeltaD = DeltaD;
@@ -151,9 +153,10 @@ export class SignMessageForRound2 extends AbstractSignDirectMessage {
       public readonly from: PartyId;
       public readonly to: PartyId;
       public readonly proofEnc: ZkEncProof;
+      public readonly type;
 
       private constructor(from: PartyId, to: PartyId, proofEnc: ZkEncProof) {
-            super(from, 2);
+            super(from, to, 2);
             this.from = from;
             this.to = to;
             this.proofEnc = proofEnc;

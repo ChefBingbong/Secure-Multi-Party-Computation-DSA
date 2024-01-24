@@ -3,8 +3,8 @@ import { ZkEncProof, ZkEncProofJSON, ZkEncPublic, zkEncVerifyProof } from "../zk
 import { zkLogstarCreateProof, ZkLogstarPrivate, ZkLogstarPublic } from "../zk/logstar";
 import { mtaProveAffG } from "../zk/mta";
 import { AbstractSignRound } from "./abstractSignRound";
+import { SignBroadcastForRound2, SignBroadcastForRound3 } from "./signMessages/broadcasts";
 import { SignMessageForRound2, SignMessageForRound3 } from "./signMessages/directMessages";
-import { SignBroadcastForRound3 } from "./signRound3";
 import { SignSession } from "./signSession";
 import {
       SignBroadcastForRound2JSON,
@@ -12,40 +12,6 @@ import {
       SignPartyInputRound2,
       SignPartyOutputRound2,
 } from "./types.js";
-
-export class SignBroadcastForRound2 {
-      public readonly from: PartyId;
-      public readonly K: bigint; // Paillier ciphertext
-      public readonly G: bigint; // Paillier ciphertext
-
-      private constructor(from: PartyId, K: bigint, G: bigint) {
-            this.from = from;
-            this.K = K;
-            this.G = G;
-      }
-
-      public static from({ from, K, G }: { from: PartyId; K: bigint; G: bigint }): SignBroadcastForRound2 {
-            const bmsg = new SignBroadcastForRound2(from, K, G);
-            Object.freeze(bmsg);
-            return bmsg;
-      }
-
-      public static fromJSON(json: SignBroadcastForRound2JSON): SignBroadcastForRound2 {
-            return SignBroadcastForRound2.from({
-                  from: json.from as PartyId,
-                  K: BigInt(`0x${json.Khex}`),
-                  G: BigInt(`0x${json.Ghex}`),
-            });
-      }
-
-      public toJSON(): SignBroadcastForRound2JSON {
-            return {
-                  from: this.from,
-                  Khex: this.K.toString(16),
-                  Ghex: this.G.toString(16),
-            };
-      }
-}
 
 export class SignerRound2 extends AbstractSignRound {
       public session: SignSession;

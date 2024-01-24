@@ -5,11 +5,13 @@ import { AffinePoint, AffinePointJSON } from "../types";
 import { ZkAffgProofJSON } from "../zk/affg";
 import { ZkEncProofJSON } from "../zk/enc";
 import { ZkLogstarProofJSON } from "../zk/logstar";
+import {
+      SignBroadcastForRound2,
+      SignBroadcastForRound3,
+      SignBroadcastForRound4,
+      SignBroadcastForRound5,
+} from "./signMessages/broadcasts";
 import { SignMessageForRound2, SignMessageForRound3, SignMessageForRound4 } from "./signMessages/directMessages";
-import { SignBroadcastForRound2 } from "./signRound2";
-import { SignBroadcastForRound3 } from "./signRound3";
-import { SignBroadcastForRound4 } from "./signRound4";
-import { SignBroadcastForRound5 } from "./signRound5";
 
 export type SignRequestJSON = {
       messageHex: string;
@@ -65,11 +67,13 @@ export type SignBroadcastForRound2JSON = {
       from: string;
       Khex: string;
       Ghex: string;
+      type: 2;
 };
 
 export type SignBroadcastForRound3JSON = {
       from: string;
       BigGammaShare: AffinePointJSON;
+      type: 3;
 };
 
 export type SignMessageForRound3JSON = {
@@ -104,6 +108,7 @@ export type SignBroadcastForRound4JSON = {
       from: string;
       DeltaShareHex: string;
       BigDeltaShare: AffinePointJSON;
+      type: 4;
 };
 
 export type SignInputForRound4 = {
@@ -129,6 +134,7 @@ export type SignPartyOutputRound4 = {
 export type SignBroadcastForRound5JSON = {
       from: string;
       SigmaShareHex: string;
+      type: 5;
 };
 
 export type SignInputForRound5 = {

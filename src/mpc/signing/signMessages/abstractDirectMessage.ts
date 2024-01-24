@@ -2,13 +2,15 @@ import { PartyId } from "../../keygen/partyKey";
 import { SignMessageForRound2JSON, SignMessageForRound3JSON, SignMessageForRound4JSON } from "../types";
 import { SignMessageForRound2, SignMessageForRound3, SignMessageForRound4 } from "./directMessages";
 
-export class AbstractSignDirectMessage {
+export abstract class AbstractSignDirectMessage {
       public readonly from: PartyId;
       public readonly type: number;
+      public readonly to: PartyId;
 
-      constructor(from: PartyId, type: number) {
+      constructor(from: PartyId, to: PartyId, type: number) {
             this.from = from;
             this.type = type;
+            this.to = to;
       }
 
       public toJSON(): SignMessageForRound2JSON | SignMessageForRound3JSON | SignMessageForRound4JSON {
