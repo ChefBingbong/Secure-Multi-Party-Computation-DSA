@@ -13,22 +13,6 @@ import {
 } from "./broadcasts";
 
 export class AbstractKeygenBroadcast {
-      public readonly from: PartyId;
-      public readonly type: number;
-
-      constructor(from: PartyId, type: number) {
-            this.from = from;
-            this.type = type;
-      }
-
-      public toJSON():
-            | KeygenBroadcastForRound2JSON
-            | KeygenBroadcastForRound3JSON
-            | KeygenBroadcastForRound4JSON
-            | KeygenBroadcastForRound5JSON {
-            throw new Error("toJSON method must be implemented in derived classes");
-      }
-
       public static fromJSON(
             json:
                   | KeygenBroadcastForRound2JSON

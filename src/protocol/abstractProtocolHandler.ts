@@ -1,13 +1,10 @@
 import { Logger } from "winston";
-import { AllSignSessionRounds } from "../mpc/signing/index";
-import { AbstractSignDirectMessage } from "../mpc/signing/signMessages/abstractDirectMessage";
-import { AbstractSignBroadcast } from "../mpc/signing/signMessages/abstractSignBroadcast";
-import { SignSession } from "../mpc/signing/signSession";
+import { AppLogger } from "../http/middleware/logger";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
+import { ProtocolMessageParser } from "./protocolMessageParser";
 import { ServerDirectMessage, ServerMessage, SessionState } from "./types";
 import Validator from "./validators/validator";
-import { AppLogger } from "../http/middleware/logger";
 
 export interface BaseProtocolHnadlerInterface<Protocol> {
       // startNewSession(): boolean;
@@ -26,7 +23,8 @@ export abstract class AbstractProcolManager<Protocol>
       protected validators: string[] = [];
       protected selfId: string;
       public validator: Validator;
-      public protocolId: "cmd/sigm";
+      public protocolId: string = "cmp/sign";
+      public protocol: "sign" | "keygen";
 
       public sessionInitialized: boolean | undefined;
       public threshold: number | undefined;
@@ -41,14 +39,12 @@ export abstract class AbstractProcolManager<Protocol>
       public log: Logger;
 
       // initiate new session and all rounds
-      constructor(validator: Validator, validators: string[]) {
+      constructor(protocol: "sign" | "keygen") {
             super();
-            this.validator = validator;
-            this.selfId = validator.nodeId;
-            this.validators = validators;
+            this.protocol = protocol;
       }
 
-      public abstract init(threshold: number, validators: string[]): void;
+      public abstract init(threshold: number, validator: Validator, validators: string[]): Promise<void>;
       // public abstract startNewSession(): boolean;
       public abstract finalizeCurrentRound(currentRound: number): Promise<void>;
       public abstract startNewRound(): void;
@@ -62,7 +58,7 @@ export abstract class AbstractProcolManager<Protocol>
 
             this.messages
                   .getRoundValues(currentRound - 1)
-                  .map((broadcast) => AbstractSignBroadcast.fromJSON(broadcast as any))
+                  .map((broadcast) => ProtocolMessageParser.fromJSONB(broadcast as any, this.protocol))
                   .forEach((broadcast) => activeRound.handleBroadcastMessage(broadcast));
       }
 
@@ -72,7 +68,7 @@ export abstract class AbstractProcolManager<Protocol>
 
             this.directMessages
                   .getRoundValues(currentRound - 1)
-                  .map((directMsg) => AbstractSignDirectMessage.fromJSON(directMsg))
+                  .map((directMsg) => ProtocolMessageParser.fromJSOND(directMsg, this.protocol))
                   .filter((directMsg: any) => directMsg.to === this.selfId)
                   .forEach((directMsg) => activeRound.handleDirectMessage(directMsg));
       }
@@ -111,11 +107,14 @@ export abstract class AbstractProcolManager<Protocol>
       }
 
       protected storePeerDirectMessageResponse(newDirectMessage: Msg<any>, round: any, currentRound: number) {
+            console.log("madeee ittt");
+
             if (
                   round.isDirectMessageRound &&
                   newDirectMessage &&
                   this.validator.canAccept(newDirectMessage, this.session as any, this.selfId)
             ) {
+                  console.log("madeee ittt");
                   this.directMessages.set(currentRound, newDirectMessage.Data);
             }
             return this.directMessages.getNonNullValuesLength(currentRound);

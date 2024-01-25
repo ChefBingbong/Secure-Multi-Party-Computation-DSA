@@ -1,14 +1,11 @@
 import assert from "assert";
 import axios from "axios";
 import { createHash } from "crypto";
-import Flatted from "flatted";
+import { Logger } from "winston";
 import config from "../config/config";
 import { redisClient } from "../db/redis";
-import { AppLogger } from "../http/middleware/logger";
 import { AllKeyGenRounds } from "../mpc/keygen";
 import { AbstractKeygenRound, GenericKeygenRoundBroadcast } from "../mpc/keygen/abstractRound";
-import { AbstractKeygenBroadcast } from "../mpc/keygen/keygenMessages/abstractKeygenBroadcast";
-import { KeygenDirectMessageForRound4 } from "../mpc/keygen/keygenMessages/directMessages";
 import { KeygenSession } from "../mpc/keygen/keygenSession";
 import { PartySecretKeyConfig } from "../mpc/keygen/partyKey";
 import {
@@ -24,14 +21,12 @@ import { MESSAGE_TYPE } from "../p2p/types";
 import { tryNTimes } from "../rpc/utils/helpers";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import { extractError } from "../utils/extractError";
+import { AbstractProcolManager } from "./abstractProtocolHandler";
 import { app } from "./index";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
-import { KeygenCurrentState, KeygenMessageData, Round, Rounds, ServerDirectMessage, ServerMessage } from "./types";
+import { KeygenMessageData, Round, ServerDirectMessage, ServerMessage } from "./types";
 import Validator from "./validators/validator";
-import TransactionPool from "../wallet/transactionPool";
-import { Logger } from "winston";
-import { AbstractProcolManager, BaseProtocolHnadlerInterface } from "./abstractProtocolHandler";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -42,15 +37,14 @@ export class KeygenSessionManager extends AbstractProcolManager<KeygenSession> {
       private broadcastRoundHashes: Record<number, string> = {};
       private directMessageRoundHashes: Record<number, string> = {};
 
-      constructor(validator: Validator, validators: string[]) {
-            super(validator, validators);
-            this.validator = validator;
-            this.selfId = validator.nodeId;
+      constructor() {
+            super("keygen");
       }
 
-      public async init(threshold: number, validators: string[], validator?: Validator) {
-            this.threshold = threshold;
+      public async init(threshold: number, validator: Validator, validators: string[]) {
             this.validator = validator;
+            this.selfId = validator.nodeId;
+            this.threshold = threshold;
             this.validators = validators;
             this.startNewSession({
                   selfId: app.p2pServer.NODE_ID,
@@ -63,8 +57,6 @@ export class KeygenSessionManager extends AbstractProcolManager<KeygenSession> {
             if (this.sessionInitialized || this.currentRound > 0) {
                   throw new Error(`there is already a keygen session n progress`);
             }
-            this.init(sessionConfig.threshold, sessionConfig.partyIds);
-
             this.directMessages = new MessageQueueArray(this.finalRound + 1);
             this.messages = new MessageQueueMap(this.validators, this.finalRound + 1);
             this.broadcastRoundHashes[0] = this.hashMessageData("0x0");
@@ -118,6 +110,7 @@ export class KeygenSessionManager extends AbstractProcolManager<KeygenSession> {
 
                   //if we are on a dm round. wait until all nodes have collected their dms
                   const dmsLen = this.directMessages.getNonNullValuesLength(currentRound);
+                  // console.log(round.isDirectMessageRound, currentRound, this.threshold, dmsLen);
                   if (round.isDirectMessageRound && dmsLen < this.threshold - 1) {
                         await delay(200);
                         await this.sessionRoundProcessor(data);
@@ -417,6 +410,3 @@ export class KeygenSessionManager extends AbstractProcolManager<KeygenSession> {
             // this.validator.PartyKeyShare = undefined;
       }
 }
-
-const v = new Validator();
-export const maager = new KeygenSessionManager(v, []);

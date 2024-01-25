@@ -12,23 +12,7 @@ import {
       SignBroadcastForRound5,
 } from "./broadcasts";
 
-export abstract class AbstractSignBroadcast {
-      public readonly from: PartyId;
-      public readonly type: number;
-
-      constructor(from: PartyId, type: number) {
-            this.from = from;
-            this.type = type;
-      }
-
-      public toJSON():
-            | SignBroadcastForRound2JSON
-            | SignBroadcastForRound3JSON
-            | SignBroadcastForRound4JSON
-            | SignBroadcastForRound5JSON {
-            throw new Error("toJSON method must be implemented in derived classes");
-      }
-
+export class AbstractSignBroadcast {
       public static fromJSON(
             json:
                   | SignBroadcastForRound2JSON

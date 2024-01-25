@@ -2,21 +2,7 @@ import { PartyId } from "../../keygen/partyKey";
 import { SignMessageForRound2JSON, SignMessageForRound3JSON, SignMessageForRound4JSON } from "../types";
 import { SignMessageForRound2, SignMessageForRound3, SignMessageForRound4 } from "./directMessages";
 
-export abstract class AbstractSignDirectMessage {
-      public readonly from: PartyId;
-      public readonly type: number;
-      public readonly to: PartyId;
-
-      constructor(from: PartyId, to: PartyId, type: number) {
-            this.from = from;
-            this.type = type;
-            this.to = to;
-      }
-
-      public toJSON(): SignMessageForRound2JSON | SignMessageForRound3JSON | SignMessageForRound4JSON {
-            throw new Error("toJSON method must be implemented in derived classes");
-      }
-
+export class AbstractSignDirectMessage {
       public static fromJSON(
             json: SignMessageForRound2JSON | SignMessageForRound3JSON | SignMessageForRound4JSON
       ): AbstractSignDirectMessage {
