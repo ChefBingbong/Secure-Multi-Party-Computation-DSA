@@ -179,4 +179,5 @@ export type KeygenDirectMessageForRound4JSON = {
       to: string;
       shareHex: string;
       facProof: ZkFacProofJSON;
+      type: 4;
 };

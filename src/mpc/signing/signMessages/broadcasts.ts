@@ -9,15 +9,15 @@ import {
 } from "../types";
 import { AbstractSignBroadcast } from "./abstractSignBroadcast";
 
-export class SignBroadcastForRound2 extends AbstractSignBroadcast {
+export class SignBroadcastForRound2 {
       public readonly from: PartyId;
       public readonly K: bigint; // Paillier ciphertext
       public readonly G: bigint; // Paillier ciphertext
-      public readonly t;
+      public readonly type: 2;
 
       private constructor(from: PartyId, K: bigint, G: bigint) {
-            super(from, 2);
             this.from = from;
+            this.type = 2;
             this.K = K;
             this.G = G;
       }
@@ -45,13 +45,14 @@ export class SignBroadcastForRound2 extends AbstractSignBroadcast {
             };
       }
 }
-export class SignBroadcastForRound3 extends AbstractSignBroadcast {
+export class SignBroadcastForRound3 {
+      public readonly type: 3;
       public readonly from: PartyId;
       public readonly BigGammaShare: AffinePoint;
 
       public constructor(from: PartyId, BigGammaShare: AffinePoint) {
-            super(from, 2);
             this.from = from;
+            this.type = 3;
             this.BigGammaShare = BigGammaShare;
       }
 
@@ -83,14 +84,15 @@ export class SignBroadcastForRound3 extends AbstractSignBroadcast {
       }
 }
 
-export class SignBroadcastForRound4 extends AbstractSignBroadcast {
+export class SignBroadcastForRound4 {
+      public readonly type: 4;
       public readonly from: PartyId;
       public readonly DeltaShare: bigint;
       public readonly BigDeltaShare: AffinePoint;
 
       private constructor(from: PartyId, DeltaShare: bigint, BigDeltaShare: AffinePoint) {
-            super(from, 4);
             this.from = from;
+            this.type = 4;
             this.DeltaShare = DeltaShare;
             this.BigDeltaShare = BigDeltaShare;
       }
@@ -130,13 +132,14 @@ export class SignBroadcastForRound4 extends AbstractSignBroadcast {
       }
 }
 
-export class SignBroadcastForRound5 extends AbstractSignBroadcast {
+export class SignBroadcastForRound5 {
+      public readonly type: 5;
       public readonly from: PartyId;
       public readonly SigmaShare: bigint;
 
       private constructor(from: PartyId, SigmaShare: bigint) {
-            super(from, 2);
             this.from = from;
+            this.type = 5;
             this.SigmaShare = SigmaShare;
       }
 

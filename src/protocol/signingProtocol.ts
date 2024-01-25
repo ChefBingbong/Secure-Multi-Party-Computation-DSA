@@ -31,6 +31,7 @@ import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
 import { ServerDirectMessage, ServerMessage } from "./types";
 import Validator from "./validators/validator";
+
 const SignRounds = Object.values(AllSignSessionRounds);
 
 export type SignSessionCurrentState = {
@@ -56,31 +57,28 @@ export class SigningSessionManager extends AbstractProcolManager<SignSession> {
 
       // verify initiators party key
       // initiate new session and all rounds
-      constructor(validator: Validator, validators: string[], message: any) {
-            super(validator, validators);
+      constructor() {
+            super("sign");
+      }
+
+      public async init(threshold: number, validator: Validator, validators: string[]) {
+            if (this.sessionInitialized) {
+                  throw new ErrorWithCode(`Session was not initialized correctly.`, ProtocolError.PARAMETER_ERROR);
+            }
             this.validator = validator;
             this.selfId = validator.nodeId;
-
-            this.messageToSign = message;
+            this.threshold = threshold;
+            this.validators = validators;
+            this.messageToSign = this.messageToSign;
             this.signRequestSerialized = {
-                  messageHex: bytesToHex(keccak_256(message)),
+                  messageHex: bytesToHex(keccak_256(this.messageToSign)),
                   signerIds: validators,
             };
 
             this.signRequest = SignRequest.fromJSON(this.signRequestSerialized);
-            this.secretKeyConfig = validator.PartyKeyShare.toJSON();
-            this.publicKeyConfig = validator.PartyKeyShare.publicPartyData[this.validator.nodeId].toJSON();
+            this.secretKeyConfig = this.validator.PartyKeyShare.toJSON();
+            this.publicKeyConfig = this.validator.PartyKeyShare.publicPartyData[this.validator.nodeId].toJSON();
             this.partyKeyConfig = PartySecretKeyConfig.fromJSON(this.secretKeyConfig);
-
-            console.log(this.secretKeyConfig, this.publicKeyConfig);
-      }
-
-      public async init(threshold: number, validators: string[]) {
-            if (this.sessionInitialized) {
-                  throw new ErrorWithCode(`Session was not initialized correctly.`, ProtocolError.PARAMETER_ERROR);
-            }
-            this.threshold = threshold;
-            this.validators = validators;
 
             this.checkPaillierFixture(this.publicKeyConfig.paillier, this.secretKeyConfig.paillier);
             this.checkCurvePointFixture(this.publicKeyConfig.ecdsa, this.secretKeyConfig.ecdsaHex);

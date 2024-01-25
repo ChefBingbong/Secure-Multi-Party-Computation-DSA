@@ -61,8 +61,10 @@ class P2pServer extends AppLogger {
 
             this.updateReplica(Number(this.NODE_ID), "CONNECT");
             new ValidatorsGroup(this.validator.toString());
-            new KeygenSessionManager(this.validator, []);
-            // new SigningSessionManager(this.validator, [], "");
+            // this.signSessionProcessor = new SigningSessionManager();
+            // this.keygenSessionProcessor = new KeygenSessionManager();
+            // this.keygenSessionProcessor = new KeygenSessionManager(this.validator);
+            // this.signSessionProcessor = new SigningSessionManager(this.validator);
 
             this.initState();
       }
@@ -306,17 +308,18 @@ class P2pServer extends AppLogger {
                   //handle keygen & pBFT consensus for broadcasts
                   // console.log(message);
                   if (!this.signSessionProcessor && message.type === MESSAGE_TYPE.signSessionInit) {
-                        this.signSessionProcessor = new SigningSessionManager(
-                              this.validator,
-                              this.validators,
-                              "hello"
-                        );
-                        this.signSessionProcessor.init(this.threshold, this.validators);
+                        // this.keygenSessionProcessor = new KeygenSessionManager(this.validator);
+                        this.signSessionProcessor = new SigningSessionManager();
+                        // this.keygenSessionProcessor = new KeygenSessionManager();
+                        this.signSessionProcessor.init(this.threshold, this.validator, this.validators);
+                        await delay(1000);
                   }
-                  // if (!this.keygenSessionProcessor && message.type === MESSAGE_TYPE.keygenInit) {
-                  //       this.keygenSessionProcessor = new KeygenSessionManager(this.validator, this.validators);
-                  //       this.keygenSessionProcessor.init(this.threshold, this.validators);
-                  // }
+                  if (!this.keygenSessionProcessor && message.type === MESSAGE_TYPE.keygenInit) {
+                        // this.keygenSessionProcessor = new KeygenSessionManager(this.validator, this.validators);
+                        this.keygenSessionProcessor = new KeygenSessionManager();
+                        this.keygenSessionProcessor.init(this.threshold, this.validator, this.validators);
+                        await delay(1000);
+                  }
                   await this.signSessionProcessor?.handleSignSessionConsensusMessage(message);
                   await this.keygenSessionProcessor?.handleKeygenConsensusMessage(message);
                   await this.chain.handleBlockchainConsensusMessage(message);
@@ -330,6 +333,7 @@ class P2pServer extends AppLogger {
                         //handle keygen & pBFT consensus for direcct msgs
                         await this.signSessionProcessor?.handleSignSessionConsensusMessage(message);
                         // await KeygenSessionManager.handleKeygenConsensusMessage(message);
+                        await this.keygenSessionProcessor?.handleKeygenConsensusMessage(message);
                         await this.chain.handleBlockchainConsensusMessage(message);
                         await callback();
                   } catch (error) {

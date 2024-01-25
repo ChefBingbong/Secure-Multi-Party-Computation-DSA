@@ -15,12 +15,15 @@ import {
       KeygenBroadcastForRound5JSON,
 } from "../types";
 
-export class KeygenBroadcastForRound2 extends AbstractKeygenBroadcast {
+export class KeygenBroadcastForRound2 {
       public readonly commitment: Uint8Array;
+      public readonly from: PartyId;
+      public readonly type: 2;
 
       constructor(from: PartyId, commitment: Uint8Array) {
-            super(from, 2);
+            this.from = from;
             this.commitment = commitment;
+            this.type = 2;
       }
 
       public toJSON(): KeygenBroadcastForRound2JSON {
@@ -37,7 +40,9 @@ export class KeygenBroadcastForRound2 extends AbstractKeygenBroadcast {
       }
 }
 
-export class KeygenBroadcastForRound3 extends AbstractKeygenBroadcast {
+export class KeygenBroadcastForRound3 {
+      public readonly from: PartyId;
+      public readonly type: 3;
       public readonly RID: bigint;
       public readonly C: bigint;
       public readonly vssPolynomial: Exponent;
@@ -56,7 +61,8 @@ export class KeygenBroadcastForRound3 extends AbstractKeygenBroadcast {
             pedersenPublic: PedersenParams,
             decommitment: Uint8Array
       ) {
-            super(from, 3);
+            this.from = from;
+            this.type = 3;
             this.RID = RID;
             this.C = C;
             this.vssPolynomial = vssPolynomial;
@@ -107,12 +113,15 @@ export class KeygenBroadcastForRound3 extends AbstractKeygenBroadcast {
       }
 }
 
-export class KeygenBroadcastForRound4 extends AbstractKeygenBroadcast {
+export class KeygenBroadcastForRound4 {
+      public readonly from: PartyId;
+      public readonly type: 4;
       public readonly modProof: ZkModProof;
       public readonly prmProof: ZkPrmProof;
 
       constructor(from: PartyId, modProof: ZkModProof, prmProof: ZkPrmProof) {
-            super(from, 4);
+            this.from = from;
+            this.type = 4;
             this.modProof = modProof;
             this.prmProof = prmProof;
       }
@@ -136,11 +145,14 @@ export class KeygenBroadcastForRound4 extends AbstractKeygenBroadcast {
       }
 }
 
-export class KeygenBroadcastForRound5 extends AbstractKeygenBroadcast {
+export class KeygenBroadcastForRound5 {
+      public readonly from: PartyId;
+      public readonly type: 5;
       public readonly SchnorrResponse: ZkSchResponse;
 
       constructor(from: PartyId, SchnorrResponse: ZkSchResponse) {
-            super(from, 5);
+            this.from = from;
+            this.type = 5;
             this.SchnorrResponse = SchnorrResponse;
       }
 
