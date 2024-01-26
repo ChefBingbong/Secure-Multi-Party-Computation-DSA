@@ -23,7 +23,7 @@ export interface BitcoinOutputPayload {
 
 export enum Network {
       Mainet = "Mainet",
-      Testnet = "Testnet",
+      Testnet = "testnet",
 }
 export type BitcoinNetworkConfigMap = {
       [network in Network]?: BitcoinNetworkConfig;

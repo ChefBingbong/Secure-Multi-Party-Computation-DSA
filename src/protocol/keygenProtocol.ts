@@ -25,6 +25,7 @@ import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
 import { KeygenMessageData, Round, ServerDirectMessage, ServerMessage } from "./types";
 import Validator from "../p2p/validators/validator";
+import { btcTestnetAddress } from "../mpc/btc";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -238,6 +239,9 @@ export class KeygenSessionManager extends AbstractProcolManager<KeygenSession> {
             }
 
             console.log(`KEY GENERATION WAS SUCCESSFUL, ${proofs}\n`);
+            this.log.info(
+                  `DERVIVED BTC ADDRESS, ${btcTestnetAddress(this.validator.PartyKeyShare.publicPoint())}\n`
+            );
             const leader = await redisClient.getSingleData<string>("leader");
 
             if (this.selfId === this.validators[0]) {

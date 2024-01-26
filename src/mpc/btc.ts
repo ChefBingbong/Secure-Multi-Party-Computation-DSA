@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import crypto from "crypto";
 import { AffinePoint } from "./types";
 import { numberToBytesBE } from "@noble/curves/abstract/utils";
+import base58 from "bs58";
 
 export const btcAddress = (pub: AffinePoint) => {
       const xBytes = numberToBytesBE(pub.x, 32);
@@ -14,6 +15,22 @@ export const btcAddress = (pub: AffinePoint) => {
       const checksumHash = crypto.createHash("sha256").update(checksum).digest().slice(0, 4);
       const address = Buffer.concat([addressBytes, checksumHash]);
       return base58Encode(address);
+};
+
+export const btcTestnetAddress = (pub: AffinePoint) => {
+      const xBytes = numberToBytesBE(pub.x, 32);
+      const yBytes = numberToBytesBE(pub.y, 32);
+      const pubKeyBytes = Buffer.concat([Buffer.from([0x04]), xBytes, yBytes], 65);
+      const hash = crypto.createHash("sha256").update(pubKeyBytes).digest();
+      const publicKeyHash = createHash("rmd160").update(hash).digest();
+      // Use testnet address version (0x6F) instead of mainnet version (0x00)
+      const addressBytes = Buffer.concat([Buffer.from([0x6f]), publicKeyHash], 21);
+
+      const checksum = crypto.createHash("sha256").update(addressBytes).digest();
+      const checksumHash = crypto.createHash("sha256").update(checksum).digest().slice(0, 4);
+
+      const address = Buffer.concat([addressBytes, checksumHash]);
+      return base58.encode(address);
 };
 
 export const base58Encode = (buffer: Buffer) => {

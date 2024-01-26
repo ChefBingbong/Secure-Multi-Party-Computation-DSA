@@ -43,7 +43,7 @@ const BitcoinTestnet: BitcoinNetworkConfig = {
 };
 enum BitcoinNertwork {
       Mainet = "Mainet",
-      Testnet = "Testnet",
+      Testnet = "testnet",
 }
 
 export class Bitcoin extends BitcoinBaseChain {

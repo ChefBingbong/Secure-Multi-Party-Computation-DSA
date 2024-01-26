@@ -54,19 +54,6 @@ export abstract class BitcoinBaseChain {
             return this.network.explorer.address(address);
       };
 
-      public getBalance = async (
-            asset: string,
-            address: string
-            // eslint-disable-next-line @typescript-eslint/require-await
-      ): Promise<BigNumber> => {
-            this._assertAssetIsSupported(asset);
-            if (!this.validateAddress(address)) {
-                  throw new Error(`Invalid address ${address}.`);
-            }
-            // TODO: Implement.
-            return new BigNumber(0);
-      };
-
       public validateAddress = (address: string): boolean => {
             try {
                   return validate(
@@ -122,9 +109,9 @@ export abstract class BitcoinBaseChain {
             asset: string,
             fromPayload: BitcoinInputPayload,
             address: string,
-            onInput: (input: any) => void,
-            _removeInput: (input: any) => void,
-            listenerCancelled: () => boolean
+            onInput?: (input: any) => void,
+            _removeInput?: (input: any) => void,
+            listenerCancelled?: () => boolean
       ): Promise<void> => {
             this._assertAssetIsSupported(asset);
             if (fromPayload.chain !== this.chain) {
@@ -155,6 +142,7 @@ export abstract class BitcoinBaseChain {
 
             try {
                   const txs = await tryNTimes(async () => this.api.fetchTXs(address), 2);
+                  console.log(txs);
                   txs.map((tx) =>
                         // do processing
                         {}

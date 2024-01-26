@@ -32,7 +32,7 @@ import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
 import { DirectMessageSignReturnType } from "./protocolMessageParser";
 import { ServerDirectMessage, ServerMessage } from "./types";
-import { btcAddress } from "../mpc/btc";
+import { btcAddress, btcTestnetAddress } from "../mpc/btc";
 
 const SignRounds = Object.values(AllSignSessionRounds);
 
@@ -311,7 +311,7 @@ export class SigningSessionManager extends AbstractProcolManager<SignSession> {
       public verifyAndEndSession = async () => {
             const pubPoint = this.partyKeyConfig.publicPoint();
             const address = ethAddress(pubPoint);
-            const bitcoinAddress = btcAddress(pubPoint);
+            const bitcoinAddress = btcTestnetAddress(pubPoint);
 
             const ethSig = sigEthereum(this.signature.R, this.signature.S);
             const addressRec = ethers
