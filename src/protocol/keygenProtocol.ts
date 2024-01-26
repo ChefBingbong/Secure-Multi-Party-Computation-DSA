@@ -10,7 +10,7 @@ import { AbstractKeygenRound, GenericKeygenRoundBroadcast } from "../mpc/keygen/
 import { AbstractKeygenBroadcast } from "../mpc/keygen/keygenMessages/abstractKeygenBroadcast";
 import { KeygenDirectMessageForRound4 } from "../mpc/keygen/keygenMessages/directMessages";
 import { KeygenSession } from "../mpc/keygen/keygenSession";
-import { PartySecretKeyConfig } from "../mpc/keygen/partyKey";
+import { PartyId, PartySecretKeyConfig } from "../mpc/keygen/partyKey";
 import {
       GenericKeygenRoundInput,
       GenericRoundOutput,
@@ -31,6 +31,7 @@ import { KeygenCurrentState, KeygenMessageData, Round, Rounds, ServerDirectMessa
 import Validator from "./validators/validator";
 import TransactionPool from "../wallet/transactionPool";
 import { Logger } from "winston";
+import { ValidatorsGroup } from "./validators/validators";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -55,21 +56,29 @@ export class KeygenSessionManager extends AppLogger {
       private static directMessageRoundHashes: Record<number, string> = {};
 
       constructor(validator: Validator) {
-            super();
             KeygenSessionManager.validator = validator;
             KeygenSessionManager.selfId = validator.nodeId;
+            super();
       }
 
-      private static async init(threshold: number, validators: string[]) {
-            this.threshold = threshold;
-            this.validators = validators;
+      public static async init(selfId: PartyId) {
+            this.validators = ValidatorsGroup.getAllKeys().ports;
+            this.threshold = this.validators.length - 1;
+            console.log(this.threshold, this.validators, selfId);
+            console.log(app.p2pServer.NODE_ID, app.p2pServer.validators, app.p2pServer.threshold);
+            //t this.startNewSession({ threshold: this.threshold, partyIds: this.validators, selfId: this.selfId });
+            this.startNewSession({
+                  selfId: app.p2pServer.NODE_ID,
+                  partyIds: app.p2pServer.validators,
+                  threshold: app.p2pServer.threshold,
+            });
       }
 
       public static startNewSession(sessionConfig: SessionConfig): void {
+            console.log(this.sessionInitialized, this.currentRound);
             if (this.sessionInitialized || this.currentRound > 0) {
                   throw new Error(`there is already a keygen session n progress`);
             }
-            this.init(sessionConfig.threshold, sessionConfig.partyIds);
 
             this.directMessages = new MessageQueueArray(this.finalRound + 1);
             this.messages = new MessageQueueMap(this.validators, KeygenSessionManager.finalRound + 1);
@@ -143,7 +152,7 @@ export class KeygenSessionManager extends AppLogger {
 
                   if (
                         round.isBroadcastRound &&
-                        bcsLen === this.threshold &&
+                        bcsLen >= this.threshold &&
                         this.receivedAll(round, currentRound)
                   ) {
                         this.generateBroadcastHashes<MessageQueueMap<GenericKeygenRoundBroadcast>>(
@@ -228,11 +237,11 @@ export class KeygenSessionManager extends AppLogger {
                         await this.keygenRoundProcessor(message);
                         break;
                   case MESSAGE_TYPE.keygenInit:
-                        this.startNewSession({
-                              selfId: app.p2pServer.NODE_ID,
-                              partyIds: app.p2pServer.validators,
-                              threshold: app.p2pServer.threshold,
-                        });
+                        // this.startNewSession({
+                        //       selfId: app.p2pServer.NODE_ID,
+                        //       partyIds: app.p2pServer.validators,
+                        //       threshold: app.p2pServer.threshold,
+                        // });
                         await this.finalizeCurrentRound(0);
                         break;
                   default:
@@ -329,6 +338,7 @@ export class KeygenSessionManager extends AppLogger {
             currentRound: number,
             senderNode: string
       ) {
+            console.log(this.selfId);
             if (
                   round.isBroadcastRound &&
                   newMessage &&
@@ -344,6 +354,8 @@ export class KeygenSessionManager extends AppLogger {
             round: AbstractKeygenRound,
             currentRound: number
       ) {
+            console.log(this.selfId);
+
             if (
                   round.isDirectMessageRound &&
                   newDirectMessage &&

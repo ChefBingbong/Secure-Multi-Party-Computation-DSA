@@ -303,13 +303,9 @@ class P2pServer extends AppLogger {
                   this.validator.messages.set(0, message);
                   //handle keygen & pBFT consensus for broadcasts
                   // console.log(message);
-                  if (!this.signSessionProcessor && message.type === MESSAGE_TYPE.signSessionInit) {
-                        this.signSessionProcessor = new SigningSessionManager(
-                              this.validator,
-                              this.validators,
-                              "hello"
-                        );
-                        this.signSessionProcessor.init(this.threshold, this.validators);
+                  if (message.type === MESSAGE_TYPE.keygenInit) {
+                        await KeygenSessionManager.init(this.NODE_ID);
+                        await delay(500);
                   }
                   await this.signSessionProcessor?.handleSignSessionConsensusMessage(message);
                   await KeygenSessionManager.handleKeygenConsensusMessage(message);
