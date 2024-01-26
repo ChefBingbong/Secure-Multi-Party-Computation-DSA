@@ -33,7 +33,7 @@ class Validator extends Wallet {
             this.keyPair = ChainUtil.genKeyPair(secret);
             this.publicKey = this.keyPair.getPublic("hex");
             this.nodeId = config.p2pPort;
-            this.directMessagesMap = new MessageQueueMap([this.nodeId], KeygenSessionManager.finalRound + 1);
+            this.directMessagesMap = new MessageQueueMap([this.nodeId], 6);
             this.messages = new MessageQueueArray(1);
       }
 

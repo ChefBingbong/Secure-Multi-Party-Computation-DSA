@@ -9,6 +9,8 @@ import P2pServer from "../p2p/server";
 import { ServerDirectMessage, ServerMessage } from "./types";
 import Validator from "./validators/validator";
 import { PartyId } from "../mpc/keygen/partyKey";
+import { KeygenSession } from "../mpc/keygen/keygenSession";
+import { createHash } from "crypto";
 
 export interface BaseProtocolHnadlerInterface {
       finalizeCurrentRound(currentRound: number): Promise<void>;
@@ -18,10 +20,15 @@ export interface BaseProtocolHnadlerInterface {
       sessionRoundVerifier: () => Promise<void>;
 }
 
-export abstract class AbstractProcolManager<Protocol> extends AppLogger implements BaseProtocolHnadlerInterface {
+export abstract class AbstractProcolManager<Protocol extends KeygenSession>
+      extends AppLogger
+      implements BaseProtocolHnadlerInterface
+{
       public protocolId: string = "cmp/sign";
       public protocol: "sign" | "keygen";
 
+      public validators: string[] = [];
+      public validator: Validator;
       public selfId: PartyId;
       public sessionInitialized: boolean | undefined;
       public threshold: number | undefined;
@@ -36,8 +43,10 @@ export abstract class AbstractProcolManager<Protocol> extends AppLogger implemen
       protected messages: MessageQueueMap<any>;
       public log: Logger;
 
-      constructor(protocol: "sign" | "keygen") {
+      constructor(validator: Validator, protocol: "sign" | "keygen") {
             super();
+            this.validator = validator;
+            this.selfId = validator.nodeId;
             this.protocol = protocol;
       }
 
@@ -45,7 +54,7 @@ export abstract class AbstractProcolManager<Protocol> extends AppLogger implemen
             this.validators = updated;
       }
 
-      public abstract init(selfId: PartyId): Promise<void>;
+      public abstract init(threshold: number, validators: string[]): Promise<void>;
       public abstract finalizeCurrentRound(currentRound: number): Promise<void>;
       public abstract startNewRound(): void;
       public abstract sessionRoundProcessor(data: ServerMessage<any>): Promise<void>;
@@ -63,66 +72,14 @@ export abstract class AbstractProcolManager<Protocol> extends AppLogger implemen
       }
 
       protected validateRoundDirectMessages(activeRound: any, currentRound: number) {
-            const previousRound = this.rounds[currentRound]?.round;
+            const previousRound = this.rounds[currentRound - 1]?.round;
             if (!previousRound?.isDirectMessageRound) return;
 
             this.directMessages
                   .getRoundValues(currentRound - 1)
                   .map((directMsg) => KeygenDirectMessageForRound4.fromJSON(directMsg))
-                  .filter((directMsg: any) => directMsg.to === app.p2pServer.NODE_ID)
+                  .filter((directMsg) => directMsg.to === this.selfId)
                   .forEach((directMsg) => activeRound.handleDirectMessage(directMsg));
-      }
-
-      protected createDirectMessage = (round: any, messageType: any[], currentRound: number): Msg<any>[] => {
-            if (!round.isDirectMessageRound) return [];
-
-            return messageType.map((msg) => {
-                  return Msg.create<any>(
-                        app.p2pServer.NODE_ID,
-                        msg?.to,
-                        this.protocolId,
-                        currentRound,
-                        msg,
-                        false
-                  );
-            });
-      };
-
-      protected createBroadcastMessage = (
-            round: any,
-            messageType: any,
-            currentRound: number
-      ): Msg<any> | undefined => {
-            if (!round.isBroadcastRound) return undefined;
-            return Msg.create<any>(app.p2pServer.NODE_ID, "", this.protocolId, currentRound, messageType, true);
-      };
-
-      protected storePeerBroadcastResponse(
-            newMessage: Msg<any> | undefined,
-            round: any,
-            currentRound: number,
-            senderNode: string
-      ) {
-            if (
-                  round.isBroadcastRound &&
-                  newMessage &&
-                  app.p2pServer.validator.canAccept(newMessage, this.session as any, app.p2pServer.NODE_ID)
-            ) {
-                  console.log("yupp");
-                  this.messages.set(currentRound, senderNode, newMessage.Data);
-            }
-            return this.messages.getRoundMessagesLen(currentRound);
-      }
-
-      protected storePeerDirectMessageResponse(newDirectMessage: Msg<any>, round: any, currentRound: number) {
-            if (
-                  round.isDirectMessageRound &&
-                  newDirectMessage &&
-                  app.p2pServer.validator.canAccept(newDirectMessage, this.session as any, app.p2pServer.NODE_ID)
-            ) {
-                  this.directMessages.set(currentRound, newDirectMessage.Data);
-            }
-            return this.directMessages.getNonNullValuesLength(currentRound);
       }
 
       public getCurrentState(): any {
@@ -136,4 +93,146 @@ export abstract class AbstractProcolManager<Protocol> extends AppLogger implemen
                   session,
             };
       }
+
+      public isFinalRound(currentRound?: number): boolean {
+            if (currentRound) return currentRound === this.finalRound;
+            return this.currentRound === this.finalRound;
+      }
+
+      protected storePeerBroadcastResponse(
+            newMessage: Msg<any> | undefined,
+            round: any,
+            currentRound: number,
+            senderNode: string
+      ) {
+            if (
+                  round.isBroadcastRound &&
+                  newMessage &&
+                  this.validator.canAccept(newMessage, this.session, this.selfId)
+            ) {
+                  this.messages.set(currentRound, senderNode, newMessage.Data);
+            }
+            return this.messages.getRoundMessagesLen(currentRound);
+      }
+
+      protected storePeerDirectMessageResponse(newDirectMessage: Msg<any>, round: any, currentRound: number) {
+            if (
+                  round.isDirectMessageRound &&
+                  newDirectMessage &&
+                  this.validator.canAccept(newDirectMessage, this.session, this.selfId)
+            ) {
+                  this.directMessages.set(currentRound, newDirectMessage.Data);
+            }
+            return this.directMessages.getNonNullValuesLength(currentRound);
+      }
+
+      protected createDirectMessage = (round: any, messageType: any[], currentRound: number): Msg<any>[] => {
+            if (!round.isDirectMessageRound) return [];
+
+            return messageType.map((msg) => {
+                  return Msg.create<any>(this.selfId, msg?.to, this.session.protocolId, currentRound, msg, false);
+            });
+      };
+
+      protected createBroadcastMessage = (
+            round: any,
+            messageType: any,
+            currentRound: number
+      ): Msg<any> | undefined => {
+            if (!round.isBroadcastRound) return undefined;
+            return Msg.create<any>(this.selfId, "", this.session.protocolId, currentRound, messageType, true);
+      };
+
+      protected receivedAll(round: any, currentRound: number): boolean {
+            const isBroadcastRound = round.isBroadcastRound;
+            const isDirectMessageRound = round.isDirectMessageRound;
+
+            const roundBroadcasts = this.messages.getRoundMessagesLen(currentRound);
+            const roundMessages = this.directMessages.getNonNullValuesLength(currentRound);
+            const partyId = this.validators.length;
+
+            if (isBroadcastRound && isDirectMessageRound) {
+                  return roundBroadcasts === partyId && roundMessages === partyId - 1;
+            }
+            if (isBroadcastRound && !isDirectMessageRound) {
+                  return roundBroadcasts === partyId;
+            }
+            if (!isBroadcastRound && isDirectMessageRound) {
+                  return roundMessages === partyId - 1;
+            }
+            return true;
+      }
+
+      protected hashMessageData(data: any): string {
+            const hash = createHash("sha256");
+            hash.update(JSON.stringify(data));
+            return hash.digest("hex");
+      }
+
+      protected generateBroadcastHashes<T extends MessageQueueArray<any> | MessageQueueMap<any>>(
+            messages: T,
+            roundNumber: number,
+            roundHashes: Record<number, string>
+      ): string[] {
+            if (!messages) {
+                  throw new Error(`round messages do not exists something went wrong.`);
+            }
+            const dataForRound: string[] = ["0x0"];
+            for (let round = 1; round <= roundNumber; round++) {
+                  if (!this.rounds[round].round.isDirectMessageRound && round !== 3) continue;
+
+                  const currentRoundData = dataForRound.join("");
+                  const currentRoundHash = this.hashMessageData(currentRoundData);
+
+                  if (currentRoundHash !== roundHashes[round - 1]) {
+                        throw new Error(`Inconsistent hash detected for the last round: ${round - 1}`);
+                  }
+
+                  messages.getRoundValues(round).forEach((messageData) => {
+                        if (messageData) {
+                              const hashedData = this.hashMessageData(messageData);
+                              dataForRound.push(hashedData);
+                        }
+                  });
+            }
+
+            const currentRoundData = dataForRound.join("");
+            const currentRoundHash = this.hashMessageData(currentRoundData);
+            roundHashes[roundNumber] = currentRoundHash;
+            return dataForRound;
+      }
+
+      protected verifyInputForNextRound = (currentRound: number): any => {
+            const round = this.rounds[currentRound - 1].round;
+
+            if (currentRound === 2 && !round.output.inputRound1) {
+                  throw new Error(`Round 2 has not beeen initialised`);
+            }
+            if (currentRound === 3 && !round.output.inputForRound2) {
+                  throw new Error(`Round 3 has not beeen initialised`);
+            }
+            if (currentRound === 4 && !round.output.inputForRound3) {
+                  throw new Error(`Round 4 has not beeen initialised`);
+            }
+            if (currentRound === 5 && !round.output.inputForRound4) {
+                  throw new Error(`Round 5 has not beeen initialised`);
+            }
+            return round.output;
+      };
+
+      protected verifyOutputForCurrentRound = (currentRound: number, roundOutput: any): any => {
+            if (currentRound === 1 && !roundOutput.inputForRound2) {
+                  throw new Error(`Round 1 has not beeen processed`);
+            }
+            if (currentRound === 2 && !roundOutput.inputForRound3) {
+                  throw new Error(`Round 2 has not beeen processed`);
+            }
+            if (currentRound === 3 && !roundOutput.inputForRound4) {
+                  throw new Error(`Round 3 has not beeen processed`);
+            }
+            if (currentRound === 4 && !roundOutput.inputForRound5) {
+                  throw new Error(`Round 4 has not beeen processed`);
+            }
+            return roundOutput;
+      };
 }
