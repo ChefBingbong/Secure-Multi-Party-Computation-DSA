@@ -38,6 +38,7 @@
     "@swc/jest": "^0.2.29",
     "axios": "^1.6.5",
     "bigint-crypto-utils": "3.3.0",
+    "bignumber.js": "^9.1.2",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
