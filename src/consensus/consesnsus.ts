@@ -5,8 +5,8 @@ import { MESSAGE_TYPE } from "../p2p/types";
 import { app } from "../protocol";
 import { KeygenSessionManager } from "../protocol/keygenProtocol";
 import { ServerMessage } from "../protocol/types";
-import Validator from "../protocol/validators/validator";
-import { ValidatorsGroup } from "../protocol/validators/validators";
+import Validator from "../p2p/validators/validator";
+import { ValidatorsGroup } from "../p2p/validators/validators";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import Transaction from "../wallet/transaction";
 import TransactionPool from "../wallet/transactionPool";
@@ -146,9 +146,9 @@ class Blockchain implements BlockchainInterface {
                   } else {
                         await redisClient.setSignleData("leader", leader);
                   }
-                  if (KeygenSessionManager.sessionInitialized) {
-                        throw new Error(`cannot elect a new leader while a session is active`);
-                  }
+                  // if (KeygenSessionManager.sessionInitialized) {
+                  //       throw new Error(`cannot elect a new leader while a session is active`);
+                  // }
                   if (this.validator.nodeId !== leader) {
                         throw new Error(`election can only be started by previous rounds leader`);
                   }

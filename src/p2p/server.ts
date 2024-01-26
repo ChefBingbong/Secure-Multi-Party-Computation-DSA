@@ -8,8 +8,8 @@ import { KeygenSessionManager } from "../protocol/keygenProtocol";
 import { GenericMessageParams, ServerMessage, TransactionData } from "../protocol/types";
 import { Server, WebSocket } from "ws";
 import Block from "../consensus/block";
-import Validator from "../protocol/validators/validator";
-import { ValidatorsGroup } from "../protocol/validators/validators";
+import Validator from "./validators/validator";
+import { ValidatorsGroup } from "./validators/validators";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import TransactionPool from "../wallet/transactionPool";
 import Wallet from "../wallet/wallet";
@@ -40,6 +40,7 @@ class P2pServer extends AppLogger {
       private seenMessages: Set<string> = new Set();
       private isInitialized: boolean = false;
       public signSessionProcessor: SigningSessionManager;
+      public keygenSessionProcessor: KeygenSessionManager;
 
       constructor() {
             super();
@@ -60,7 +61,8 @@ class P2pServer extends AppLogger {
 
             this.updateReplica(Number(this.NODE_ID), "CONNECT");
             new ValidatorsGroup(this.validator.toString());
-            new KeygenSessionManager(this.validator);
+            // this.signSessionProcessor = new SigningSessionManager(this.validator, [], "h");
+            this.keygenSessionProcessor = new KeygenSessionManager(this.validator);
 
             this.initState();
       }
@@ -303,16 +305,21 @@ class P2pServer extends AppLogger {
                   this.validator.messages.set(0, message);
                   //handle keygen & pBFT consensus for broadcasts
                   // console.log(message);
-                  if (!this.signSessionProcessor && message.type === MESSAGE_TYPE.signSessionInit) {
+                  if (message.type === MESSAGE_TYPE.keygenInit) {
+                        await this.keygenSessionProcessor.init(this.threshold, this.validators);
+                        await delay(500);
+                  }
+                  if (message.type === MESSAGE_TYPE.signSessionInit) {
                         this.signSessionProcessor = new SigningSessionManager(
                               this.validator,
                               this.validators,
-                              "hello"
+                              "h"
                         );
-                        this.signSessionProcessor.init(this.threshold, this.validators);
+                        await this.signSessionProcessor.init(this.threshold, this.validators);
+                        await delay(500);
                   }
                   await this.signSessionProcessor?.handleSignSessionConsensusMessage(message);
-                  await KeygenSessionManager.handleKeygenConsensusMessage(message);
+                  await this.keygenSessionProcessor?.handleKeygenConsensusMessage(message);
                   await this.chain.handleBlockchainConsensusMessage(message);
                   await callback();
             });
@@ -323,7 +330,7 @@ class P2pServer extends AppLogger {
                   try {
                         //handle keygen & pBFT consensus for direcct msgs
                         await this.signSessionProcessor?.handleSignSessionConsensusMessage(message);
-                        await KeygenSessionManager.handleKeygenConsensusMessage(message);
+                        await this.keygenSessionProcessor.handleKeygenConsensusMessage(message);
                         await this.chain.handleBlockchainConsensusMessage(message);
                         await callback();
                   } catch (error) {

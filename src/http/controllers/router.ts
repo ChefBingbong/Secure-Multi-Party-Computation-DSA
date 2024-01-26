@@ -2,8 +2,8 @@ import { NextFunction, Request, Response } from "express";
 import config from "../../config/config";
 import { MESSAGE_TYPE } from "../../p2p/types";
 import { app } from "../../protocol";
-import Validator from "../../protocol/validators/validator";
-import { ValidatorsGroup } from "../../protocol/validators/validators";
+import Validator from "../../p2p/validators/validator";
+import { ValidatorsGroup } from "../../p2p/validators/validators";
 import Transaction from "../../wallet/transaction";
 import { SigningSessionManager } from "../../protocol/signingProtocol";
 

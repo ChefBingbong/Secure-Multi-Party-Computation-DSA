@@ -44,11 +44,11 @@ export type GenericMessageParams<T> = {
       destination?: string;
       ttl?: number;
 };
-export type ServerDirectMessage = {
+export type ServerDirectMessage<Protocol> = {
       message: string;
       type: string;
       data: {
-            directMessages?: Msg<KeygenDirectMessageForRound4JSON>;
+            directMessages?: Msg<Protocol>;
       };
       senderNode: string;
 };

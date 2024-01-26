@@ -1,6 +1,7 @@
 import { sampleScalar, sampleScalarPointPair } from "../math/sample";
 import { ZkEncPrivate, ZkEncPublic, zkEncCreateProof } from "../zk/enc";
-import { SignBroadcastForRound2, SignMessageForRound2 } from "./signRound2";
+import { SignBroadcastForRound2 } from "./signMessages/broadcasts";
+import { SignMessageForRound2 } from "./signMessages/directMessages";
 import { SignSession } from "./signSession";
 import { SignPartyInputRound1, SignPartyOutputRound1 } from "./types";
 
@@ -69,7 +70,7 @@ export class SignerRound1 {
                   messages.push(message as any);
             });
 
-            this.session.currentRound = "round2";
+            this.session.currentRound = 2;
 
             this.output = {
                   inputForRound1: this.roundInput,

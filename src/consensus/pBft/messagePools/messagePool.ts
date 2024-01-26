@@ -1,4 +1,4 @@
-import ChainUtil from "../../../protocol/validators/chainUtil";
+import ChainUtil from "../../../p2p/validators/chainUtil";
 import Wallet from "../../../wallet/wallet";
 import { RoundChangeMessage } from "../../types";
 import AbstractPBFTMessagePool from "../abstractPBFTPool";

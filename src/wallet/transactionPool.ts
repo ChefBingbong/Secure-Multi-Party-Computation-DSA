@@ -1,5 +1,5 @@
 import { app } from "../protocol";
-import { ValidatorsGroup } from "../protocol/validators/validators";
+import { ValidatorsGroup } from "../p2p/validators/validators";
 import Transaction from "./transaction";
 
 export interface BaseTransactionPoolInterface {
