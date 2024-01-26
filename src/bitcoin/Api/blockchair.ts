@@ -3,6 +3,7 @@ import { GET, POST } from "../../utils/network";
 
 export enum BlockchairNetwork {
       BITCOIN = "bitcoin",
+      BITCOIN_TESTNET = "bitcoin/testnet",
 }
 
 export class Blockchair implements BitcoinAPI {
