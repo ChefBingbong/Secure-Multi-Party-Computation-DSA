@@ -2,11 +2,10 @@ import { Logger } from "winston";
 import { redisClient } from "../db/redis";
 import { delay } from "../p2p/server";
 import { MESSAGE_TYPE } from "../p2p/types";
-import { app } from "../protocol";
-import { KeygenSessionManager } from "../protocol/keygenProtocol";
-import { ServerMessage } from "../protocol/types";
 import Validator from "../p2p/validators/validator";
 import { ValidatorsGroup } from "../p2p/validators/validators";
+import { app } from "../protocol";
+import { ServerMessage } from "../protocol/types";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import Transaction from "../wallet/transaction";
 import TransactionPool from "../wallet/transactionPool";
@@ -18,11 +17,11 @@ import MessagePool from "./pBft/messagePools/messagePool";
 import PreparePool from "./pBft/messagePools/preparePool";
 import {
       BlockchainInterface,
-      GenericPBFTMessage,
       CommitMessage,
+      GenericPBFTMessage,
+      LeaderElectionArgs,
       PrepareMessage,
       RoundChangeMessage,
-      LeaderElectionArgs,
 } from "./types";
 
 class Blockchain implements BlockchainInterface {
@@ -146,9 +145,9 @@ class Blockchain implements BlockchainInterface {
                   } else {
                         await redisClient.setSignleData("leader", leader);
                   }
-                  // if (KeygenSessionManager.sessionInitialized) {
-                  //       throw new Error(`cannot elect a new leader while a session is active`);
-                  // }
+                  if (app.p2pServer.keygenSessionProcessor.sessionInitialized) {
+                        throw new Error(`cannot elect a new leader while a session is active`);
+                  }
                   if (this.validator.nodeId !== leader) {
                         throw new Error(`election can only be started by previous rounds leader`);
                   }

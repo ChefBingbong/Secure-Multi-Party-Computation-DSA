@@ -54,7 +54,6 @@ export class KeygenSessionManager extends AbstractProcolManager<KeygenSession> {
             if (this.sessionInitialized || this.currentRound > 0) {
                   throw new Error(`there is already a keygen session n progress`);
             }
-            this.init(sessionConfig.threshold, sessionConfig.partyIds);
 
             this.directMessages = new MessageQueueArray(this.finalRound + 1);
             this.messages = new MessageQueueMap(this.validators, this.finalRound + 1);
@@ -239,7 +238,6 @@ export class KeygenSessionManager extends AbstractProcolManager<KeygenSession> {
             }
 
             console.log(`KEY GENERATION WAS SUCCESSFUL, ${proofs}\n`);
-            // this.validator.PartyKeyShare = this.rounds[5].round.output.UpdatedConfig.toJSON() as any;
             const leader = await redisClient.getSingleData<string>("leader");
 
             if (this.selfId === this.validators[0]) {
@@ -264,6 +262,7 @@ export class KeygenSessionManager extends AbstractProcolManager<KeygenSession> {
             }
 
             await delay(200);
+            this.proofs = [];
             this.resetSessionState();
             if (this.selfId === leader) app.p2pServer.chain.electNewLeader();
       };
@@ -279,15 +278,5 @@ export class KeygenSessionManager extends AbstractProcolManager<KeygenSession> {
       private createKeygenProof(currentRound: number, inputForNextRound: KeygenRound5Output): string | undefined {
             if (!this.isFinalRound(currentRound) || !inputForNextRound.UpdatedConfig) return undefined;
             return Hasher.create().update(inputForNextRound.UpdatedConfig).digestBigint().toString();
-      }
-
-      private resetSessionState() {
-            this.currentRound = 0;
-            this.sessionInitialized = false;
-            this.rounds = undefined;
-            this.session = undefined;
-            this.messages = undefined;
-            this.directMessages = undefined;
-            this.proofs = [];
       }
 }

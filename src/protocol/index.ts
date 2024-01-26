@@ -1,7 +1,6 @@
 import config from "../config/config";
 import { redisClient } from "../db/redis";
 import App from "../http/app";
-// import { MultiHandler } from "./messageProcessor";
 
 export let app: App;
 

@@ -61,7 +61,6 @@ class P2pServer extends AppLogger {
 
             this.updateReplica(Number(this.NODE_ID), "CONNECT");
             new ValidatorsGroup(this.validator.toString());
-            // this.signSessionProcessor = new SigningSessionManager(this.validator, [], "h");
             this.keygenSessionProcessor = new KeygenSessionManager(this.validator);
 
             this.initState();
@@ -304,7 +303,6 @@ class P2pServer extends AppLogger {
             this.on("broadcast", async ({ message }: { message: ServerMessage<any> }) => {
                   this.validator.messages.set(0, message);
                   //handle keygen & pBFT consensus for broadcasts
-                  // console.log(message);
                   if (message.type === MESSAGE_TYPE.keygenInit) {
                         await this.keygenSessionProcessor.init(this.threshold, this.validators);
                         await delay(500);

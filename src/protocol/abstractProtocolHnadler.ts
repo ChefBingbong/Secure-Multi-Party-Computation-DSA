@@ -233,4 +233,13 @@ export abstract class AbstractProcolManager<Protocol extends KeygenSession | Sig
             }
             return roundOutput;
       };
+
+      protected resetSessionState() {
+            this.currentRound = 0;
+            this.sessionInitialized = false;
+            this.rounds = undefined;
+            this.session = undefined;
+            this.messages = undefined;
+            this.directMessages = undefined;
+      }
 }

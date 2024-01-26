@@ -14,6 +14,7 @@ import {
       PaillierSecretKey,
       PaillierSecretKeyJSON,
 } from "../mpc/paillierKeyPair/paillierKeygen";
+import { GenericSignRoundBroadcast, GenericSignRoundDirectMessage } from "../mpc/signing/abstractSignRound";
 import { AllSignSessionRounds } from "../mpc/signing/index";
 import { SignRequest } from "../mpc/signing/sign";
 import { PedersenParametersJSON } from "../mpc/signing/sign.test";
@@ -22,20 +23,15 @@ import { SignRequestJSON } from "../mpc/signing/types";
 import { AffinePointJSON } from "../mpc/types";
 import { delay } from "../p2p/server";
 import { MESSAGE_TYPE } from "../p2p/types";
+import Validator from "../p2p/validators/validator";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import { extractError } from "../utils/extractError";
 import { AbstractProcolManager } from "./abstractProtocolHnadler";
 import { app } from "./index";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
+import { DirectMessageSignReturnType } from "./protocolMessageParser";
 import { ServerDirectMessage, ServerMessage } from "./types";
-import Validator from "../p2p/validators/validator";
-import {
-      BroadcastKeygenReturn,
-      BroadcastSignReturn,
-      DirectMessageSignReturnType,
-      ProtoclDirectMessageReturnType,
-} from "./protocolMessageParser";
 
 const SignRounds = Object.values(AllSignSessionRounds);
 
@@ -78,8 +74,6 @@ export class SigningSessionManager extends AbstractProcolManager<SignSession> {
             this.secretKeyConfig = validator.PartyKeyShare.toJSON();
             this.publicKeyConfig = validator.PartyKeyShare.publicPartyData[this.validator.nodeId].toJSON();
             this.partyKeyConfig = PartySecretKeyConfig.fromJSON(this.secretKeyConfig);
-
-            console.log(this.secretKeyConfig, this.publicKeyConfig);
       }
 
       public async init(threshold: number, validators: string[]) {
@@ -126,7 +120,9 @@ export class SigningSessionManager extends AbstractProcolManager<SignSession> {
             return this.sessionInitialized;
       }
 
-      public signSessionRoundProcessor = async (data: ServerMessage<any>) => {
+      public signSessionRoundProcessor = async (
+            data: ServerMessage<{ broadcasts: Msg<GenericSignRoundBroadcast> }>
+      ) => {
             if (!this.sessionInitialized) return;
             try {
                   const { broadcasts } = data.data;
@@ -138,7 +134,7 @@ export class SigningSessionManager extends AbstractProcolManager<SignSession> {
                         await delay(200);
                         await this.signSessionRoundProcessor(data);
 
-                        this.generateBroadcastHashes<MessageQueueArray<any>>(
+                        this.generateBroadcastHashes<MessageQueueArray<GenericSignRoundDirectMessage>>(
                               this.directMessages,
                               currentRound,
                               this.directMessageRoundHashes
@@ -323,6 +319,7 @@ export class SigningSessionManager extends AbstractProcolManager<SignSession> {
                   .toLowerCase();
 
             assert.strictEqual(address, addressRec);
+            this.resetSessionState();
             console.log(`SIGNING WAS SUCCESSFUL, ${address}, ${addressRec}\n`);
       };
 

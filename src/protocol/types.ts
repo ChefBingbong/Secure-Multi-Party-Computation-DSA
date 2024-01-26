@@ -1,6 +1,7 @@
 import { AbstractKeygenRound, GenericKeygenRoundBroadcast } from "../mpc/keygen/abstractRound";
 import { KeygenSession } from "../mpc/keygen/keygenSession";
 import { KeygenDirectMessageForRound4JSON } from "../mpc/keygen/types";
+import { GenericSignRoundBroadcast, GenericSignRoundDirectMessage } from "../mpc/signing/abstractSignRound";
 import { Message as Msg } from "./message/message";
 
 export type Round = {
@@ -37,6 +38,10 @@ export type KeygenMessageData = {
       directMessages?: Msg<KeygenDirectMessageForRound4JSON>[];
       proof?: string;
 };
+
+export type SignBroadcastPayload = { broadcasts: Msg<GenericSignRoundBroadcast> };
+export type SignDirectMessagePayload = { directMessages: Msg<GenericSignRoundDirectMessage> };
+export type GenericSignMessagePayload = SignDirectMessagePayload | SignBroadcastPayload;
 
 export type GenericMessageParams<T> = {
       type: "BROADCAST" | "DIRECT";
