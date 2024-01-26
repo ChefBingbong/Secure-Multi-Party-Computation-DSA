@@ -1,26 +1,24 @@
+import { createHash } from "crypto";
 import { Logger } from "winston";
 import { AppLogger } from "../http/middleware/logger";
+import { KeygenSession } from "../mpc/keygen/keygenSession";
+import { PartyId } from "../mpc/keygen/partyKey";
+import { SignSession } from "../mpc/signing/signSession";
+import Validator from "../p2p/validators/validator";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
-import { app } from ".";
-import { AbstractKeygenBroadcast } from "../mpc/keygen/keygenMessages/abstractKeygenBroadcast";
-import { KeygenDirectMessageForRound4 } from "../mpc/keygen/keygenMessages/directMessages";
-import P2pServer from "../p2p/server";
+import { ProtocolMessageParser } from "./protocolMessageParser";
 import { ServerDirectMessage, ServerMessage } from "./types";
-import Validator from "./validators/validator";
-import { PartyId } from "../mpc/keygen/partyKey";
-import { KeygenSession } from "../mpc/keygen/keygenSession";
-import { createHash } from "crypto";
 
 export interface BaseProtocolHnadlerInterface {
       finalizeCurrentRound(currentRound: number): Promise<void>;
       startNewRound(): void;
       sessionRoundProcessor: (data: ServerMessage<any>) => Promise<void>;
-      sessionRoundDirectMessageProcessor: (data: ServerDirectMessage) => Promise<void>;
+      sessionRoundDirectMessageProcessor: (data: ServerDirectMessage<any>) => Promise<void>;
       sessionRoundVerifier: () => Promise<void>;
 }
 
-export abstract class AbstractProcolManager<Protocol extends KeygenSession>
+export abstract class AbstractProcolManager<Protocol extends KeygenSession | SignSession>
       extends AppLogger
       implements BaseProtocolHnadlerInterface
 {
@@ -58,7 +56,7 @@ export abstract class AbstractProcolManager<Protocol extends KeygenSession>
       public abstract finalizeCurrentRound(currentRound: number): Promise<void>;
       public abstract startNewRound(): void;
       public abstract sessionRoundProcessor(data: ServerMessage<any>): Promise<void>;
-      public abstract sessionRoundDirectMessageProcessor(data: ServerDirectMessage): Promise<void>;
+      public abstract sessionRoundDirectMessageProcessor(data: ServerDirectMessage<any>): Promise<void>;
       public abstract sessionRoundVerifier(): Promise<void>;
 
       protected validateRoundBroadcasts(activeRound: any, currentRound: number) {
@@ -67,7 +65,7 @@ export abstract class AbstractProcolManager<Protocol extends KeygenSession>
 
             this.messages
                   .getRoundValues(currentRound - 1)
-                  .map((broadcast) => AbstractKeygenBroadcast.fromJSON(broadcast as any))
+                  .map((broadcast) => ProtocolMessageParser.fromJSONB(broadcast as any, this.protocol))
                   .forEach((broadcast) => activeRound.handleBroadcastMessage(broadcast));
       }
 
@@ -77,7 +75,7 @@ export abstract class AbstractProcolManager<Protocol extends KeygenSession>
 
             this.directMessages
                   .getRoundValues(currentRound - 1)
-                  .map((directMsg) => KeygenDirectMessageForRound4.fromJSON(directMsg))
+                  .map((directMsg) => ProtocolMessageParser.fromJSOND(directMsg, this.protocol))
                   .filter((directMsg) => directMsg.to === this.selfId)
                   .forEach((directMsg) => activeRound.handleDirectMessage(directMsg));
       }

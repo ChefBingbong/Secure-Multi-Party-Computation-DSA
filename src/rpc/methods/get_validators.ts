@@ -1,4 +1,4 @@
-import { WalletInfo } from "../../protocol/validators/validator";
+import { WalletInfo } from "../../p2p/validators/validator";
 
 interface ParsedWalletInfo {
       partyIds: WalletInfo[];

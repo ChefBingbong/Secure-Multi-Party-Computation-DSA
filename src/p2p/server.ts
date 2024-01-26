@@ -8,8 +8,8 @@ import { KeygenSessionManager } from "../protocol/keygenProtocol";
 import { GenericMessageParams, ServerMessage, TransactionData } from "../protocol/types";
 import { Server, WebSocket } from "ws";
 import Block from "../consensus/block";
-import Validator from "../protocol/validators/validator";
-import { ValidatorsGroup } from "../protocol/validators/validators";
+import Validator from "./validators/validator";
+import { ValidatorsGroup } from "./validators/validators";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import TransactionPool from "../wallet/transactionPool";
 import Wallet from "../wallet/wallet";
@@ -61,6 +61,7 @@ class P2pServer extends AppLogger {
 
             this.updateReplica(Number(this.NODE_ID), "CONNECT");
             new ValidatorsGroup(this.validator.toString());
+            // this.signSessionProcessor = new SigningSessionManager(this.validator, [], "h");
             this.keygenSessionProcessor = new KeygenSessionManager(this.validator);
 
             this.initState();
@@ -308,8 +309,17 @@ class P2pServer extends AppLogger {
                         await this.keygenSessionProcessor.init(this.threshold, this.validators);
                         await delay(500);
                   }
+                  if (message.type === MESSAGE_TYPE.signSessionInit) {
+                        this.signSessionProcessor = new SigningSessionManager(
+                              this.validator,
+                              this.validators,
+                              "h"
+                        );
+                        await this.signSessionProcessor.init(this.threshold, this.validators);
+                        await delay(500);
+                  }
                   await this.signSessionProcessor?.handleSignSessionConsensusMessage(message);
-                  await this.keygenSessionProcessor.handleKeygenConsensusMessage(message);
+                  await this.keygenSessionProcessor?.handleKeygenConsensusMessage(message);
                   await this.chain.handleBlockchainConsensusMessage(message);
                   await callback();
             });

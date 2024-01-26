@@ -12,9 +12,9 @@ export class SignSession {
       // private signRequest: SignRequest;
       // private keyConfig: PartySecretKeyConfig;
 
-      public currentRound = "round1";
+      public currentRound = 0;
       public curve = "secp256k1";
-      public finalRound = "round5";
+      public finalRound = 5;
       public partyIds: Array<PartyId>;
       public protocolId = "cmp/sign";
       public selfId: PartyId;
@@ -31,7 +31,7 @@ export class SignSession {
       constructor() {
             this.isBroadcastRound = false;
             this.isDirectMessageRound = false;
-            // this.currentRound = 0
+            this.currentRound = 0;
       }
 
       public init(signRequest: SignRequest, keyConfig: PartySecretKeyConfig) {

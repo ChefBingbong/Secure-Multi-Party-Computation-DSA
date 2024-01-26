@@ -24,7 +24,7 @@ import { app } from "./index";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
 import { KeygenMessageData, Round, ServerDirectMessage, ServerMessage } from "./types";
-import Validator from "./validators/validator";
+import Validator from "../p2p/validators/validator";
 
 const KeygenRounds = Object.values(AllKeyGenRounds);
 
@@ -144,7 +144,7 @@ export class KeygenSessionManager extends AbstractProcolManager<KeygenSession> {
             }
       };
 
-      public sessionRoundDirectMessageProcessor = async (data: ServerDirectMessage) => {
+      public sessionRoundDirectMessageProcessor = async (data: ServerDirectMessage<any>) => {
             if (!this.sessionInitialized) return;
             try {
                   const { directMessages } = data.data;
@@ -289,6 +289,5 @@ export class KeygenSessionManager extends AbstractProcolManager<KeygenSession> {
             this.messages = undefined;
             this.directMessages = undefined;
             this.proofs = [];
-            // this.validator.PartyKeyShare = undefined;
       }
 }

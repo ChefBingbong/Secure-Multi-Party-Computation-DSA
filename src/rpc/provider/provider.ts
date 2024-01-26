@@ -1,4 +1,4 @@
-import { WalletInfo } from "../../protocol/validators/validator";
+import { WalletInfo } from "../../p2p/validators/validator";
 import { JsonRpcProvider, Provider } from "../jsonRpc";
 import { ParamsQueryValidators, ResponseQueryValidators } from "../methods/get_validators";
 import { Logger } from "winston";

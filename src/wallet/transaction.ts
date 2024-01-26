@@ -1,4 +1,4 @@
-import Validator from "../protocol/validators/validator";
+import Validator from "../p2p/validators/validator";
 import ChainUtil from "../utils/chainUtil";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 

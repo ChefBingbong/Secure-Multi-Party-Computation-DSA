@@ -1,15 +1,13 @@
 import config from "../../config/config";
-import { GenericKeygenRoundBroadcast } from "../../mpc/keygen/abstractRound";
 import { KeygenSession } from "../../mpc/keygen/keygenSession";
-import { KeygenDirectMessageForRound4JSON } from "../../mpc/keygen/types";
-import { KeygenSessionManager } from "../keygenProtocol";
-import { Message } from "../message/message";
-import { MessageQueueArray, MessageQueueMap } from "../message/messageQueue";
-import { MessageQueue } from "../types";
-import ChainUtil from "./chainUtil";
-import { Message as Msg } from "../types";
 import { PartySecretKeyConfig } from "../../mpc/keygen/partyKey";
+import { SignSession } from "../../mpc/signing/signSession";
 import Wallet from "../../wallet/wallet";
+import { Message } from "../../protocol/message/message";
+import { MessageQueueArray, MessageQueueMap } from "../../protocol/message/messageQueue";
+import { ProtoclBroadcastReturnType, ProtoclDirectMessageReturnType } from "../../protocol/protocolMessageParser";
+import { MessageQueue, Message as Msg } from "../../protocol/types";
+import ChainUtil from "./chainUtil";
 
 export interface WalletInfo {
       publicKey: string;
@@ -23,7 +21,7 @@ class Validator extends Wallet {
       public ID: string;
       public nodeId: string;
       public messages: MessageQueueArray<any>;
-      public directMessagesMap: MessageQueueMap<KeygenDirectMessageForRound4JSON>;
+      public directMessagesMap: MessageQueueMap<ProtoclDirectMessageReturnType>;
       public PartyKeyShare: PartySecretKeyConfig;
 
       constructor() {
@@ -39,7 +37,7 @@ class Validator extends Wallet {
 
       public getDirectMessages(
             round?: number
-      ): MessageQueue<KeygenDirectMessageForRound4JSON> | KeygenDirectMessageForRound4JSON[] {
+      ): MessageQueue<ProtoclDirectMessageReturnType> | ProtoclDirectMessageReturnType[] {
             return !round ? this.directMessagesMap.getAll() : this.directMessagesMap.getRoundValues(round);
       }
 
@@ -65,9 +63,9 @@ class Validator extends Wallet {
             return null;
       }
 
-      public canAccept<T extends Message<GenericKeygenRoundBroadcast> | Message<KeygenDirectMessageForRound4JSON>>(
+      public canAccept<T extends Message<ProtoclBroadcastReturnType> | Message<ProtoclDirectMessageReturnType>>(
             message: T,
-            session: KeygenSession,
+            session: KeygenSession | SignSession,
             nodeId: string
       ): boolean {
             if (!Message.isFor<T>(nodeId, message)) {

@@ -7,12 +7,14 @@ export class KeygenDirectMessageForRound4 {
       public readonly to: PartyId;
       public readonly share: bigint;
       public readonly facProof: ZkFacProof;
+      public readonly type: 4;
 
       private constructor(from: PartyId, to: PartyId, share: bigint, facProof: ZkFacProof) {
             this.from = from;
             this.to = to;
             this.share = share;
             this.facProof = facProof;
+            this.type = 4;
       }
 
       public static from({
@@ -37,6 +39,7 @@ export class KeygenDirectMessageForRound4 {
                   to: this.to,
                   shareHex: this.share.toString(16),
                   facProof: this.facProof.toJSON(),
+                  type: 4,
             };
       }
 
