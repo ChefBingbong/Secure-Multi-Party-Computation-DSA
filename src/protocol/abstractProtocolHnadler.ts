@@ -43,6 +43,7 @@ export abstract class AbstractProcolManager<Protocol extends KeygenSession | Sig
 
       constructor(validator: Validator, protocol: "sign" | "keygen") {
             super();
+            this.log = this.getLogger(`${protocol}-protocol-handler`);
             this.validator = validator;
             this.selfId = validator.nodeId;
             this.protocol = protocol;

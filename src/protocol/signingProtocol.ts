@@ -32,6 +32,7 @@ import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
 import { DirectMessageSignReturnType } from "./protocolMessageParser";
 import { ServerDirectMessage, ServerMessage } from "./types";
+import { btcAddress } from "../mpc/btc";
 
 const SignRounds = Object.values(AllSignSessionRounds);
 
@@ -54,8 +55,6 @@ export class SigningSessionManager extends AbstractProcolManager<SignSession> {
             R: AffinePoint<bigint>;
             S: bigint;
       };
-      public log: Logger;
-
       private broadcastRoundHashes: Record<number, string> = {};
       private directMessageRoundHashes: Record<number, string> = {};
 
@@ -256,7 +255,7 @@ export class SigningSessionManager extends AbstractProcolManager<SignSession> {
                   this.log.error(`Session is not isnitilized or last round has not finished`);
                   return;
             }
-            console.log(`STARTING KEYGEN ROUND ${this.currentRound}\n`);
+            console.log(`STARTING SIGN ROUND ${this.currentRound}\n`);
             const round = this.rounds[newRound].round;
             this.rounds[newRound] = {
                   round,
@@ -312,6 +311,7 @@ export class SigningSessionManager extends AbstractProcolManager<SignSession> {
       public verifyAndEndSession = async () => {
             const pubPoint = this.partyKeyConfig.publicPoint();
             const address = ethAddress(pubPoint);
+            const bitcoinAddress = btcAddress(pubPoint);
 
             const ethSig = sigEthereum(this.signature.R, this.signature.S);
             const addressRec = ethers
@@ -320,7 +320,10 @@ export class SigningSessionManager extends AbstractProcolManager<SignSession> {
 
             assert.strictEqual(address, addressRec);
             this.resetSessionState();
-            console.log(`SIGNING WAS SUCCESSFUL, ${address}, ${addressRec}\n`);
+            this.log.info(`SIGNING WAS SUCCESSFUL, ${address}, ${addressRec}\n`);
+            this.log.info(`SHARD PUBLIC KEY, 0x${this.partyKeyConfig.ecdsa}\n`);
+            this.log.info(`DERVIVED ETH ADDRESS, ${address}\n`);
+            this.log.info(`DERVIVED BTC ADDRESS, ${bitcoinAddress}\n`);
       };
 
       public checkPaillierFixture = (
