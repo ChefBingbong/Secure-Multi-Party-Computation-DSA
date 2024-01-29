@@ -7,7 +7,7 @@ this work is not complete. so far i have only started working on the keygen step
 
 ## Scheme Overview
 This TSS protocol is based from the paper https://eprint.iacr.org/2021/060.pdf and consists of four phases; one phase for generating the (shared) key which is run once, one phase to refresh the secret key-shares and to generate the auxiliary information required for
-signing, one to preprocess signatures before the messages are known, and finally, one for calculating and communicating the signature-shares once the message to be signed is known. my implementation is also based on this ts browser implementatuon https://github.com/burmisov/mpc-tss-js/tree/main aswell as inspiration from this golang implementation [https://github.com/taurusgroup/multi-party-sig https://github.com/burmisov/mpc-tss-js/tree/main](https://github.com/taurusgroup/multi-party-sig) for guidance.
+signing, one to preprocess signatures before the messages are known, and finally, one for calculating and communicating the signature-shares once the message to be signed is known. my implementation is also based on golang implementation [https://github.com/taurusgroup/multi-party-sig https://github.com/burmisov/mpc-tss-js/tree/main](https://github.com/taurusgroup/multi-party-sig) for guidance.
 
 ### Key Generation:
 Participants work together to create a shared private key without revealing it entirely. The public key is derived from this collaboration.
@@ -44,6 +44,9 @@ ive started implemented an a distributed blockchain ledger following the practic
 my current thinking on the topic is to follow an approach similar to Ren protocol whereby we can predertmine sign an event such as a lock deposit and have this signature be able to be reconstricted later from known paramaters such as the transaction payload pHash, the gHash (which from renvm) corresponds to the current gateway shard or collection of darknodes that is currently under management of the keys of said transactions locked funds. whilst this project is small in scope i will probably mock something similar. i might try something similar here. using methods like this the signature signed the VM can be recalcukated and spent in a smart contracts on evm compatabile chains. 
 
 So going forward the next steps for me will be to finish implementing the mpc signing part of the protocol and then start to look int BTC json RPC na perhaos making a wrapper for it such that i can query/initiate relevant transactions. one thing im so far unfamiliar with is how to use bitcoin scripting to my advantage. maybe there is a way to use bitcoin scipting to emit events on such lock depositi addresses.
+
+## Bitcoin API Wrapper
+ive started implemening a wrapper for the bitcoin JSON-RPC- spec so that i can watch deposits of a certain address. those addresses being the adress that the kegen algorthm generates. the way bridge will work is each time a deposit to ny of the addressesses get detected we can initiate the signing protoocol. when thats done we can publish this signed transaction/message (where the message is the hash of the btc trandaction itself).to the ledger. after that we just need a set of smart of smart contracts on the ethereum side to co-operareate by recon-structing the transaction and verifyfing that the signare hasnt been spent via a noce and also the recovery address value of the signature should equal the shards address. once this is done i can complete the whoke process. will keep updated
 
 
 ## Usage
