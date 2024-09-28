@@ -27,7 +27,7 @@ import Validator from "../p2p/validators/validator";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import { extractError } from "../utils/extractError";
 import { AbstractProcolManager } from "./abstractProtocolHnadler";
-import { app } from "./index";
+import { app } from "../index";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
 import { DirectMessageSignReturnType } from "./protocolMessageParser";

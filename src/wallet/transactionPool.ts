@@ -1,4 +1,4 @@
-import { app } from "../protocol";
+import { app } from "..";
 import { ValidatorsGroup } from "../p2p/validators/validators";
 import Transaction from "./transaction";
 

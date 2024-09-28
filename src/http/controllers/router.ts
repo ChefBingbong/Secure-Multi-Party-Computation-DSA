@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import config from "../../config/config";
 import { MESSAGE_TYPE } from "../../p2p/types";
-import { app } from "../../protocol";
+import { app } from "../..";
 import Validator from "../../p2p/validators/validator";
 import { ValidatorsGroup } from "../../p2p/validators/validators";
 import Transaction from "../../wallet/transaction";

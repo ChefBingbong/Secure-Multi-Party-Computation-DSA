@@ -6,8 +6,8 @@
     "format": "prettier --write .",
     "lint": "eslint './src/**/*.{js,json,ts}'",
     "build": "tsc",
-    "start": "tsc && node ./build/protocol/index.js",
-    "start:dev": "nodemon src/protocol/index.ts",
+    "start": "tsc && node ./build/index.js",
+    "start:dev": "nodemon src/index.ts",
     "test": "node --import tsx --test src/**/*.test.ts src/**/**/*.test.ts"
   },
   "devDependencies": {

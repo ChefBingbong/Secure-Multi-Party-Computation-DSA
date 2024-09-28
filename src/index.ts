@@ -1,6 +1,6 @@
-import config from "../config/config";
-import { redisClient } from "../db/redis";
-import App from "../http/app";
+import config from "./config/config";
+import { redisClient } from "./db/redis";
+import App from "./http/app";
 
 export let app: App;
 

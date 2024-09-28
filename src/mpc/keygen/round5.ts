@@ -1,4 +1,4 @@
-import { app } from "../../protocol";
+import { app } from "../..";
 import { zkSchIsResponseValid, zkSchVerifyResponse } from "../zk/zksch";
 import { AbstractKeygenRound } from "./abstractRound";
 import { KeygenBroadcastForRound5 } from "./keygenMessages/broadcasts";

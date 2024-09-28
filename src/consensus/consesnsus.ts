@@ -4,7 +4,7 @@ import { delay } from "../p2p/server";
 import { MESSAGE_TYPE } from "../p2p/types";
 import Validator from "../p2p/validators/validator";
 import { ValidatorsGroup } from "../p2p/validators/validators";
-import { app } from "../protocol";
+import { app } from "..";
 import { ServerMessage } from "../protocol/types";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import Transaction from "../wallet/transaction";

@@ -20,7 +20,7 @@ import { tryNTimes } from "../rpc/utils/helpers";
 import { ErrorWithCode, ProtocolError } from "../utils/errors";
 import { extractError } from "../utils/extractError";
 import { AbstractProcolManager } from "./abstractProtocolHnadler";
-import { app } from "./index";
+import { app } from "../index";
 import { Message as Msg } from "./message/message";
 import { MessageQueueArray, MessageQueueMap } from "./message/messageQueue";
 import { KeygenMessageData, Round, ServerDirectMessage, ServerMessage } from "./types";
